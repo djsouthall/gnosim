@@ -1,0 +1,34 @@
+=== OVERVIEW ===
+
+Greenland Neutrino Observatory Simulator (GNOSim)
+
+Keith Bechtol
+bechtol@kicp.uchicago.edu
+
+=== USAGE EXAMPLES ===
+
+=== CODE REPOSITORY ===
+
+=== DEPENDENCIES ===
+
+Python packages:
+numpy
+
+=== CONVENTIONS ===
+
+Naming:
+package_name
+module_name.py
+ClassName
+functionName
+variable_name
+
+Coordinates:
+x = east
+y = north
+z = elevation (negative values are below surface)
+theta = zenith angle
+phi = azimuth angle
+
+Units:
+SI
