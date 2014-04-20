@@ -87,7 +87,7 @@ def testFresnel():
 
 ############################################################
 
-def rayTrace(origin, phi_0, theta_0, t_max=10000., t_step=1.):
+def rayTrace(origin, phi_0, theta_0, t_max=40000., t_step=1.):
     """
     z_0 = initial elevation (m)
     t_max = max time (ns)
@@ -173,7 +173,7 @@ def rayTrace(origin, phi_0, theta_0, t_max=10000., t_step=1.):
 
 ############################################################
 
-def makeLibrary(z_0, theta_ray_array, save=True):
+def makeLibrary(z_0, theta_ray_array, save=True, library_dir='library'):
     x_0 = 0.
     y_0 = 0.
     phi_0 = 0.
@@ -210,7 +210,6 @@ def makeLibrary(z_0, theta_ray_array, save=True):
 
         if save:
             n_points = len(t)
-            library_dir = 'library'
             outfile = '%s/z0_%.2f_theta_%.2f_n_%i.h5'%(library_dir, z_0, theta_ray_array[ii], n_points)
             file = h5py.File(outfile, 'w')
             
@@ -359,17 +358,17 @@ class RefractionLibrary:
         flag_direct, flag_crossover, flag_reflect = self.query(r, z)
 
         if flag_direct:
-            dic_direct = getValue(self.direct, r, z)
+            dic_direct = self.getValue(self.direct, r, z)
         else:
             dic_direct = {}
 
         if flag_crossover:
-            dic_crossover = getValue(self.crossover, r, z)
+            dic_crossover = self.getValue(self.crossover, r, z)
         else:
             dic_crossover = {}
 
         if flag_reflect:
-            dic_reflect = getValue(self.reflect, r, z)
+            dic_reflect = self.getValue(self.reflect, r, z)
         else:
             dic_reflect = {}
 
@@ -637,6 +636,9 @@ class RefractionLibrary:
 
         pylab.legend(loc='upper right')
         
+        pylab.xlabel('Radius (m)')
+        pylab.ylabel('Elevation (m)')
+
     def makeEnvelope(self, r, z):
         index_0 = numpy.argmin(r)
         r_0 = r[index_0] 
@@ -953,14 +955,14 @@ class RefractionLibrary:
 ############################################################
 
 if __name__ == '__main__':
-    z_0 = -2.
+    z_0 = -2. # -2, -30, -100
     #theta_array = numpy.degrees(numpy.arccos(numpy.linspace(-1, 0, 20)))
     #theta_array = numpy.linspace(10., 170., 20)
     theta_array = numpy.linspace(0., 180., 60) # 30
     #theta_array = numpy.linspace(80., 100., 20)
     #theta_array = numpy.array([68.9473684211])
     #theta_array = numpy.array([30.])
-    makeLibrary(z_0, theta_array)
+    makeLibrary(z_0, theta_array, save=True, library_dir='library_-2_empirical')
 
 ############################################################
 # CODE SCRAPS

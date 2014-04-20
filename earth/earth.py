@@ -13,13 +13,17 @@ pylab.ion()
 
 ############################################################
 
-def interactionLength(density_input, energy_neutrino_array, plot=True):
+def interactionLength(density_input, energy_neutrino_array, plot=False):
     """
     Tool for quickly plotting interaction length as a function of neutrino energy for a fixed density medium.
 
     density_input = density (kg m^-3)
     energy_neutrino_array = energy of neutrino (GeV)
     """
+    
+    if numpy.isscalar(energy_neutrino_array):
+        energy_neutrino_array = numpy.array([energy_neutrino_array])
+
     #density = numpy.array(density_input) \
     #          * gnosim.utils.constants.cm_to_m**3 / gnosim.utils.constants.mass_proton # convert from kg m^-3 to nucleons cm^-3
     density = numpy.array(density_input) / gnosim.utils.constants.mass_proton
@@ -43,7 +47,10 @@ def interactionLength(density_input, energy_neutrino_array, plot=True):
         pylab.ylabel('Interaction Length (m)')
         pylab.legend(loc='upper right')
 
-    return interaction_length_array, interaction_length_anti_array
+    if len(energy_neutrino_array) == 1:
+        return interaction_length_array[0], interaction_length_anti_array[0] # m, m
+    else:
+        return interaction_length_array, interaction_length_anti_array # m, m
 
 ############################################################
 
@@ -156,7 +163,7 @@ if __name__ == "__main__":
         survival_array.append([])
         for theta in theta_array:
             survival_array[-1].append(probSurvival(energy_neutrino, theta))
-        pylab.plot(cos_theta_array, survival_array[-1])
+        pylab.plot(cos_theta_array, survival_array[-1], c='blue')
     pylab.title('Neutrinos')
     pylab.xlabel('Cos(Zenith Angle)')
     pylab.ylabel('Survival Probability')
@@ -168,7 +175,7 @@ if __name__ == "__main__":
         survival_anti_array.append([])
         for theta in theta_array:
             survival_anti_array[-1].append(probSurvival(energy_neutrino, theta, anti=True))
-        pylab.plot(cos_theta_array, survival_anti_array[-1])
+        pylab.plot(cos_theta_array, survival_anti_array[-1], c='blue')
     pylab.title('Anti-Neutrinos')
     pylab.xlabel('Cos(Zenith Angle)')
     pylab.ylabel('Survival Probability')
