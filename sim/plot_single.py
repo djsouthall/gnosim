@@ -21,8 +21,10 @@ title = r'E$_{\nu}$ = %.2e GeV, Depth = %.1f, %i Events'%(float(os.path.basename
 cut_seen = reader['p_detect'][...] == 1.
 cut_unseen = numpy.logical_not(cut_seen)
 
-r = numpy.sqrt(reader['x_0'][...]**2 + reader['y_0'][...]**2)
+print numpy.sum(cut_seen), len(cut_seen)
 
+r = numpy.sqrt(reader['x_0'][...]**2 + reader['y_0'][...]**2)
+"""
 pylab.figure()
 pylab.scatter(r[cut_unseen], reader['z_0'][cut_unseen], c='gray', edgecolors='none')
 pylab.scatter(r[cut_seen], reader['z_0'][cut_seen], c=numpy.log10(reader['electric_field'][cut_seen]), edgecolors='none')
@@ -34,10 +36,10 @@ pylab.title(title)
 
 pylab.figure()
 pylab.yscale('log')
-pylab.scatter(reader['theta_0'][cut_seen], reader['electric_field'][cut_seen], c=reader['p_earth'][cut_seen], edgecolors='none')
+pylab.scatter(numpy.cos(numpy.radians(reader['theta_0'][cut_seen])), reader['electric_field'][cut_seen], c=reader['p_earth'][cut_seen], edgecolors='none')
 colorbar = pylab.colorbar()
 colorbar.set_label('Probability Earth')
-pylab.xlabel('Theta (deg)')
+pylab.xlabel('Cos(Theta)')
 pylab.ylabel(r'Electric Field (V m$^{-1}$)')
 pylab.title(title)
 
@@ -77,7 +79,7 @@ pylab.ylabel('CDF')
 x_min, x_max = pylab.xlim()
 pylab.xlim([x_max, x_min])
 pylab.title(title)
-
+"""
 # Acceptance
 
 electric_field_threshold = 1.e-4

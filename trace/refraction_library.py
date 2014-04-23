@@ -87,7 +87,7 @@ def testFresnel():
 
 ############################################################
 
-def rayTrace(origin, phi_0, theta_0, t_max=40000., t_step=1.):
+def rayTrace(origin, phi_0, theta_0, t_max=40000., t_step=1.): # t_max=40000, t_max=1000 (testing)
     """
     z_0 = initial elevation (m)
     t_max = max time (ns)
@@ -316,7 +316,8 @@ class RefractionLibrary:
         self.hull_reflect_r, self.hull_reflect_z = self.makeHull(self.reflect)
         
         self.envelope_direct_low, self.envelope_direct_high = self.makeEnvelope(self.hull_direct_r, self.hull_direct_z)
-        self.envelope_crossover_low, self.envelope_crossover_high = self.makeEnvelope(self.hull_crossover_r, self.hull_crossover_z)
+        self.envelope_crossover_low, self.envelope_crossover_high = self.makeEnvelope(self.hull_crossover_r, self.hull_crossover_z,
+                                                                                      self.crossover['r'], self.crossover['z'], self.crossover['theta_0'])
         self.envelope_reflect_low, self.envelope_reflect_high = self.makeEnvelope(self.hull_reflect_r, self.hull_reflect_z)
 
         # Interpolation functions
@@ -639,7 +640,7 @@ class RefractionLibrary:
         pylab.xlabel('Radius (m)')
         pylab.ylabel('Elevation (m)')
 
-    def makeEnvelope(self, r, z):
+    def makeEnvelope(self, r, z, r_full=None, z_full=None, theta_0_full=None):
         index_0 = numpy.argmin(r)
         r_0 = r[index_0] 
         z_0 = z[index_0]
@@ -652,20 +653,49 @@ class RefractionLibrary:
         cut_low = (z <= (z_0 + (slope * (r - r_0))))
         cut_high = (z >= (z_0 + (slope * (r - r_0))))
         
+        # Make sure to get the endpoints
+        cut_low[index_0] = True
+        cut_low[index_1] = True
+        cut_high[index_0] = True
+        cut_high[index_1] = True
+
         r_low = r[cut_low]
         z_low = z[cut_low]
         index = numpy.argsort(r_low)
         r_low = r_low[index]
         z_low = z_low[index]
-        f_low = scipy.interpolate.interp1d(r_low, z_low, bounds_error=False, fill_value=1.e10)
+        f_low = scipy.interpolate.interp1d(r_low, z_low, bounds_error=False, fill_value=numpy.max(z_low))
 
         r_high = r[cut_high]
         z_high = z[cut_high]
         index = numpy.argsort(r_high)
         r_high = r_high[index]
         z_high = z_high[index]
-        f_high = scipy.interpolate.interp1d(r_high, z_high, bounds_error=False, fill_value=-1.e10)
+        f_high = scipy.interpolate.interp1d(r_high, z_high, bounds_error=False, fill_value=numpy.min(z_high))
         
+        if r_full is not None and z_full is not None and theta_0_full is not None:
+            r_interp = numpy.linspace(r_0, r_1, 10000)
+            
+            theta_0_unique = numpy.unique(theta_0_full)
+            f_array = []
+            z_array = []
+            for ii in range(0, len(theta_0_unique)):
+                cut = theta_0_full == theta_0_unique[ii]
+                f_array.append(scipy.interpolate.interp1d(r_full[cut], z_full[cut], bounds_error=False, fill_value=numpy.max(z_full))) 
+                z_array.append(f_array[-1](r_interp))
+
+            z_interp = numpy.min(numpy.array(z_array), axis=0)
+            f_theta_0 = scipy.interpolate.interp1d(r_interp, z_interp)
+            
+            r_minimum = r_full[numpy.argmin(z_full)]
+            z_final = numpy.concatenate([numpy.max([f_low(r_interp),
+                                                    f_theta_0(r_interp)], axis=0)[r_interp < r_minimum],
+                                         numpy.min([f_low(r_interp),
+                                                    f_theta_0(r_interp)], axis=0)[r_interp > r_minimum]])
+
+            f_low = scipy.interpolate.interp1d(r_interp, z_final, bounds_error=False, fill_value=numpy.max(z_low))
+
+
         return f_low, f_high
 
     def makeEnvelope5(self, dic):
@@ -910,20 +940,20 @@ class RefractionLibrary:
         if mode == 'direct':
             title = 'Direct Rays'
             dic = self.direct
-            #envelope_low = self.envelope_direct_low
-            #envelope_high = self.envelope_direct_high
+            envelope_low = self.envelope_direct_low
+            envelope_high = self.envelope_direct_high
             hull_r, hull_z = self.hull_direct_r, self.hull_direct_z
         elif mode == 'crossover':
             title = 'Crossover Rays'
             dic = self.crossover
-            #envelope_low = self.envelope_crossover_low
-            #envelope_high = self.envelope_crossover_high
+            envelope_low = self.envelope_crossover_low
+            envelope_high = self.envelope_crossover_high
             hull_r, hull_z = self.hull_crossover_r, self.hull_crossover_z
         elif mode == 'reflect':
             title = 'Reflected Rays'
             dic = self.reflect
-            #envelope_low = self.envelope_reflect_low
-            #envelope_high = self.envelope_reflect_high
+            envelope_low = self.envelope_reflect_low
+            envelope_high = self.envelope_reflect_high
             hull_r, hull_z = self.hull_reflect_r, self.hull_reflect_z
         else:
             print 'WARNING!!'
@@ -937,11 +967,11 @@ class RefractionLibrary:
         colorbar.set_label(colorbar_dict[field])
 
         r_interp = numpy.arange(numpy.min(dic['r']), numpy.max(dic['r']), 0.1)
-        #pylab.plot(r_interp, envelope_low(r_interp), color='black', linestyle='--')
-        #pylab.plot(r_interp, envelope_high(r_interp), color='black', linestyle='--')
+        pylab.plot(r_interp, envelope_low(r_interp), color='black', linestyle='--')
+        pylab.plot(r_interp, envelope_high(r_interp), color='black', linestyle='--')
         
         #pylab.plot(hull_r, hull_z, )
-        pylab.gca().add_patch(pylab.Polygon(zip(hull_r, hull_z), closed=True, fill=False, linestyle='dashed', color='black'))
+        #pylab.gca().add_patch(pylab.Polygon(zip(hull_r, hull_z), closed=True, fill=False, linestyle='dashed', color='black'))
 
         #pylab.scatter(self.r_intersect, self.z_intersect, c='red')
 
@@ -955,14 +985,14 @@ class RefractionLibrary:
 ############################################################
 
 if __name__ == '__main__':
-    z_0 = -2. # -2, -30, -100
+    z_0 = -100. # -2, -30, -100
     #theta_array = numpy.degrees(numpy.arccos(numpy.linspace(-1, 0, 20)))
     #theta_array = numpy.linspace(10., 170., 20)
     theta_array = numpy.linspace(0., 180., 60) # 30
     #theta_array = numpy.linspace(80., 100., 20)
     #theta_array = numpy.array([68.9473684211])
     #theta_array = numpy.array([30.])
-    makeLibrary(z_0, theta_array, save=True, library_dir='library_-2_empirical')
+    makeLibrary(z_0, theta_array, save=True, library_dir='library_-100_empirical')
 
 ############################################################
 # CODE SCRAPS

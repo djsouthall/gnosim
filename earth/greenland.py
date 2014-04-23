@@ -93,7 +93,7 @@ f_density = scipy.interpolate.interp1d(numpy.concatenate([elevation_deep[::-1], 
 
 ############################################################
 
-def density(z, mode='parametric'):
+def density(z, mode='empirical'):
     """
     z = elevation (m)
     
@@ -120,7 +120,7 @@ def density(z, mode='parametric'):
 
 ############################################################
 
-def indexOfRefraction(z, mode='parametric'):
+def indexOfRefraction(z, mode='empirical'):
     """
     z = elevation (m)
 
@@ -134,10 +134,13 @@ def indexOfRefraction(z, mode='parametric'):
         n_0 = 1.29 # Index of refraction at surface
         n_air = 1.000293
         a = 10 # m
-        return (z <= 0.) * (n_0 - (n_infinity * z / a)) / (1. - (z / a)) + (z > 0.) * n_air
+        return (z <= 0.) * (n_0 - (n_infinity * z / a)) / (1. - (z / a)) \
+            + (z > 0.) * n_air
     elif mode == 'empirical':
+        n_air = 1.000293
         k = 0.86 * 1.e-3 # kg^-1 m^3                                                                                                                        
-        return 1. + (k * f_density(z) * gnosim.utils.constants.mass_proton)
+        return (z <= 0.) * (1. + (k * f_density(z) * gnosim.utils.constants.mass_proton)) \
+            + (z > 0.) * n_air 
     else:
         print 'WARNING'
         return -999
@@ -167,20 +170,24 @@ if __name__ == "__main__":
     z = numpy.linspace(-3000., 0., 1000) # Array of elevations (m)
 
     pylab.figure()
-    pylab.plot(z, density(z) * gnosim.utils.constants.mass_proton) # Convert from nucleons m^-3 to kg m^-3
+    pylab.plot(z, density(z, mode='parametric') * gnosim.utils.constants.mass_proton, label='Parametric') # Convert from nucleons m^-3 to kg m^-3
+    pylab.plot(z, density(z, mode='empirical') * gnosim.utils.constants.mass_proton, label='Empirical') # Convert from nucleons m^-3 to kg m^-3
     pylab.xlabel('Elevation (m)')
     pylab.ylabel(r'Density (kg m$^{-3}$)')
-    pylab.scatter(elevation_firn[1:-1], density_firn[1:-1] * gnosim.utils.constants.mass_proton, c='red')
-    pylab.scatter(elevation_deep[1:-1], density_deep[1:-1] * gnosim.utils.constants.mass_proton, c='black')
-    pylab.plot(z, f_density(z) * gnosim.utils.constants.mass_proton, c='green')
+    pylab.legend(loc='lower left')
+    #pylab.scatter(elevation_firn[1:-1], density_firn[1:-1] * gnosim.utils.constants.mass_proton, c='red')
+    #pylab.scatter(elevation_deep[1:-1], density_deep[1:-1] * gnosim.utils.constants.mass_proton, c='black')
+    pylab.xlim([-300., 0.])
 
     pylab.figure()
-    pylab.plot(z, indexOfRefraction(z))
+    pylab.plot(z, indexOfRefraction(z, mode='parametric'), label='Parametric')
+    pylab.plot(z, indexOfRefraction(z, mode='empirical'), label='Empirical')
     pylab.xlabel('Elevation (m)')
     pylab.ylabel('Index of Refraction')
-
-    k = 0.86 * 1.e-3 # kg^-1 m^3
-    pylab.plot(z, 1. + (k * f_density(z) * gnosim.utils.constants.mass_proton), c='green')
+    pylab.legend(loc='lower left')
+    #k = 0.86 * 1.e-3 # kg^-1 m^3
+    #pylab.plot(z, 1. + (k * f_density(z) * gnosim.utils.constants.mass_proton), c='green')
+    pylab.xlim([-300., 0.])
 
     """
     pylab.figure()
