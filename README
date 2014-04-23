@@ -7,11 +7,20 @@ bechtol@kicp.uchicago.edu
 
 === USAGE EXAMPLES ===
 
+Fast-track to running simulations. Follow these steps:
+
 1. Precompute ray-tracing libraries
    gnosim/trace/refraction_library.py
 
-2. Detector configuration
+   This will create a folder containing multiple traces through the ice corresponding
+   to different elevation angles at the antenna. The RefractionLibrary class manages
+   the output trace files. Need to regenerate trace libraries for different antenna
+   elevations, index of refraction profiles, attenuation lengths, etc.
+
+2. Set detector configuration
    gnosim/sim/config_simple_-2.py (example)
+
+   Currently very simplistic, single station with single antenna.
 
 3. Run simulations
    a. One scenario at a time:
@@ -19,6 +28,8 @@ bechtol@kicp.uchicago.edu
 
    b. Multiple scenarios simultaneously on compute farm:
       gnosim/sim/farm.py
+
+      Currently only syntax appropriate to Midway cluster at UChicago.
 
 === CODE REPOSITORY ===
 
@@ -42,15 +53,16 @@ functionName
 variable_name
 
 Coordinates:
-x = east
+x = east (currently arbitrary)
 y = north
 z = elevation (negative values are below surface)
 theta = zenith angle
 phi = azimuth angle
 
 Units:
-SI
+SI units are used throughout for all electricity and magnetism calculations.
 distance (m)
 time (ns)
 frequency (GHz)
-
+mass (kg)
+See gnosim/utils/constants.py for unit conversions.
