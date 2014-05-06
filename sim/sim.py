@@ -296,10 +296,12 @@ if __name__ == "__main__":
     config_file = sys.argv[1]
     energy_neutrino = float(sys.argv[2])
     n_events = int(sys.argv[3])
+    index = int(sys.argv[4])
 
-    outfile = 'results_empirical/%s_%.2e_GeV_%i_events.h5'%(config_file.replace('.py', ''),
-                                                            energy_neutrino,
-                                                            n_events)
+    outfile = 'results_empirical_trials/%s_%.2e_GeV_%i_events_%i.h5'%(config_file.replace('.py', ''),
+                                                                      energy_neutrino,
+                                                                      n_events,
+                                                                      index)
 
     my_sim = Sim(config_file)
     my_sim.throw(energy_neutrino, n_events=n_events, outfile=outfile)

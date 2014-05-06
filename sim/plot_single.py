@@ -20,6 +20,8 @@ title = r'E$_{\nu}$ = %.2e GeV, Depth = %.1f, %i Events'%(float(os.path.basename
 
 cut_seen = reader['p_detect'][...] == 1.
 cut_unseen = numpy.logical_not(cut_seen)
+electric_field_threshold = 1.e-4
+cut_detected = numpy.logical_and(reader['electric_field'][...] > electric_field_threshold, reader['p_earth'][...] >= 0.9)
 
 print numpy.sum(cut_seen), len(cut_seen)
 
@@ -80,6 +82,33 @@ x_min, x_max = pylab.xlim()
 pylab.xlim([x_max, x_min])
 pylab.title(title)
 """
+# Theta ray distribution
+"""
+pylab.figure()
+pylab.hist(numpy.cos(numpy.radians(reader['theta_ray'][cut_seen])), weights=reader['p_earth'][cut_seen], bins=numpy.linspace(-1, 1, 41), normed=True)
+pylab.xlabel('Cos(Theta Ray)')
+pylab.ylabel('PDF')
+pylab.title(title)
+pylab.xlim([-1., 1.])
+
+# Theta ray distribution
+
+pylab.figure()
+pylab.hist(numpy.cos(numpy.radians(reader['theta_0'][cut_seen])), weights=reader['p_earth'][cut_seen], bins=numpy.linspace(-1, 1, 41), normed=True)
+pylab.xlabel('Cos(Theta)')
+pylab.ylabel('PDF')
+pylab.title(title)
+pylab.xlim([-1., 1.])
+"""
+pylab.figure()
+pylab.scatter(r[cut_detected], reader['z_0'][cut_detected], c=reader['theta_0'][cut_detected], edgecolors='none', vmin=0., vmax=90.)
+colorbar = pylab.colorbar()
+colorbar.set_label(r'Theta (deg)')
+pylab.xlabel('Radius (m)')
+pylab.ylabel('Elevation (m)')
+pylab.title(title)
+pylab.xlim([-1000., 5000.])
+
 # Acceptance
 
 electric_field_threshold = 1.e-4
