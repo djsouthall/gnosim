@@ -12,6 +12,8 @@ pylab.ion()
 
 ############################################################
 
+ice_model_default = 'test'
+
 # From
 # Density (Mg m^-3)
 # Elevation, negative is down (m)
@@ -56,7 +58,8 @@ density_deep = profile_deep.transpose()[0] * 1.e3 / gnosim.utils.constants.mass_
 # Depth, positive is down (m)
 # Density (kg m^-3)
 profile_firn = numpy.array([[-1.e10, 0.], # Filler
-                            [0, 256.9169960474308],
+                            [-1.e-10, 0.], # Filler
+                            [0., 256.9169960474308],
                             [0.46728971962616633, 270.75098814229256],
                             [0.778816199376947, 292.49011857707507],
                             [1.5576323987538898, 322.1343873517786],
@@ -93,7 +96,7 @@ f_density = scipy.interpolate.interp1d(numpy.concatenate([elevation_deep[::-1], 
 
 ############################################################
 
-def density(z, mode='empirical'):
+def density(z, ice_model=ice_model_default):
     """
     z = elevation (m)
     
@@ -102,8 +105,8 @@ def density(z, mode='empirical'):
     
     Source: http://www.iceandclimate.nbi.ku.dk/research/flowofice/densification/
     """
-    if mode == 'parametric':
-        density_surface = 50. # km m^-3
+    if ice_model == 'parametric':
+        density_surface = 50. # kg m^-3
         density_deep = 917. # kg m^-3
         scale_depth = 30. # m
     
@@ -112,15 +115,25 @@ def density(z, mode='empirical'):
                   * (density_deep - (density_deep - density_surface) * numpy.exp(z / scale_depth)) # kg m^-3
     
         return density / gnosim.utils.constants.mass_proton # convert from kg m^-3 to nucleons m^-3
-    elif mode == 'empirical':
+    elif ice_model == 'empirical':
         return f_density(z) # nucleons m^-3
+    elif ice_model == 'ross':
+        return (z >= -500.) * (z <= 0.) * f_density(z) # nucleons m^-3
+    elif ice_model == 'test':
+        density_surface = 257. # kg m^-3
+        density_deep = 920. # kg m^-3
+        scale_depth = 40. # m
+        # Require that neutrino interacts in upper 3 km of ice
+        density = (z >= -500.) * (z <= 0.) \
+                  * (density_deep - (density_deep - density_surface) * numpy.exp(z / scale_depth)) # kg m^-3
+        return density / gnosim.utils.constants.mass_proton # convert from kg m^-3 to nucleons m^-3
     else:
         print 'WARNING'
         return -999
 
 ############################################################
 
-def indexOfRefraction(z, mode='empirical'):
+def indexOfRefraction(z, ice_model=ice_model_default):
     """
     z = elevation (m)
 
@@ -129,25 +142,39 @@ def indexOfRefraction(z, mode='empirical'):
 
     Source: Pawlowicz 1972
     """
-    if mode == 'parametric':
+    if ice_model == 'parametric':
         n_infinity = 1.831 # Index of refraction deep in the ice
         n_0 = 1.29 # Index of refraction at surface
         n_air = 1.000293
         a = 10 # m
         return (z <= 0.) * (n_0 - (n_infinity * z / a)) / (1. - (z / a)) \
             + (z > 0.) * n_air
-    elif mode == 'empirical':
+    elif ice_model == 'empirical':
         n_air = 1.000293
         k = 0.86 * 1.e-3 # kg^-1 m^3                                                                                                                        
         return (z <= 0.) * (1. + (k * f_density(z) * gnosim.utils.constants.mass_proton)) \
-            + (z > 0.) * n_air 
+            + (z > 0.) * n_air
+    elif ice_model == 'ross':
+        n_air = 1.000293
+        n_water = 1.33
+        k = 0.86 * 1.e-3 # kg^-1 m^3                                                                                                                        
+        return (z < -500.) * n_water \
+            + (z >= -500.) * (z <= 0.) * (1. + (k * f_density(z) * gnosim.utils.constants.mass_proton)) \
+            + (z > 0.) * n_air
+    elif ice_model == 'test':
+        n_air = 1.000293
+        n_water = 1.33
+        k = 0.86 * 1.e-3 # kg^-1 m^3                                                                                                                        
+        return (z < -500.) * n_water \
+            + (z >= -500.) * (z <= 0.) * (1. + (k * density(z, ice_model=ice_model) * gnosim.utils.constants.mass_proton)) \
+            + (z > 0.) * n_air
     else:
         print 'WARNING'
         return -999
 
 ############################################################
 
-def attenuationLength(z, frequency):
+def attenuationLength(z, frequency, ice_model=ice_model_default):
     """
     z = elevation (m)
     frequency = radio frequency (GHz)
@@ -156,46 +183,61 @@ def attenuationLength(z, frequency):
     attenuation length, i.e., distance at which electric field is reduced by e (m)
 
     Source: ARA insturment paper Allison et al. 2011, arXiv:1105.2854
+
+    Question: What is radio attenuation lenth in air??
     """
     # Treat as constant with respect to depth and frequency until add real data points
     frequency_0 = 0.3 # GHz
-    if numpy.isscalar(z):
-        return (z <= 0.) * 820. + (z > 0.) * 1.e20 # m
+
+    if ice_model in ['greenland', 'empirical']:
+        attenuation_length = 820. # m
+    elif ice_model in ['ross', 'test']:
+        attenuation_length = 400. # m
     else:
-        return (z <= 0.) * 820. * numpy.ones(len(z)) + (z > 0.) * 1.e20 * numpy.ones(len(z)) # m
+        print 'WARNING'
+        attenuation_length = 1000. # m
+
+    if numpy.isscalar(z):
+        return (z <= 0.) * attenuation_length + (z > 0.) * 1.e20 # m
+    else:
+        return (z <= 0.) * attenuation_length * numpy.ones(len(z)) + (z > 0.) * 1.e20 * numpy.ones(len(z)) # m
 
 ############################################################
 
 if __name__ == "__main__":
-    z = numpy.linspace(-3000., 0., 1000) # Array of elevations (m)
+    z = numpy.linspace(-3000., 100., 2000) # Array of elevations (m)
 
     pylab.figure()
-    pylab.plot(z, density(z, mode='parametric') * gnosim.utils.constants.mass_proton, label='Parametric') # Convert from nucleons m^-3 to kg m^-3
-    pylab.plot(z, density(z, mode='empirical') * gnosim.utils.constants.mass_proton, label='Empirical') # Convert from nucleons m^-3 to kg m^-3
+    pylab.plot(z, density(z, ice_model='parametric') * gnosim.utils.constants.mass_proton, label='Parametric') # Convert from nucleons m^-3 to kg m^-3
+    pylab.plot(z, density(z, ice_model='empirical') * gnosim.utils.constants.mass_proton, label='Empirical') # Convert from nucleons m^-3 to kg m^-3
+    pylab.plot(z, density(z, ice_model='ross') * gnosim.utils.constants.mass_proton, label='Ross') # Convert from nucleons m^-3 to kg m^-3
+    pylab.plot(z, density(z, ice_model='test') * gnosim.utils.constants.mass_proton, label='Test') # Convert from nucleons m^-3 to kg m^-3
     pylab.xlabel('Elevation (m)')
     pylab.ylabel(r'Density (kg m$^{-3}$)')
-    pylab.legend(loc='lower left')
+    pylab.legend(loc='lower center')
     #pylab.scatter(elevation_firn[1:-1], density_firn[1:-1] * gnosim.utils.constants.mass_proton, c='red')
     #pylab.scatter(elevation_deep[1:-1], density_deep[1:-1] * gnosim.utils.constants.mass_proton, c='black')
-    pylab.xlim([-300., 0.])
+    pylab.xlim([-600., 100.])
 
     pylab.figure()
-    pylab.plot(z, indexOfRefraction(z, mode='parametric'), label='Parametric')
-    pylab.plot(z, indexOfRefraction(z, mode='empirical'), label='Empirical')
+    pylab.plot(z, indexOfRefraction(z, ice_model='parametric'), label='Parametric')
+    pylab.plot(z, indexOfRefraction(z, ice_model='empirical'), label='Empirical')
+    pylab.plot(z, indexOfRefraction(z, ice_model='ross'), label='Ross')
+    pylab.plot(z, indexOfRefraction(z, ice_model='test'), label='Test')
     pylab.xlabel('Elevation (m)')
     pylab.ylabel('Index of Refraction')
-    pylab.legend(loc='lower left')
+    pylab.legend(loc='lower center')
     #k = 0.86 * 1.e-3 # kg^-1 m^3
     #pylab.plot(z, 1. + (k * f_density(z) * gnosim.utils.constants.mass_proton), c='green')
-    pylab.xlim([-300., 0.])
-
+    pylab.xlim([-600., 100.])
     """
+    z = numpy.linspace(-3000., 0., 2000) # Array of elevations (m)
     pylab.figure()
     frequency = 0.3 # GHz
-    pylab.plot(z, attenuationLength(z, frequency=frequency))
+    pylab.plot(z, attenuationLength(z, frequency=frequency, ice_model='ross'))
     pylab.title('Frequency = %i MHz'%(frequency * gnosim.utils.constants.MHz_to_GHz))
     pylab.xlabel('Elevation (m)')
     pylab.ylabel('Electric Field Attenuation Length (m)')
+    pylab.xlim([-3000., 0.])
     """
-
 ############################################################

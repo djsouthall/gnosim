@@ -81,9 +81,9 @@ pylab.ylabel('CDF')
 x_min, x_max = pylab.xlim()
 pylab.xlim([x_max, x_min])
 pylab.title(title)
-"""
+
 # Theta ray distribution
-"""
+
 pylab.figure()
 pylab.hist(numpy.cos(numpy.radians(reader['theta_ray'][cut_seen])), weights=reader['p_earth'][cut_seen], bins=numpy.linspace(-1, 1, 41), normed=True)
 pylab.xlabel('Cos(Theta Ray)')
@@ -99,7 +99,7 @@ pylab.xlabel('Cos(Theta)')
 pylab.ylabel('PDF')
 pylab.title(title)
 pylab.xlim([-1., 1.])
-"""
+
 pylab.figure()
 pylab.scatter(r[cut_detected], reader['z_0'][cut_detected], c=reader['theta_0'][cut_detected], edgecolors='none', vmin=0., vmax=90.)
 colorbar = pylab.colorbar()
@@ -108,6 +108,36 @@ pylab.xlabel('Radius (m)')
 pylab.ylabel('Elevation (m)')
 pylab.title(title)
 pylab.xlim([-1000., 5000.])
+"""
+# Observation Angle
+
+pylab.figure()
+pylab.hist(reader['observation_angle'][cut_seen], bins=numpy.linspace(0., 180., 41), alpha=0.5, normed=True, color='red', label='Visible')
+pylab.hist(reader['observation_angle'][cut_detected], bins=numpy.linspace(0., 180., 41), alpha=0.5, normed=True, color='blue', label='Detected')
+pylab.xlabel('Observation Angle (deg)')
+pylab.ylabel('PDF')
+pylab.title(title)
+pylab.legend(loc='upper right')
+"""
+pylab.figure()
+pylab.yscale('log')
+pylab.scatter(reader['observation_angle'][cut_seen], reader['electric_field'][cut_seen], c=reader['d'][cut_seen], edgecolors='none')
+colorbar = pylab.colorbar()
+colorbar.set_label(r'Distance (m)')
+pylab.xlabel('Observation Angle (deg)')
+pylab.ylabel(r'Electric Field (V m$^{-1}$)')
+pylab.title(title)
+pylab.xlim([0., 180.])
+"""
+# Solutions
+
+pylab.figure()
+pylab.hist(reader['solution'][cut_seen], bins=numpy.arange(6 + 1), alpha=0.5, color='red', normed=True, label='Visible')
+pylab.hist(reader['solution'][cut_detected], bins=numpy.arange(6 + 1), alpha=0.5, color='blue', normed=True, label='Detected')
+pylab.xlabel('Solution')
+pylab.ylabel('PDF')
+pylab.title(title)
+pylab.legend(loc='upper right')
 
 # Acceptance
 

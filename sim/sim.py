@@ -58,15 +58,11 @@ class Sim:
         p_detect = 0.
 
         # Placeholders
-        flag_direct, flag_crossover, flag_reflect, dic_direct, dic_crossover, dic_reflect = 0, 0, 0, {}, {}, {}
-        #electric_field_direct = 0.
-        #electric_field_crossover = 0.
-        #electric_field_reflect = 0.
-
         inelasticity = -999.
         electric_field_max = 0.
         dic_max = {}
-        path_max = -999.
+        observation_angle_max = -999.
+        solution_max = -999.
         index_station_max = -999.
         index_antenna_max = -999.
 
@@ -78,10 +74,9 @@ class Sim:
                 y_antenna = self.stations[index_station].antennas[index_antenna].y
                 z_antenna = self.stations[index_station].antennas[index_antenna].z
                 r = numpy.sqrt((x_0 - x_antenna)**2 + (y_0 - y_antenna)**2)
-                flag_direct, flag_crossover, flag_reflect, dic_direct, dic_crossover, dic_reflect \
-                    = self.stations[index_station].antennas[index_antenna].lib.event(r, z_0)
-
-                if numpy.any([flag_direct, flag_crossover, flag_direct]):
+                flag_array, dic_array = self.stations[index_station].antennas[index_antenna].lib.event(r, z_0)                                              
+                
+                if numpy.any(flag_array):
                     p_detect = 1.
                     inelasticity = gnosim.interaction.inelasticity.inelasticity(energy_neutrino, mode='cc') # GENERALIZE THIS LATER
                     frequency = numpy.linspace(self.stations[index_station].antennas[index_antenna].frequency_low,
@@ -91,61 +86,28 @@ class Sim:
                     vector_neutrino = gnosim.utils.quat.angToVec(phi_0, theta_0) # Direction neutrino came from
                     phi_ray = numpy.degrees(numpy.arctan2(y_0 - y_antenna, x_0 - x_antenna)) % 360. # deg
                     
-                    if flag_direct:
-                        vector_ray = gnosim.utils.quat.angToVec(phi_ray, dic_direct['theta']) # Direction of outgoing ray from antenna to interaction vertex
-                        observation_angle = gnosim.utils.quat.angTwoVec(vector_neutrino, vector_ray)
-                        d = dic_direct['d'] # m
-                        # COME BACK TO GENERALIZE THIS
-                        electric_field \
-                            = gnosim.interaction.askaryan.electricField(frequency, d, observation_angle, 
-                                                                        energy_neutrino, inelasticity, 'cc', index_of_refraction) # V m^-1 GHz^-1, dimensionless
-                        electric_field *= dic_direct['a_v'] # COME BACK TO GENERALIZE THIS
-                        electric_field = self.stations[index_station].antennas[index_antenna].electricField(frequency, electric_field) # V m^-1
-                        #electric_field_direct = electric_field
-                        if electric_field > electric_field_max:
-                            electric_field_max = electric_field
-                            dic_max = dic_direct
-                            path_max = 0
-                            index_station_max = index_station
-                            index_antenna_max = index_antenna
-
-                    if flag_crossover:
-                        vector_ray = gnosim.utils.quat.angToVec(phi_ray, dic_crossover['theta']) # Direction of outgoing ray from antenna to interaction vertex
-                        observation_angle = gnosim.utils.quat.angTwoVec(vector_neutrino, vector_ray)
-                        d = dic_crossover['d'] # m
-                        # COME BACK TO GENERALIZE THIS
-                        electric_field \
-                            = gnosim.interaction.askaryan.electricField(frequency, d, observation_angle, 
-                                                                        energy_neutrino, inelasticity, 'cc', index_of_refraction) # V m^-1 GHz^-1, dimensionless
-                        electric_field *= dic_crossover['a_v'] # COME BACK TO GENERALIZE THIS
-                        electric_field = self.stations[index_station].antennas[index_antenna].electricField(frequency, electric_field) # V m^-1
-                        #electric_field_crossover = electric_field
-                        if electric_field > electric_field_max:
-                            electric_field_max = electric_field
-                            dic_max = dic_crossover
-                            path_max = 1
-                            index_station_max = index_station
-                            index_antenna_max = index_antenna
-
-                    if flag_reflect:
-                        vector_ray = gnosim.utils.quat.angToVec(phi_ray, dic_reflect['theta']) # Direction of outgoing ray from antenna to interaction vertex
-                        observation_angle = gnosim.utils.quat.angTwoVec(vector_neutrino, vector_ray)
-                        d = dic_reflect['d'] # m
-                        # COME BACK TO GENERALIZE THIS
-                        electric_field \
-                            = gnosim.interaction.askaryan.electricField(frequency, d, observation_angle, 
-                                                                        energy_neutrino, inelasticity, 'cc', index_of_refraction) # V m^-1 GHz^-1, dimensionless
-                        electric_field *= dic_reflect['a_v'] # COME BACK TO GENERALIZE THIS
-                        electric_field = self.stations[index_station].antennas[index_antenna].electricField(frequency, electric_field) # V m^-1
-                        #electric_field_reflect = electric_field
-                        if electric_field > electric_field_max:
-                            electric_field_max = electric_field
-                            dic_max = dic_reflect
-                            path_max = 2
-                            index_station_max = index_station
-                            index_antenna_max = index_antenna
-
-        return p_interact, p_earth, p_detect, inelasticity, electric_field_max, dic_max, path_max, index_station_max, index_antenna_max
+                    for ii, solution in enumerate(self.stations[index_station].antennas[index_antenna].lib.solutions):
+                        if flag_array[ii]:
+                            # Direction of outgoing ray from antenna to interaction vertex
+                            vector_ray = gnosim.utils.quat.angToVec(phi_ray, dic_array[ii]['theta'])
+                            observation_angle = gnosim.utils.quat.angTwoVec(vector_neutrino, vector_ray) # deg
+                            d = dic_array[ii]['d'] # m
+                            electric_field \
+                                = gnosim.interaction.askaryan.electricField(frequency, d, observation_angle,
+                                                                            energy_neutrino, inelasticity, 
+                                                                            'cc', index_of_refraction) # V m^-1 GHz^-1, dimensionless
+                            electric_field *= dic_array[ii]['a_v'] # COME BACK TO GENERALIZE THIS
+                            electric_field = self.stations[index_station].antennas[index_antenna].electricField(frequency, electric_field) # V m^-1
+                            
+                            if electric_field > electric_field_max:
+                                electric_field_max = electric_field
+                                dic_max = dic_array[ii]
+                                observation_angle_max = observation_angle
+                                solution_max = ii
+                                index_station_max = index_station
+                                index_antenna_max = index_antenna
+                                
+        return p_interact, p_earth, p_detect, inelasticity, electric_field_max, dic_max, observation_angle_max, solution_max, index_station_max, index_antenna_max
         #return p_interact, p_earth, p_detect, electric_field_direct, electric_field_crossover, electric_field_reflect,  dic_direct, dic_crossover, dic_reflect
 
     def throw(self, energy_neutrino=1.e9, 
@@ -183,7 +145,8 @@ class Sim:
         p_detect = numpy.zeros(n_events)
         inelasticity = numpy.zeros(n_events)
         electric_field_max = numpy.zeros(n_events)
-        path_max = numpy.zeros(n_events)
+        observation_angle_max = numpy.zeros(n_events)
+        solution_max = numpy.zeros(n_events)
         index_station_max = numpy.zeros(n_events)
         index_antenna_max = numpy.zeros(n_events)
         t_max = numpy.zeros(n_events)
@@ -204,7 +167,7 @@ class Sim:
             print 'Event (%i/%i)'%(ii, n_events)
             #p_interact[ii], p_earth[ii], p_detect[ii], electric_field_direct[ii], electric_field_crossover[ii], electric_field_reflect[ii], flag_direct[ii], flag_crossover[ii], flag_reflect[ii], dic_direct, dic_crossover, dic_reflect \
             #    = self.event(energy_neutrino[ii], phi[ii], theta[ii], x[ii], y[ii], z[ii], anti=anti)
-            p_interact[ii], p_earth[ii], p_detect[ii], inelasticity[ii], electric_field_max[ii], dic_max, path_max[ii], index_station_max[ii], index_antenna_max[ii] \
+            p_interact[ii], p_earth[ii], p_detect[ii], inelasticity[ii], electric_field_max[ii], dic_max, observation_angle_max[ii], solution_max[ii], index_station_max[ii], index_antenna_max[ii] \
                 = self.event(energy_neutrino[ii], phi_0[ii], theta_0[ii], x_0[ii], y_0[ii], z_0[ii], anti=anti)
 
             if p_detect[ii] == 1.:
@@ -238,6 +201,7 @@ class Sim:
             file = h5py.File(outfile, 'w')
             file.attrs['geometric_factor'] = (4. * numpy.pi) * (numpy.pi * detector_volume_radius**2 * detector_volume_depth) # m^3 sr
             file.attrs['config'] = self.config_file
+            file.attrs['ice_model'] = gnosim.earth.greenland.ice_model_default
 
             file.create_dataset('energy_neutrino', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             file.create_dataset('inelasticity', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
@@ -255,7 +219,8 @@ class Sim:
             file.create_dataset('index_antenna', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
 
             file.create_dataset('electric_field', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('path', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            file.create_dataset('observation_angle', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            file.create_dataset('solution', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             file.create_dataset('t', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             file.create_dataset('d', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             file.create_dataset('theta_ray', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
@@ -279,7 +244,8 @@ class Sim:
             file['index_antenna'][...] = index_antenna_max
 
             file['electric_field'][...] = electric_field_max
-            file['path'][...] = path_max
+            file['observation_angle'][...] = observation_angle_max
+            file['solution'][...] = solution_max
             file['t'][...] = t_max
             file['d'][...] = d_max
             file['theta_ray'][...] = theta_ray_max
@@ -294,16 +260,16 @@ class Sim:
 if __name__ == "__main__":
 
     config_file = sys.argv[1]
-    energy_neutrino = float(sys.argv[2])
+    energy_neutrino = float(sys.argv[2]) # GeV
     n_events = int(sys.argv[3])
     index = int(sys.argv[4])
 
-    outfile = 'results_empirical_trials/%s_%.2e_GeV_%i_events_%i.h5'%(config_file.replace('.py', ''),
-                                                                      energy_neutrino,
-                                                                      n_events,
-                                                                      index)
+    outfile = 'results_ross_trials/%s_%.2e_GeV_%i_events_%i.h5'%(config_file.replace('.py', ''),
+                                                                 energy_neutrino,
+                                                                 n_events,
+                                                                 index)
 
     my_sim = Sim(config_file)
-    my_sim.throw(energy_neutrino, n_events=n_events, outfile=outfile)
+    my_sim.throw(energy_neutrino, n_events=n_events, detector_volume_radius=1200., detector_volume_depth=500., outfile=outfile)
 
 ############################################################

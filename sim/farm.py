@@ -1,9 +1,9 @@
 import os
 import numpy
 
-config_file_array = ['config_simple_-2.py',
-                     'config_simple_-30.py',
-                     'config_simple_-100.py']
+config_file_array = ['config_simple_-2.py']
+#                     'config_simple_-30.py',
+#                     'config_simple_-100.py']
 #energy_neutrino_array = 10**numpy.arange(7., 12, 0.5) # GeV
 energy_neutrino_array = 10**numpy.array([9.]) # GeV
 n_events = 100000

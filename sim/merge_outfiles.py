@@ -19,7 +19,7 @@ infiles = glob.glob(infile_search)
 
 print 'Found %s infiles...'%(len(infiles))
 
-sys.exit('DONE')
+#sys.exit('DONE')
 
 dic_attrs = {}
 dic_data = {}
