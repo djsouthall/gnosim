@@ -59,7 +59,8 @@ def getAcceptance(infile, cos_theta_bins, electric_field_threshold = 1.e-4, eart
                                       reader['electric_field'][...] > electric_field_threshold],
                                      axis=0))
 
-        #print n_total, n_pass, float(n_pass) / n_total, reader.attrs['geometric_factor']
+        
+        print n_total, n_pass, float(n_pass) / n_total, reader.attrs['geometric_factor']
 
         #n_volume = numpy.sum(reader['p_earth'][...] \
         #                     * reader['p_detect'][...] \
@@ -101,7 +102,8 @@ def getAcceptance(infile, cos_theta_bins, electric_field_threshold = 1.e-4, eart
 dic_infiles = {'2': 'results_empirical_trials/config_simple_-2_1.00e+09_GeV_1000000_events.h5',
                '30': 'results_empirical_trials/config_simple_-30_1.00e+09_GeV_1000000_events.h5',
                '100': 'results_empirical_trials/config_simple_-100_1.00e+09_GeV_1000000_events.h5',
-               'Ross': 'results_ross_trials/config_simple_-2_1.00e+09_GeV_1000000_events.h5'}
+               'Ross': 'results_ross_trials/config_simple_0_1.00e+09_GeV_1000000_events.h5',
+               'Minna': 'results_ross_trials/config_simple_1000_1.00e+09_GeV_1000000_events.h5'}
 
 cos_theta_bins = numpy.linspace(-1., 1., 21) # Must be equally spaced
 cos_theta_centers = 0.5 * (cos_theta_bins[0: -1] + cos_theta_bins[1:])
@@ -125,10 +127,12 @@ pylab.figure()
 #pylab.yscale('log')
 xerr = 2. * numpy.ones(len(cos_theta_centers)) / (2. * len(cos_theta_centers))
 #for key in dic_data.keys():
-for key in ['2', '30', '100', 'Ross']:
+for key in ['2', '30', '100', 'Ross', 'Minna']:
 #for key in ['2', '30', '100']:
     if key in ['Ross']:
-        label = 'Ross'
+        label = 'Ross Surface'
+    elif key in ['Minna']:
+        label = 'Minna Bluff'
     else:
         label = 'Depth = %i m'%(int(key))
     pylab.errorbar(cos_theta_centers, dic_data[key]['acceptance'], 

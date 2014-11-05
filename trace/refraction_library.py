@@ -8,6 +8,7 @@ import pylab
 import gnosim.utils.constants
 import gnosim.utils.rf
 import gnosim.utils.plane
+import gnosim.earth.earth
 import gnosim.earth.greenland
 
 pylab.ion()
@@ -25,7 +26,6 @@ def fresnel(n_1, n_2, incidence_angle, mode):
 
     Need to return to this function to make it more numpy compliant eventually.
     """
-
     c = numpy.cos(numpy.radians(incidence_angle))
     s = numpy.sin(numpy.radians(incidence_angle))
 
@@ -113,15 +113,29 @@ def testFresnel(n_low=1., n_high=1.5):
 
 ############################################################
 
-def rayTrace(origin, phi_0, theta_0, t_max=40000., t_step=1.): # t_max=40000, t_max=1000 (testing)
+def rayTrace(origin, phi_0, theta_0, t_max=50000., t_step=1.): # t_max=40000, t_max=1000 (testing)
     """
     z_0 = initial elevation (m)
     t_max = max time (ns)
     t_step = time step (ns)
     """
-    n_steps =  int(t_max / t_step)
 
-    t_array = numpy.arange(0, t_step * (n_steps + 1), t_step) # Time (ns)
+    # IDEA: let t_step grow when the index of refraction isn't changing fast, i.e.,
+    #       a dynamic t_step 
+
+    # ORIGINAL
+    #n_steps =  int(t_max / t_step)
+    # ORIGINAL
+    # NEW
+    n_steps = 1000000 # Arbitrary large number
+    # NEW
+    
+    # ORIGINAL
+    #t_array = numpy.arange(0., t_step * (n_steps + 1), t_step) # Time (ns)
+    # ORIGINAL
+    # NEW
+    t_array = numpy.zeros(n_steps + 1) # m
+    # NEW
     x_array = numpy.zeros(n_steps + 1) # m
     y_array = numpy.zeros(n_steps + 1) # m
     z_array = numpy.zeros(n_steps + 1) # m
@@ -146,14 +160,60 @@ def rayTrace(origin, phi_0, theta_0, t_max=40000., t_step=1.): # t_max=40000, t_
 
     for ii in range(0, n_steps):
 
-        x_step = (t_step * gnosim.utils.constants.speed_light * numpy.sin(numpy.radians(theta_array[ii])) * numpy.cos(numpy.radians(phi_array[ii])) \
-                  / gnosim.earth.greenland.indexOfRefraction(z_array[ii]))
-        y_step = (t_step * gnosim.utils.constants.speed_light * numpy.sin(numpy.radians(theta_array[ii])) * numpy.sin(numpy.radians(phi_array[ii])) \
-                  / gnosim.earth.greenland.indexOfRefraction(z_array[ii]))
-        z_step = (t_step * gnosim.utils.constants.speed_light * numpy.cos(numpy.radians(theta_array[ii])) \
-                  / gnosim.earth.greenland.indexOfRefraction(z_array[ii]))
+        # Dynamic time step depending on how fast the index of refraction is changing
+        if gnosim.earth.greenland.deltaIndexOfRefraction(z_array[ii]) > 1.e-4 or z_array[ii] >= 0.:
+            t_step = 1.
+        else:
+            t_step = 5.
+        t_array[ii + 1] = t_array[ii] + t_step
 
-        d_step = numpy.sqrt(x_step**2 + y_step**2 + z_step**2) # Distance traveled during step
+        if ii == 0 and z_array[ii] > 1.:
+            # Rather than take many steps to the ice, take one large jump
+
+            """
+            # THIS VERSION WORKS, BUT DOES NOT FULLY TAKE INTO ACCOUNT EARTH CURVATURE
+            r = (z_array[ii] + 0.01) * numpy.tan(numpy.radians(theta_array[ii])) # 0.01 meter into ground (i.e., below surface)
+            d = numpy.sqrt(r**2 + z_array[ii]**2)
+            t = d * gnosim.earth.greenland.indexOfRefraction(z_array[ii]) / gnosim.utils.constants.speed_light
+
+            t_array[1:] += (t - t_step)
+            x_step = d * numpy.sin(numpy.radians(theta_array[ii])) * numpy.cos(numpy.radians(phi_array[ii]))
+            y_step = d * numpy.sin(numpy.radians(theta_array[ii])) * numpy.sin(numpy.radians(phi_array[ii]))
+            z_step = d * numpy.cos(numpy.radians(theta_array[ii]))
+            # THIS VERSION WORKS, BUT DOES NOT FULLY TAKE INTO ACCOUNT EARTH CURVATURE
+            """
+            
+            # Curvature corrections
+            distance_with_curvature, angle_curvature, x_curvature = gnosim.earth.earth.curvature(z_array[ii], theta_array[ii]) 
+            
+            x_step = x_curvature * numpy.cos(numpy.radians(phi_array[ii]))
+            y_step = x_curvature * numpy.sin(numpy.radians(phi_array[ii]))
+            z_step = -1. * (z_array[ii] + 0.01) # Go 0.01 m into ground (i.e., below surface)
+
+            # Correct time
+            t = distance_with_curvature * gnosim.earth.greenland.indexOfRefraction(z_array[ii]) / gnosim.utils.constants.speed_light
+            #t_array[1:] += (t - t_step)
+            t_array[ii + 1] = t_array[ii] + t
+
+            # Incidence angle is increased due to curvature of Earth
+            theta_array[ii] = theta_array[ii] - angle_curvature
+            if theta_array[ii] < 90. or numpy.isnan(theta_array[ii]):
+                print 'WARNING: Ray does not intersect Earth'
+                raw_input('CONTINUE?')
+                theta_array[ii] = 90. + 1.e10
+            
+            # Distance corrected for curvature of the Earth
+            d_step = distance_with_curvature
+        else:
+            x_step = (t_step * gnosim.utils.constants.speed_light * numpy.sin(numpy.radians(theta_array[ii])) * numpy.cos(numpy.radians(phi_array[ii])) \
+                      / gnosim.earth.greenland.indexOfRefraction(z_array[ii]))
+            y_step = (t_step * gnosim.utils.constants.speed_light * numpy.sin(numpy.radians(theta_array[ii])) * numpy.sin(numpy.radians(phi_array[ii])) \
+                      / gnosim.earth.greenland.indexOfRefraction(z_array[ii]))
+            z_step = (t_step * gnosim.utils.constants.speed_light * numpy.cos(numpy.radians(theta_array[ii])) \
+                      / gnosim.earth.greenland.indexOfRefraction(z_array[ii]))
+            
+            d_step = numpy.sqrt(x_step**2 + y_step**2 + z_step**2) # Distance traveled during step
+        
         d_array[ii + 1] = d_step
         
         attenuation_length = gnosim.earth.greenland.attenuationLength(z_array[ii], 0.3) # m, Transmission
@@ -161,8 +221,8 @@ def rayTrace(origin, phi_0, theta_0, t_max=40000., t_step=1.): # t_max=40000, t_
             a_v_array[ii + 1] = 1.
             a_h_array[ii + 1] = 1.
         else:
-            a_v_array[ii + 1] = numpy.exp(-1. * d_step / gnosim.earth.greenland.attenuationLength(z_array[ii], 0.3)) # Transmission 
-            a_h_array[ii + 1] = numpy.exp(-1. * d_step / gnosim.earth.greenland.attenuationLength(z_array[ii], 0.3)) # Transmission
+            a_v_array[ii + 1] = numpy.exp(-1. * d_array[ii + 1] / gnosim.earth.greenland.attenuationLength(z_array[ii], 0.3)) # Transmission 
+            a_h_array[ii + 1] = numpy.exp(-1. * d_array[ii + 1] / gnosim.earth.greenland.attenuationLength(z_array[ii], 0.3)) # Transmission
 
         x_array[ii + 1] = x_array[ii] + x_step
         y_array[ii + 1] = y_array[ii] + y_step
@@ -174,13 +234,13 @@ def rayTrace(origin, phi_0, theta_0, t_max=40000., t_step=1.): # t_max=40000, t_
         
         # Hit ice-air interface at surface?
         delta_index_of_refraction = gnosim.earth.greenland.indexOfRefraction(z_array[ii + 1]) - gnosim.earth.greenland.indexOfRefraction(z_array[ii])
-          
+        
         if ii == index_reflect and ii > 0:
             #print 'SKIP', ii
             theta_array[ii + 1] = theta_array[ii]
             index_reflect = 0
         elif delta_index_of_refraction < -0.1 and theta_array[ii] < 90.:
-            # Ray going from ice to air
+            # Ray going from ice to air (for a ray going backwards from antenna to interaction vertex)
             # Compute reflection coefficients (power which is reflected)
             incidence_angle = theta_array[ii]
             r_s, r_p = fresnel(gnosim.earth.greenland.indexOfRefraction(z_array[ii]),
@@ -194,24 +254,25 @@ def rayTrace(origin, phi_0, theta_0, t_max=40000., t_step=1.): # t_max=40000, t_
             if index_reflect_air == 0 and index_reflect_water == 0:
                 # Do not allow this index to be set twice
                 index_reflect_air = ii + 1
-        elif delta_index_of_refraction > 0.1 and theta_array[ii] > 90. and not reflection:
-            # Ray going from air to ice
+        elif delta_index_of_refraction > 0.1 and theta_array[ii] > 90.:
+            # Ray going from air to ice (for a ray going backwards from antenna to interaction vertex)
             # Compute reflection coefficients (power which is transmitted)
-            incidence_angle = 180. - theta_array[ii]
-            t_s, t_p = fresnel(gnosim.earth.greenland.indexOfRefraction(z_array[ii]),
-                               gnosim.earth.greenland.indexOfRefraction(z_array[ii + 1]),
+            theta_array[ii + 1] = 180. - numpy.degrees(numpy.arcsin(value))
+            incidence_angle = 180. - theta_array[ii + 1]
+            t_s, t_p = fresnel(gnosim.earth.greenland.indexOfRefraction(z_array[ii + 1]),
+                               gnosim.earth.greenland.indexOfRefraction(z_array[ii]),
                                incidence_angle, mode='transmission')
             a_v_array[ii + 1] *= numpy.sqrt(t_p)
             a_h_array[ii + 1] *= numpy.sqrt(t_s)
             #print 'AIR -> ICE', ii, t_p, t_s
-            theta_array[ii + 1] = 180. - numpy.degrees(numpy.arcsin(value))
         elif delta_index_of_refraction < -0.1 and theta_array[ii] > 90.:
             # Ray going from ice to water
             # Compute reflection coefficients (power which is reflected)
             incidence_angle = 180. - theta_array[ii]
-            r_s, r_p = fresnel(gnosim.earth.greenland.indexOfRefraction(z_array[ii]),
-                               gnosim.earth.greenland.indexOfRefraction(z_array[ii + 1]),
-                               incidence_angle, mode='reflection')
+            r_s, r_p = 1., 1. # Water is conductor, so complete reflection
+            #r_s, r_p = fresnel(gnosim.earth.greenland.indexOfRefraction(z_array[ii]),
+            #                   gnosim.earth.greenland.indexOfRefraction(z_array[ii + 1]),
+            #                   incidence_angle, mode='reflection')
             a_v_array[ii + 1] *= numpy.sqrt(r_p)
             a_h_array[ii + 1] *= numpy.sqrt(r_s)
             reflection_water = True
@@ -245,10 +306,10 @@ def rayTrace(origin, phi_0, theta_0, t_max=40000., t_step=1.): # t_max=40000, t_
     a_v_array = numpy.cumprod(a_v_array)
     a_h_array = numpy.cumprod(a_h_array)
 
-    return x_array[0: n_steps], y_array[0: n_steps], z_array[0: n_steps], \
+    return (x_array[0: n_steps], y_array[0: n_steps], z_array[0: n_steps], \
         t_array[0: n_steps], d_array[0: n_steps], phi_array[0: n_steps], \
         theta_array[0: n_steps], a_v_array[0: n_steps], a_h_array[0: n_steps], \
-        index_reflect_air, index_reflect_water
+        index_reflect_air, index_reflect_water)
 
 ############################################################
 
@@ -271,7 +332,7 @@ def makeLibrary(z_0, theta_ray_array, save=True, library_dir='library'):
     theta_0_array = []
 
     for ii in range(0, len(theta_ray_array)):
-        print theta_ray_array[ii]
+        print '(%i/%i) theta_0 = %.4f'%(ii, len(theta_ray_array), theta_ray_array[ii])
         x, y, z, t, d, phi, theta, a_v, a_h, index_reflect_air, index_reflect_water = rayTrace([x_0, y_0, z_0], phi_0, theta_ray_array[ii])
         x_array.append(x)
         y_array.append(y)
@@ -285,7 +346,7 @@ def makeLibrary(z_0, theta_ray_array, save=True, library_dir='library'):
 
         if save:
             n_points = len(t)
-            outfile = '%s/z0_%.2f_theta_%.2f_n_%i.h5'%(library_dir, z_0, theta_ray_array[ii], n_points)
+            outfile = '%s/z0_%.2f_theta_%.4f_n_%i.h5'%(library_dir, z_0, theta_ray_array[ii], n_points)
             file = h5py.File(outfile, 'w')
             
             file.attrs['index_reflect_air'] = index_reflect_air
@@ -422,10 +483,13 @@ class RefractionLibrary:
                     self.data[solution][key] = numpy.concatenate(self.data[solution][key])
             print solution, len(self.data[solution]['t'])
 
+        print 'Intersections...'
         # Find intersections
         dic_direct, dic_cross = self.intersect(self.data['direct'])
         self.data['direct'] = dic_direct
         self.data['cross'] = dic_cross
+
+        print 'Sort solutions...'
 
         if len(self.data['direct_2']['t']) > 0:
             theta_0_divide = self.data['direct']['theta_0'][numpy.argmax(self.data['direct']['r'])]
@@ -455,21 +519,50 @@ class RefractionLibrary:
             else:
                 self.exists[solution] = False
         
+        # Check density of ray traces to determine optimal interpolation method
+        if numpy.max(self.data['direct']['r']) / len(numpy.unique(self.data['direct']['theta_0'])) < 1000.:
+            self.dense_rays = True
+            print 'Dense ray traces'
+        else:
+            self.dense_rays = False
+            print 'Sparse ray traces'
 
     def makeHull(self, dic):
         hull = scipy.spatial.ConvexHull(zip(dic['r'], dic['z']))
         return dic['r'][hull.vertices], dic['z'][hull.vertices]
 
     def getValue(self, dic, r, z):
-        distance = numpy.sqrt((r - dic['r'])**2 + (z - dic['z'])**2)
-        index_1 = numpy.argmin(distance)
-        weight_1 = distance[index_1]**(-1)
-        #val_1 = dic[field][index]
-        distance[dic['theta_0'] == dic['theta_0'][index_1]] = 1.e10
-        index_2 = numpy.argmin(distance)
-        weight_2 = distance[index_2]**(-1)
-        #val_2 = dic[field][index]
-        #val_simple = ((weight_1 * val_1) + (weight_2 * val_2)) / (weight_1 + weight_2)
+        if self.dense_rays:
+            # This scheme works well when the rays are densely packed, 
+            # but completely fails when the rays are spread far apart.
+            distance = numpy.sqrt((r - dic['r'])**2 + (z - dic['z'])**2)
+            index_1 = numpy.argmin(distance)
+            weight_1 = distance[index_1]**(-1)
+            
+            distance[dic['theta_0'] == dic['theta_0'][index_1]] = 1.e10
+            index_2 = numpy.argmin(distance)
+            weight_2 = distance[index_2]**(-1)
+        else:
+            # This scheme works much better when the rays are spread
+            # far apart.
+            distance = numpy.sqrt((r - dic['r'])**2 + (z - dic['z'])**2)
+            theta_0_1 = dic['theta_0'][numpy.argmin(distance)]
+            cut_1 = dic['theta_0'] == theta_0_1
+            index_1 = numpy.nonzero(cut_1)[0][numpy.argmin(numpy.fabs(dic['z'][cut_1] - z))]
+            
+            distance[cut_1] = 1.e10
+            theta_0_2 = dic['theta_0'][numpy.argmin(distance)]
+            cut_2 = dic['theta_0'] == theta_0_2
+            index_2 = numpy.nonzero(cut_2)[0][numpy.argmin(numpy.fabs(dic['z'][cut_2] - z))]
+            
+            weight_1 = 1. / numpy.fabs(r - dic['r'][index_1])
+            weight_2 = 1. / numpy.fabs(r - dic['r'][index_2])
+
+        #print '%10.2f %10.2f'%(r, z)
+        #print '%10.2f %10.2f'%(dic['r'][index_1], dic['z'][index_1])
+        #print '%10.2f %10.2f'%(dic['r'][index_2], dic['z'][index_2])
+        #raw_input('WAIT')
+
         val_dic = {}
         for key in self.keys:
             val_dic[key] = ((weight_1 * dic[key][index_1]) + (weight_2 * dic[key][index_2])) / (weight_1 + weight_2)
@@ -502,9 +595,12 @@ class RefractionLibrary:
                 dic_array.append({})
         return flag_array, dic_array
 
-    def test(self, field, n_trials=10):
-        r_min, r_max = numpy.min(self.direct['r']), numpy.max(self.direct['r'])
-        z_min, z_max = numpy.min(self.direct['z']), numpy.max(self.direct['z'])
+    def test(self, field, n_trials=10, solution='direct'):
+        r_min, r_max = numpy.min(self.data[solution]['r']), numpy.max(self.data[solution]['r'])
+        z_min, z_max = numpy.min(self.data[solution]['z']), numpy.max(self.data[solution]['z'])
+
+        if z_max > 0.:
+            z_max = 0.
 
         r = numpy.zeros(n_trials)
         z = numpy.zeros(n_trials)
@@ -520,14 +616,14 @@ class RefractionLibrary:
                     break
             """
             # Begin simple procedure
-            theta_0_unique = numpy.unique(self.direct['theta_0'])
+            theta_0_unique = numpy.unique(self.data[solution]['theta_0'])
             distance_array = numpy.zeros(len(theta_0_unique))
             val_array = numpy.zeros(len(theta_0_unique))
             for jj in range(0, len(theta_0_unique)):
-                cut = (self.direct['theta_0'] == theta_0_unique[jj])
-                r_cut = self.direct['r'][cut]
-                z_cut = self.direct['z'][cut]
-                val_cut = self.direct[field][cut]
+                cut = (self.data[solution]['theta_0'] == theta_0_unique[jj])
+                r_cut = self.data[solution]['r'][cut]
+                z_cut = self.data[solution]['z'][cut]
+                val_cut = self.data[solution][field][cut]
                 distance = numpy.sqrt((r[ii] - r_cut)**2 + (z[ii] - z_cut)**2)
                 index = numpy.argmin(distance)
                 distance_array[jj] = distance[index]
@@ -544,19 +640,19 @@ class RefractionLibrary:
             
             """
             # Begin simple procedure fast
-            distance = numpy.sqrt((r[ii] - self.direct['r'])**2 + (z[ii] - self.direct['z'])**2)
+            distance = numpy.sqrt((r[ii] - self.data[solution]['r'])**2 + (z[ii] - self.data[solution]['z'])**2)
             index = numpy.argmin(distance)
             weight_1 = distance[index]**(-1)
-            val_1 = self.direct[field][index]
-            distance[self.direct['theta_0'] == self.direct['theta_0'][index]] = 1.e10
+            val_1 = self.data[solution][field][index]
+            distance[self.data[solution]['theta_0'] == self.data[solution]['theta_0'][index]] = 1.e10
             index = numpy.argmin(distance)
             weight_2 = distance[index]**(-1)
-            val_2 = self.direct[field][index]
+            val_2 = self.data[solution][field][index]
             val_simple = ((weight_1 * val_1) + (weight_2 * val_2)) / (weight_1 + weight_2)
             # End simple procedure fast
             """
             
-            val_dic = self.getValue(self.direct, r[ii], z[ii])
+            val_dic = self.getValue(self.data[solution], r[ii], z[ii])
             val_simple = val_dic[field]
             """
             r_interp_array = []
@@ -569,16 +665,16 @@ class RefractionLibrary:
                              [True, False],
                              [True, True]]
             for condition_1, condition_2 in condition_set:
-                cut_1 = r[ii] < self.direct['r']
-                cut_2 = z[ii] < self.direct['z']
+                cut_1 = r[ii] < self.data[solution]['r']
+                cut_2 = z[ii] < self.data[solution]['z']
                 cut = numpy.logical_and(cut_1 == condition_1, cut_2 == condition_2)
                 if not numpy.any(cut):
                     print 'WARNING'
 
-                r_cut = self.direct['r'][cut]
-                z_cut = self.direct['z'][cut]
-                theta_0_cut = self.direct['theta_0'][cut]
-                val_cut = self.direct[field][cut]
+                r_cut = self.data[solution]['r'][cut]
+                z_cut = self.data[solution]['z'][cut]
+                theta_0_cut = self.data[solution]['theta_0'][cut]
+                val_cut = self.data[solution][field][cut]
                 distance = numpy.sqrt((r[ii] - r_cut)**2 + (z[ii] - z_cut)**2)
                 index = numpy.argsort(distance)
                 index_max = min(100, numpy.sum(cut))
@@ -587,7 +683,7 @@ class RefractionLibrary:
                 theta_0_interp_array.append(theta_0_cut[index[0:index_max]])
                 val_interp_array.append(val_cut[index[0:index_max]])
 
-                #print ii, numpy.sum(cut), len(self.direct['r'])
+                #print ii, numpy.sum(cut), len(self.data[solution]['r'])
 
             r_interp_array = numpy.concatenate(r_interp_array)
             z_interp_array = numpy.concatenate(z_interp_array)
@@ -620,7 +716,7 @@ class RefractionLibrary:
         pylab.colorbar()
 
         pylab.figure()
-        pylab.scatter(self.direct['r'], self.direct['z'], c=self.direct[field], edgecolors='none')
+        pylab.scatter(self.data[solution]['r'], self.data[solution]['z'], c=self.data[solution][field], edgecolors='none')
         pylab.colorbar()
 
         if field == 'z':
@@ -688,16 +784,16 @@ class RefractionLibrary:
         #pylab.plot(self.hull_reflect_r, self.hull_reflect_z, c='blue', linestyle='-', label='Reflected Rays')
         #pylab.legend(loc='upper right')
 
-        for solution, color in [['direct', 'red'],
-                                ['cross', 'green'],
-                                ['reflect', 'blue'],
-                                ['direct_2', 'black'],
-                                ['cross_2', 'orange'],
-                                ['reflect_2', 'magenta']]:
+        for solution, color, label in [['direct', 'red', 'Direct'],
+                                       ['cross', 'green', 'Cross'],
+                                       ['reflect', 'blue', 'Reflect'],
+                                       ['direct_2', 'black', 'Direct (Bottom)'],
+                                       ['cross_2', 'orange', 'Cross (Bottom)'],
+                                       ['reflect_2', 'magenta', 'Reflect (Bottom)']]:
             if not self.exists[solution]:
                 continue
             r_direct = numpy.linspace(numpy.min(self.hull[solution]['r']), numpy.max(self.hull[solution]['r']), 10000)
-            pylab.plot(r_direct, self.envelope[solution]['low'](r_direct), c=color, label=solution)
+            pylab.plot(r_direct, self.envelope[solution]['low'](r_direct), c=color, label=label)
             pylab.plot(r_direct, self.envelope[solution]['high'](r_direct), c=color)
             pylab.scatter(self.hull[solution]['r'], self.hull[solution]['z'], c=color, edgecolors='none')
 
@@ -793,16 +889,19 @@ class RefractionLibrary:
         z_intersect = []
         for ii in range(0, len(theta_0_unique) - 1):
             for jj in range(ii + 1, len(theta_0_unique)):
-                cut_1 = dic['theta_0'] == theta_0_unique[ii]
-                cut_2 = dic['theta_0'] == theta_0_unique[jj]
+                cut_1 = numpy.logical_and(dic['theta_0'] == theta_0_unique[ii], dic['z'] < 1.)
+                cut_2 = numpy.logical_and(dic['theta_0'] == theta_0_unique[jj], dic['z'] < 1.)
                 if numpy.fabs(dic['r'][cut_1][0] - dic['r'][cut_1][-1]) < 1. \
                    or numpy.fabs(dic['r'][cut_2][0] - dic['r'][cut_2][-1]) < 1.:
                     continue
                 r_min = max(numpy.min(dic['r'][cut_1]), numpy.min(dic['r'][cut_2]))
                 r_max = min(numpy.max(dic['r'][cut_1]), numpy.max(dic['r'][cut_2]))
-                r = numpy.arange(r_min, r_max, 0.1)
-                if len(r) < 2:
+                #r = numpy.arange(r_min, r_max, 0.1)
+                if (r_max - r_min) < 1.:
                     continue
+                r = numpy.linspace(r_min, r_max, 10000)
+                #if len(r) < 2:
+                #    continue
 
                 f_1 = scipy.interpolate.interp1d(dic['r'][cut_1], dic['z'][cut_1])
                 f_2 = scipy.interpolate.interp1d(dic['r'][cut_2], dic['z'][cut_2])
@@ -913,7 +1012,7 @@ class RefractionLibrary:
         pylab.ylabel('Elevation (m)')
         colorbar = pylab.colorbar()
         colorbar.set_label('Zenith Angle Antenna (deg)')
-        pylab.ylim([-3000., 100.])
+        #pylab.ylim([-3000., 100.])
 
         pylab.figure()  
         pylab.scatter(r, z, c=theta, s=s, edgecolors='none', marker='.')
@@ -921,20 +1020,54 @@ class RefractionLibrary:
         pylab.ylabel('Elevation (m)')
         colorbar = pylab.colorbar()
         colorbar.set_label('Zenith Angle Ray (deg)')
-        pylab.ylim([-3000., 100.])
+        #pylab.ylim([-3000., 100.])
         
 ############################################################
 
 if __name__ == '__main__':
-    z_0 = 0. # -2, -30, -100, 10
+    z_0 = 6000. # -2, -30, -100, 0, 10, 1000, 5000, 6000, 38000
+    #library_dir = 'library_-100_deep'
+    #library_dir = 'library_-30_deep'
+    #library_dir = 'library_-2_deep'
+    #library_dir = 'library_0_ross'
+    #library_dir = 'library_1000_ross'
+    #library_dir = 'library_5000_ross'
+    #library_dir = 'library_38000_deep'
+    #library_dir = 'library_38000_mid'
+    #library_dir = 'library_-100_arthern'
+    #library_dir = 'library_-30_arthern'
+    #library_dir = 'library_-2_arthern'
+    library_dir = 'library_6000_ross'
+    #library_dir = 'library_6000_mid'
+    print 'library dir = %s'%(library_dir)
+    print 'z_0 = %.2f'%(z_0)
+    print 'ice model = %s'%(gnosim.earth.greenland.ice_model_default)
+   
     #theta_array = numpy.degrees(numpy.arccos(numpy.linspace(-1, 0, 20)))
     #theta_array = numpy.linspace(10., 170., 20)
-    #theta_array = numpy.linspace(0., 180., 60) # 60, THIS IS THE USUAL
-    theta_array = numpy.linspace(90.1, 180., 30) # TESTING ROSS ICE SHELF AND LIGHTPOST IDEA
+    #theta_array = numpy.linspace(0., 180., 60) # 60, THIS IS THE USUAL FOR SUBTERRANEAN CONFIGURATIONS
+    #theta_array = numpy.linspace(90.01, 180., 30) # TESTING ROSS ICE SHELF AND LIGHTPOST IDEA
+
+    """
+    # WANT TO TAKE INTO ACCOUNT CURVATURE OF THE EARTH HERE
+    #theta_array = numpy.degrees(numpy.arctan2(numpy.linspace(0., 50000., 120), -1000.)) # MINNA BLUFF
+    theta_horizon = 90. + gnosim.earth.earth.horizon(z_0)[1] + 1.e-3 # deg
+    x_horizon = -1. * z_0 * numpy.tan(numpy.radians(theta_horizon)) # m
+    #theta_array = numpy.degrees(numpy.arctan2(numpy.linspace(0., x_horizon, 120), -1. * z_0)) # MINNA BLUFF
+    theta_array = numpy.degrees(numpy.arctan2(numpy.linspace(0., x_horizon, 120), -1. * z_0)) # MINNA BLUFF
+    """
+
+    # FULLY ACCOUNTING FOR EARTH CURVATURE, USE THIS FOR HIGH-ALTITUDE CONFIGURATIONS
+    theta_array = gnosim.earth.earth.curvatureToTheta(z_0, numpy.linspace(0., gnosim.earth.earth.horizon(z_0)[2] - 1., 60)) # 30, 60
+    #print theta_array
+    #import sys
+    #sys.exit('DONE')
+
     #theta_array = numpy.linspace(80., 100., 20)
     #theta_array = numpy.array([68.9473684211])
     #theta_array = numpy.array([30.])
-    makeLibrary(z_0, theta_array, save=True, library_dir='library_0_ross')
+    
+    makeLibrary(z_0, theta_array, save=True, library_dir=library_dir)
 
 ############################################################
 

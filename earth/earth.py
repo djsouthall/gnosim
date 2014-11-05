@@ -1,5 +1,6 @@
 """
 Attenuation of neutrinos passing through the Earth.
+Geometry of the Earth.
 """
 
 import numpy
@@ -128,6 +129,151 @@ def chordLength(theta, elevation=0.):
     b = 2. * (gnosim.utils.constants.radius_earth - depth) * numpy.cos(numpy.radians(theta))
     c = depth**2 - (2. * gnosim.utils.constants.radius_earth * depth)
     return (numpy.sqrt(b**2 - (4. * a * c)) - b) / (2. * a)
+
+############################################################
+
+def horizon(elevation):
+    """
+    elevation = elevation from surface, negative is below surface (m)
+    
+    Return distance to horizon (m), angle below horizontal (deg), 
+    and distance along curved Earth surface to horizon intercept (m)
+    """
+    # Distance from antenna to the horizon taking into account Earth's curvature
+    distance = numpy.sqrt((2. * gnosim.utils.constants.radius_earth * elevation) + elevation**2) # m
+    
+    # Angle below horizontal where the horizon is located
+    angle = numpy.degrees(numpy.arccos(gnosim.utils.constants.radius_earth / (gnosim.utils.constants.radius_earth + elevation))) # deg
+    
+    # Distance along surface of the Earth to the horizon
+    theta = 90. + (angle + 1.e-10)
+    x_curve = curvature(elevation, theta)[2] # m
+
+    return distance, angle, x_curve
+
+############################################################
+
+def curvature(elevation, theta):
+    """
+    elevation = elevation from surface, negative is below surface (m)
+    theta = zenith angle of out-going ray from antenna
+
+    Return distance from antenna to surface (m), angle by which the angle of incidence is increased (deg),
+    and distance along curve of Earth's surface to the intercept (m)
+    """
+    # Distance from the antenna to the surface, taking into account the Earth's curvature
+    a = 1.
+    b = 2. * (gnosim.utils.constants.radius_earth + elevation) * numpy.cos(numpy.radians(180. - theta))
+    c = (gnosim.utils.constants.radius_earth + elevation)**2 - gnosim.utils.constants.radius_earth**2
+    d = -1. * (numpy.sqrt(b**2 - (4. * a * c)) - b) / (2. * a) # m
+    
+    # Angle by which the angle of incidence is increased
+    aa = d
+    bb = gnosim.utils.constants.radius_earth
+    cc = gnosim.utils.constants.radius_earth + elevation
+    angle = numpy.degrees(numpy.arccos((bb**2 + cc**2 - aa**2) / (2. * bb * cc))) # deg
+    
+    # Distance along Earth's curved surface to the intercept 
+    x_curve = gnosim.utils.constants.radius_earth \
+              * numpy.arcsin(d * numpy.sin(numpy.radians(180. - theta)) / gnosim.utils.constants.radius_earth) # m
+
+    return d, angle, x_curve
+
+############################################################
+
+def curvatureToTheta(elevation, x_curve):
+    """
+    elevation = elevation from surface, negative is below surface (m)
+    x_curve = distance along Earth's curved surface (m)
+
+    Returns zenith angle to intercept (deg)
+    """
+    alpha_radians = x_curve / gnosim.utils.constants.radius_earth # radians
+    theta = 180. - numpy.degrees(numpy.arctan2(gnosim.utils.constants.radius_earth * numpy.sin(alpha_radians),
+                                               elevation + gnosim.utils.constants.radius_earth * (1. - numpy.cos(alpha_radians)))) # deg
+    return theta
+
+############################################################
+
+def plotCurvature(elevation, n=10000):
+    """
+    elevation = elevation from surface, negative is below surface (m)
+    """
+    theta_array = numpy.linspace(180. - 1.e-10, 90. + horizon(elevation)[1], n)
+    
+    x_flat = numpy.zeros(n)
+    x_curve = numpy.zeros(n)
+    distance_flat = numpy.zeros(n)
+    distance_curve = numpy.zeros(n)
+    
+    for ii in range(0, n):
+        x_flat[ii] = -1. * elevation * numpy.tan(numpy.radians(theta_array[ii]))
+        x_curve[ii] = curvature(elevation, theta_array[ii])[2]
+        distance_flat[ii] = numpy.sqrt(elevation**2 + x_flat[ii]**2)
+        distance_curve[ii] = curvature(elevation, theta_array[ii])[0]
+    
+    """
+    pylab.figure()
+    #pylab.scatter(distance_flat, distance_curve / distance_flat, c=theta_array, edgecolors='none')
+    pylab.plot(distance_flat, distance_curve / distance_flat)
+    #pylab.scatter(x_flat, x_curve / x_flat, c=theta_array, edgecolors='none')
+    pylab.plot(x_flat, x_curve / x_flat) 
+    pylab.title('Curvature of the Earth')
+    pylab.xlabel('x_flat')
+    pylab.ylabel('x_curve / x_flat')
+    #pylab.colorbar()
+    """
+
+    pylab.figure()
+    theta_circle_radians = numpy.linspace(0, 2. * numpy.pi, 100000)
+    r_circle = gnosim.utils.constants.radius_earth * numpy.cos(theta_circle_radians)
+    z_circle = gnosim.utils.constants.radius_earth * (numpy.sin(theta_circle_radians) - 1.)
+    pylab.plot(r_circle, z_circle, c='black')
+    r = distance_curve * numpy.sin(numpy.radians(theta_array))
+    z = elevation + (distance_curve * numpy.cos(numpy.radians(theta_array)))
+    pylab.scatter(r, z, c=x_curve, edgecolors='none')
+    pylab.colorbar()
+    pylab.xlim([0., gnosim.utils.constants.radius_earth])
+    pylab.ylim([-1. * gnosim.utils.constants.radius_earth, 0.])
+
+############################################################
+
+def plotSampling(detector_volume_radius, n_events=1000000, detector_volume_depth=3000.):
+    """
+    Sanity check function to compare radial event sampling and geometric acceptance factors between
+    flat Earth and curved Earth cases.
+
+    detector volume radius (m)
+    detector volume depth (m)
+    """
+    
+    r_flat = numpy.random.triangular(0., detector_volume_radius, detector_volume_radius, size=n_events) # m
+
+    alpha_max_radians = detector_volume_radius / gnosim.utils.constants.radius_earth # radians                                                           
+    alpha = numpy.arccos(numpy.random.uniform(1., numpy.cos(alpha_max_radians), size=n_events)) # radians                                                
+    r_curve = gnosim.utils.constants.radius_earth * alpha # m
+
+    pylab.figure()
+    bins = numpy.linspace(0, detector_volume_radius, 41)
+    pylab.hist(r_flat, bins=bins, alpha=0.5, label='Flat')
+    pylab.hist(r_curve, bins=bins, alpha=0.5, label='Curve')
+    pylab.legend(loc='upper left')
+    pylab.xlabel('Distance Along Earth Surface (m)')
+    pylab.ylabel('Number of Events')
+
+    detector_volume_radius = numpy.linspace(0, detector_volume_radius, 10000)
+    geometric_factor_flat = (4. * numpy.pi) * (numpy.pi * detector_volume_radius**2 * detector_volume_depth) # m^3 sr
+    geometric_factor_curve = (4. * numpy.pi) \
+                             * (2. * numpy.pi * gnosim.utils.constants.radius_earth**2 \
+                                * (1. - numpy.cos(detector_volume_radius / gnosim.utils.constants.radius_earth))\
+                                * detector_volume_depth) # m^3 sr
+    
+    pylab.figure()
+    pylab.plot(detector_volume_radius, geometric_factor_flat, label='Flat')
+    pylab.plot(detector_volume_radius, geometric_factor_curve, label='Curve')
+    pylab.legend(loc='upper left')
+    pylab.xlabel('Distance Along Earth Surface (m)')
+    pylab.ylabel(r'Geometric Factor (m$^{3}$ sr)')
 
 ############################################################
 

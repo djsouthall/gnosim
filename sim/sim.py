@@ -82,7 +82,7 @@ class Sim:
                     frequency = numpy.linspace(self.stations[index_station].antennas[index_antenna].frequency_low,
                                                self.stations[index_station].antennas[index_antenna].frequency_high,
                                                100) # GHz
-                    index_of_refraction = gnosim.earth.greenland.indexOfRefraction(z_0)
+                    index_of_refraction = gnosim.earth.greenland.indexOfRefraction(z_0, ice_model=self.config['detector_volume']['ice_model'])
                     vector_neutrino = gnosim.utils.quat.angToVec(phi_0, theta_0) # Direction neutrino came from
                     phi_ray = numpy.degrees(numpy.arctan2(y_0 - y_antenna, x_0 - x_antenna)) % 360. # deg
                     
@@ -119,8 +119,16 @@ class Sim:
     
         phi_0 = numpy.random.uniform(0., 360., size=n_events) # deg
         theta_0 = numpy.degrees(numpy.arccos(numpy.random.uniform(1., -1., size=n_events))) # deg
-        r = numpy.random.triangular(0., detector_volume_radius, detector_volume_radius, size=n_events) # m
         
+        # ORIGINAL 28 MAY 2014
+        #r = numpy.random.triangular(0., detector_volume_radius, detector_volume_radius, size=n_events) # m
+        # ORIGINAL 20 MAY 2014
+        # NEW CURVATURE
+        alpha_max_radians = detector_volume_radius / gnosim.utils.constants.radius_earth # radians
+        alpha = numpy.arccos(numpy.random.uniform(1., numpy.cos(alpha_max_radians), size=n_events)) # radians
+        r = gnosim.utils.constants.radius_earth * alpha # m
+        # NEW CURVATURE
+
         phi_vertex = numpy.random.uniform(0., 360., size=n_events) # deg
     
         x_0 = r * numpy.cos(numpy.radians(phi_vertex))
@@ -199,9 +207,19 @@ class Sim:
         
         if outfile:
             file = h5py.File(outfile, 'w')
-            file.attrs['geometric_factor'] = (4. * numpy.pi) * (numpy.pi * detector_volume_radius**2 * detector_volume_depth) # m^3 sr
+            # ORIGINAL 28 MAY 2014
+            #file.attrs['geometric_factor'] = (4. * numpy.pi) * (numpy.pi * detector_volume_radius**2 * detector_volume_depth) # m^3 sr
+            # ORIGINAL 28 MAY 2014
+            # NEW CURVATURE
+            file.attrs['geometric_factor'] = (4. * numpy.pi) \
+                                             * (2. * numpy.pi * gnosim.utils.constants.radius_earth**2 \
+                                                * (1. - numpy.cos(detector_volume_radius / gnosim.utils.constants.radius_earth))\
+                                                * detector_volume_depth) # m^3 sr
+            # NEW CURVATURE
+
             file.attrs['config'] = self.config_file
-            file.attrs['ice_model'] = gnosim.earth.greenland.ice_model_default
+            #file.attrs['ice_model'] = gnosim.earth.greenland.ice_model_default
+            file.attrs['ice_model'] = self.config['detector_volume']['ice_model']
 
             file.create_dataset('energy_neutrino', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             file.create_dataset('inelasticity', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
@@ -263,13 +281,18 @@ if __name__ == "__main__":
     energy_neutrino = float(sys.argv[2]) # GeV
     n_events = int(sys.argv[3])
     index = int(sys.argv[4])
+    #detector_volume_radius = float(sys.argv[5]) # m, 1200 for Ross surface, 51000 for Minna bluff, >6000 for subterranean
+    #detector_volume_depth = float(sys.argv[6]) # m, 500 for Ross and Minna, 3000 for subterranean
 
-    outfile = 'results_ross_trials/%s_%.2e_GeV_%i_events_%i.h5'%(config_file.replace('.py', ''),
-                                                                 energy_neutrino,
-                                                                 n_events,
-                                                                 index)
-
+    outfile = 'results_2014_aug_7/%s_%.2e_GeV_%i_events_%i.h5'%(config_file.replace('.py', ''),
+                                                                energy_neutrino,
+                                                                n_events,
+                                                                index)
+    
     my_sim = Sim(config_file)
-    my_sim.throw(energy_neutrino, n_events=n_events, detector_volume_radius=1200., detector_volume_depth=500., outfile=outfile)
+    my_sim.throw(energy_neutrino, n_events=n_events, 
+                 detector_volume_radius=my_sim.config['detector_volume']['radius'],
+                 detector_volume_depth=my_sim.config['detector_volume']['depth'],
+                 outfile=outfile)
 
 ############################################################

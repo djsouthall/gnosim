@@ -20,10 +20,17 @@ title = r'E$_{\nu}$ = %.2e GeV, Depth = %.1f, %i Events'%(float(os.path.basename
 
 cut_seen = reader['p_detect'][...] == 1.
 cut_unseen = numpy.logical_not(cut_seen)
-electric_field_threshold = 1.e-4
-cut_detected = numpy.logical_and(reader['electric_field'][...] > electric_field_threshold, reader['p_earth'][...] >= 0.9)
+cut_detectable = numpy.logical_and(reader['p_detect'][...] == 1., reader['p_earth'][...] >= 0.5)
+electric_field_threshold = 1.e-6 # 1.e-5
+cut_detected = numpy.logical_and(reader['electric_field'][...] > electric_field_threshold, reader['p_earth'][...] >= 0.5)
 
-print numpy.sum(cut_seen), len(cut_seen)
+cut_no_bottom = numpy.logical_and(reader['solution'][...] >= 0, reader['solution'][...] <= 2)
+cut_bottom = numpy.logical_and(reader['solution'][...] >= 3, reader['solution'][...] <= 5)
+
+cut_detected_no_bottom = numpy.logical_and(cut_detected, cut_no_bottom)
+cut_detected_bottom = numpy.logical_and(cut_detected, cut_bottom)
+
+print numpy.sum(cut_seen), numpy.sum(cut_detected), len(cut_seen)
 
 r = numpy.sqrt(reader['x_0'][...]**2 + reader['y_0'][...]**2)
 """
@@ -60,17 +67,34 @@ pylab.title(title)
 
 pylab.figure()
 pylab.yscale('log')
+pylab.scatter(reader['d'][cut_detected], reader['electric_field'][cut_detected], c=reader['observation_angle'][cut_detected], edgecolors='none')
+colorbar = pylab.colorbar()                                                                                                                                 
+colorbar.set_label('Observation Angle (deg)')
+pylab.xlabel('Distance (m)')
+pylab.ylabel(r'Electric Field (V m$^{-1}$)')
+pylab.title(title)
+
+pylab.figure()
+pylab.yscale('log')
 pylab.scatter(reader['theta_ant'][cut_seen], reader['electric_field'][cut_seen], c=reader['p_earth'][cut_seen], edgecolors='none')
 colorbar = pylab.colorbar()
 colorbar.set_label('Probability Earth')
 pylab.xlabel('Theta Antenna (deg)')
 pylab.ylabel(r'Electric Field (V m$^{-1}$)')
 pylab.title(title)
+"""
 
+pylab.figure()
+pylab.hist(reader['theta_ant'][cut_detected], bins=numpy.linspace(0., 180., 19), normed=True)
+pylab.xlabel('Theta Ant (deg)')
+pylab.ylabel('PDF')
+
+"""
 # Cumulative distribution
 
-cut_cdf = numpy.logical_and(cut_seen, reader['p_earth'][...] > 0.5)
-electric_field_cdf = numpy.sort(reader['electric_field'][cut_cdf])[::-1]
+#cut_cdf = numpy.logical_and(cut_seen, reader['p_earth'][...] > 0.5)
+#electric_field_cdf = numpy.sort(reader['electric_field'][cut_cdf])[::-1]
+electric_field_cdf = numpy.sort(reader['electric_field'][cut_detectable])[::-1]
 cdf = numpy.linspace(0, 1, len(electric_field_cdf))
 pylab.figure()
 pylab.xscale('log')
@@ -99,18 +123,19 @@ pylab.xlabel('Cos(Theta)')
 pylab.ylabel('PDF')
 pylab.title(title)
 pylab.xlim([-1., 1.])
-
+"""
+"""
 pylab.figure()
-pylab.scatter(r[cut_detected], reader['z_0'][cut_detected], c=reader['theta_0'][cut_detected], edgecolors='none', vmin=0., vmax=90.)
+pylab.scatter(r[cut_detected_no_bottom], reader['z_0'][cut_detected_no_bottom], c=reader['theta_0'][cut_detected_no_bottom], edgecolors='none', vmin=0., vmax=90.)
 colorbar = pylab.colorbar()
 colorbar.set_label(r'Theta (deg)')
 pylab.xlabel('Radius (m)')
 pylab.ylabel('Elevation (m)')
 pylab.title(title)
-pylab.xlim([-1000., 5000.])
+#pylab.xlim([-1000., 5000.])
 """
 # Observation Angle
-
+"""
 pylab.figure()
 pylab.hist(reader['observation_angle'][cut_seen], bins=numpy.linspace(0., 180., 41), alpha=0.5, normed=True, color='red', label='Visible')
 pylab.hist(reader['observation_angle'][cut_detected], bins=numpy.linspace(0., 180., 41), alpha=0.5, normed=True, color='blue', label='Detected')
@@ -118,7 +143,7 @@ pylab.xlabel('Observation Angle (deg)')
 pylab.ylabel('PDF')
 pylab.title(title)
 pylab.legend(loc='upper right')
-"""
+
 pylab.figure()
 pylab.yscale('log')
 pylab.scatter(reader['observation_angle'][cut_seen], reader['electric_field'][cut_seen], c=reader['d'][cut_seen], edgecolors='none')
@@ -129,6 +154,16 @@ pylab.ylabel(r'Electric Field (V m$^{-1}$)')
 pylab.title(title)
 pylab.xlim([0., 180.])
 """
+"""
+pylab.figure()
+pylab.hist(reader['d'][cut_detected], bins=41, normed=True, color='blue')
+#pylab.hist(reader['observation_angle'][cut_detected], bins=numpy.linspace(0., 180., 41), alpha=0.5, normed=True, color='blue', label='Detected')
+pylab.xlabel('Distance (m)')
+pylab.ylabel('PDF')
+pylab.title(title)
+#pylab.legend(loc='upper right')
+"""
+"""
 # Solutions
 
 pylab.figure()
@@ -138,7 +173,7 @@ pylab.xlabel('Solution')
 pylab.ylabel('PDF')
 pylab.title(title)
 pylab.legend(loc='upper right')
-
+"""
 # Acceptance
 
 electric_field_threshold = 1.e-4

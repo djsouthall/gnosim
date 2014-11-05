@@ -42,7 +42,7 @@ for infile in infiles:
 print dic_attrs.keys()
 print dic_data.keys()
 
-raw_input('WAIT')
+#raw_input('WAIT')
 
 writer = h5py.File(outfile, 'w')
 

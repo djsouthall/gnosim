@@ -25,3 +25,4 @@ cm_to_m = 1.e-2
 km_to_m = 1.e3
 MHz_to_GHz = 1.e-3
 GHz_to_Hz = 1.e9
+yr_to_s = 365.25 * 24. * 60. * 60.
