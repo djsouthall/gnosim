@@ -284,7 +284,7 @@ if __name__ == "__main__":
     #detector_volume_radius = float(sys.argv[5]) # m, 1200 for Ross surface, 51000 for Minna bluff, >6000 for subterranean
     #detector_volume_depth = float(sys.argv[6]) # m, 500 for Ross and Minna, 3000 for subterranean
 
-    outfile = 'results_2014_aug_7/%s_%.2e_GeV_%i_events_%i.h5'%(config_file.replace('.py', ''),
+    outfile = 'results_2014_dec_5/%s_%.2e_GeV_%i_events_%i.h5'%(config_file.replace('.py', ''),
                                                                 energy_neutrino,
                                                                 n_events,
                                                                 index)

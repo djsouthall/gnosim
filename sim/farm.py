@@ -5,7 +5,7 @@ import numpy
 
 username = 'bechtol'
 
-config_file_array = ['config_simple_6000_ross.py']
+config_file_array = ['config_simple_-100.py']
 #config_file_array = ['config_simple_-2.py',
 #                     'config_simple_-30.py',
 #                     'config_simple_-100.py']
@@ -18,7 +18,8 @@ config_file_array = ['config_simple_38000.py',
                      'config_simple_-30.py',
                      'config_simple_-100.py']
 """
-energy_neutrino_array = 10**numpy.arange(7., 12.1, 0.5) # GeV
+energy_neutrino_array = 10**numpy.arange(5., 5.4, 0.5) # GeV
+#energy_neutrino_array = 10**numpy.arange(7., 12.1, 0.5) # GeV
 #energy_neutrino_array = 10**numpy.array([9.]) # GeV
 n_events = 100000
 n_trials = 10 # 1, 10
@@ -32,7 +33,7 @@ for config_file in config_file_array:
             command_queue = batch + command
             print command
 
-            outfile = 'results_2014_aug_7/%s_%.2e_GeV_%i_events_%i.h5'%(config_file.replace('.py', ''),
+            outfile = 'results_2014_dec_5/%s_%.2e_GeV_%i_events_%i.h5'%(config_file.replace('.py', ''),
                                                                         energy_neutrino,
                                                                         n_events,
                                                                         index)
@@ -41,13 +42,13 @@ for config_file in config_file_array:
                 continue
 
             #print '(%i/%i) %s'%(ii, len(files), command_queue)
-            #os.system('./' + command) # Run locally
-            os.system(command_queue) # Submit to queue
+            os.system('./' + command) # Run locally
+            #os.system(command_queue) # Submit to queue
 
             #break
             
             # Avoid overwhelming the queue with jobs
-            while True:
+            while False:
 
                 # Clean up log files
                 n_output = subprocess.Popen('ls slurm*.out | wc', shell=True, 

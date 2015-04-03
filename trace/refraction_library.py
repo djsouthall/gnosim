@@ -127,7 +127,7 @@ def rayTrace(origin, phi_0, theta_0, t_max=50000., t_step=1.): # t_max=40000, t_
     #n_steps =  int(t_max / t_step)
     # ORIGINAL
     # NEW
-    n_steps = 1000000 # Arbitrary large number
+    n_steps = 100000 # 1000000, Arbitrary large number, but might be too big...
     # NEW
     
     # ORIGINAL
@@ -1025,7 +1025,7 @@ class RefractionLibrary:
 ############################################################
 
 if __name__ == '__main__':
-    z_0 = 6000. # -2, -30, -100, 0, 10, 1000, 5000, 6000, 38000
+    z_0 = -100. # -2, -30, -100, 0, 10, 1000, 5000, 6000, 38000
     #library_dir = 'library_-100_deep'
     #library_dir = 'library_-30_deep'
     #library_dir = 'library_-2_deep'
@@ -1034,10 +1034,11 @@ if __name__ == '__main__':
     #library_dir = 'library_5000_ross'
     #library_dir = 'library_38000_deep'
     #library_dir = 'library_38000_mid'
-    #library_dir = 'library_-100_arthern'
+    #library_dir = 'library_-1500_arthern'
+    library_dir = 'library_-100_arthern'
     #library_dir = 'library_-30_arthern'
     #library_dir = 'library_-2_arthern'
-    library_dir = 'library_6000_ross'
+    #library_dir = 'library_6000_ross'
     #library_dir = 'library_6000_mid'
     print 'library dir = %s'%(library_dir)
     print 'z_0 = %.2f'%(z_0)
@@ -1045,7 +1046,7 @@ if __name__ == '__main__':
    
     #theta_array = numpy.degrees(numpy.arccos(numpy.linspace(-1, 0, 20)))
     #theta_array = numpy.linspace(10., 170., 20)
-    #theta_array = numpy.linspace(0., 180., 60) # 60, THIS IS THE USUAL FOR SUBTERRANEAN CONFIGURATIONS
+    theta_array = numpy.linspace(0., 180., 60) # 60, THIS IS THE USUAL FOR SUBTERRANEAN CONFIGURATIONS
     #theta_array = numpy.linspace(90.01, 180., 30) # TESTING ROSS ICE SHELF AND LIGHTPOST IDEA
 
     """
@@ -1058,7 +1059,7 @@ if __name__ == '__main__':
     """
 
     # FULLY ACCOUNTING FOR EARTH CURVATURE, USE THIS FOR HIGH-ALTITUDE CONFIGURATIONS
-    theta_array = gnosim.earth.earth.curvatureToTheta(z_0, numpy.linspace(0., gnosim.earth.earth.horizon(z_0)[2] - 1., 60)) # 30, 60
+    #theta_array = gnosim.earth.earth.curvatureToTheta(z_0, numpy.linspace(0., gnosim.earth.earth.horizon(z_0)[2] - 1., 60)) # 30, 60
     #print theta_array
     #import sys
     #sys.exit('DONE')

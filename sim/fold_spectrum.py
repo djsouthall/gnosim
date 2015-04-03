@@ -12,6 +12,7 @@ pylab.ion()
 
 ############################################################
 
+# E (GeV), E^2 dN/dE (GeV cm^-2 s^-1 sr^-1)
 model_dict = {'kotera_2010_optimistic': [[100000, 2.1910855798922374e-10],
                                          [152724.26579169, 4.1246263829013647e-10],
                                          [227154.75856012452, 7.381283196139171e-10],
@@ -80,6 +81,18 @@ model_dict = {'kotera_2010_optimistic': [[100000, 2.1910855798922374e-10],
                                          [97388067284.7494, 3.0445035410462136e-12],
                                          [126896100316.79182, 1.000000000000004e-12]]}
 
+
+# IceCube 3 yr
+# E^2 dN/dE = 1.5e-8 (E / 100 TeV)^(-0.3) GeV cm^-2 s^-1 sr^-1
+energy_array_icecube = 10.**numpy.linspace(5, 12, 100)
+e2dNdE_icecube_power_law = 1.5e-8 * (energy_array_icecube / 1.e5)**(-0.3)
+
+e2dNdE_icecube_exp_cutoff = 1.5e-8 * (energy_array_icecube / 1.e5)**(-0.3) * numpy.exp(-1. * energy_array_icecube / 1.e6)
+e2dNdE_icecube_exp_cutoff = numpy.clip(e2dNdE_icecube_exp_cutoff, 1.e-12, 1.e10)
+
+model_dict['icecube_2014_power_law'] = zip(energy_array_icecube, e2dNdE_icecube_power_law)
+model_dict['icecube_2014_exp_cutoff'] = zip(energy_array_icecube, e2dNdE_icecube_exp_cutoff)
+
 ############################################################
 
 def readModel(key):
@@ -108,7 +121,7 @@ def foldSpectrum(energy_acceptance, acceptance, model_key='kotera_2010_pessimist
 
     f_model = readModel(model_key) # GeV, GeV^-1 cm^-2 s^-1 sr^-1
 
-    f_acceptance = scipy.interpolate.interp1d(numpy.log10(energy_acceptance), numpy.log10(acceptance)) # GeV, m^2 sr
+    f_acceptance = scipy.interpolate.interp1d(numpy.log10(energy_acceptance), numpy.log10(acceptance), bounds_error=False, fill_value=0.) # GeV, m^2 sr
 
     energy_min = max(numpy.min(energy_acceptance), 10**numpy.min(f_model.x))
     energy_max = min(numpy.max(energy_acceptance), 10**numpy.max(f_model.x))
@@ -120,7 +133,11 @@ def foldSpectrum(energy_acceptance, acceptance, model_key='kotera_2010_pessimist
     rate_array = acceptance_array * differential_intensity_array * energy_array * delta_log_energy # yr^-1
     rate_threshold = numpy.cumsum(rate_array[::-1])[::-1]
 
-    rate = rate_array / numpy.log10(numpy.exp(delta_log_energy)) # yr^-1
+    # This is what I had been doing previously
+    #rate = rate_array / numpy.log10(numpy.exp(delta_log_energy)) # yr^-1
+    rate = rate_array
+    
+    rate[numpy.isnan(rate)] = 0.
 
     #pylab.figure()
     #pylab.xscale('log')

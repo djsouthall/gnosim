@@ -12,7 +12,7 @@ pylab.ion()
 
 ############################################################
 
-ice_model_default = 'test_mid'
+ice_model_default = 'arthern'
 
 # From
 # Density (Mg m^-3)
