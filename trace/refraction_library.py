@@ -113,7 +113,7 @@ def testFresnel(n_low=1., n_high=1.5):
 
 ############################################################
 
-def rayTrace(origin, phi_0, theta_0, t_max=50000., t_step=1.): # t_max=40000, t_max=1000 (testing)
+def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1.): # t_max=40000, t_max=1000 (testing)
     """
     z_0 = initial elevation (m)
     t_max = max time (ns)
@@ -152,7 +152,7 @@ def rayTrace(origin, phi_0, theta_0, t_max=50000., t_step=1.): # t_max=40000, t_
     x_array[0] = origin[0]
     y_array[0] = origin[1]
     z_array[0] = origin[2]
-    theta_array[0] = theta_0
+    theta_array[0] = theta_ant
 
     index_reflect = 0 # Latch to prevent multiple reflections at interface
     index_reflect_air = 0 # Stores index of reflection event at ice-air interface
@@ -329,10 +329,10 @@ def makeLibrary(z_0, theta_ray_array, save=True, library_dir='library'):
     a_h_array = []
     reflection = False
     
-    theta_0_array = []
+    theta_ant_array = []
 
     for ii in range(0, len(theta_ray_array)):
-        print '(%i/%i) theta_0 = %.4f'%(ii, len(theta_ray_array), theta_ray_array[ii])
+        print '(%i/%i) theta_ant = %.4f'%(ii, len(theta_ray_array), theta_ray_array[ii])
         x, y, z, t, d, phi, theta, a_v, a_h, index_reflect_air, index_reflect_water = rayTrace([x_0, y_0, z_0], phi_0, theta_ray_array[ii])
         x_array.append(x)
         y_array.append(y)
@@ -352,7 +352,7 @@ def makeLibrary(z_0, theta_ray_array, save=True, library_dir='library'):
             file.attrs['index_reflect_air'] = index_reflect_air
             file.attrs['index_reflect_water'] = index_reflect_water
             file.attrs['z_0'] = z_0
-            file.attrs['theta_0'] = theta_ray_array[ii]
+            file.attrs['theta_ant'] = theta_ray_array[ii]
             file.attrs['ice_model'] = gnosim.earth.greenland.ice_model_default
 
             file.create_dataset('r', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
@@ -360,7 +360,7 @@ def makeLibrary(z_0, theta_ray_array, save=True, library_dir='library'):
             file.create_dataset('t', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             file.create_dataset('d', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             file.create_dataset('theta', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('theta_0', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            file.create_dataset('theta_ant', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             file.create_dataset('a_v', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             file.create_dataset('a_h', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
         
@@ -369,7 +369,7 @@ def makeLibrary(z_0, theta_ray_array, save=True, library_dir='library'):
             file['t'][...] = t
             file['d'][...] = d
             file['theta'][...] = theta
-            file['theta_0'][...] = theta_ray_array[ii] * numpy.ones(n_points)
+            file['theta_ant'][...] = theta_ray_array[ii] * numpy.ones(n_points)
             file['a_v'][...] = a_v
             file['a_h'][...] = a_h
 
@@ -403,7 +403,7 @@ class RefractionLibrary:
     
         # List attributes of interest
         self.solutions = ['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']
-        self.keys = ['r', 'z', 't', 'd', 'theta', 'theta_0', 'a_v', 'a_h']
+        self.keys = ['r', 'z', 't', 'd', 'theta', 'theta_ant', 'a_v', 'a_h']
 
         # Dictionary to store data
         self.data = {}
@@ -492,8 +492,8 @@ class RefractionLibrary:
         print 'Sort solutions...'
 
         if len(self.data['direct_2']['t']) > 0:
-            theta_0_divide = self.data['direct']['theta_0'][numpy.argmax(self.data['direct']['r'])]
-            cut = self.data['direct_2']['theta_0'] < theta_0_divide
+            theta_ant_divide = self.data['direct']['theta_ant'][numpy.argmax(self.data['direct']['r'])]
+            cut = self.data['direct_2']['theta_ant'] < theta_ant_divide
             for key in self.keys:
                 self.data['cross_2'][key] = self.data['direct_2'][key][cut]
             cut = numpy.logical_not(cut)
@@ -513,14 +513,14 @@ class RefractionLibrary:
                 envelope_low, envelope_high = self.makeEnvelope(r, z, 
                                                                 self.data[solution]['r'], 
                                                                 self.data[solution]['z'], 
-                                                                self.data[solution]['theta_0'],)
+                                                                self.data[solution]['theta_ant'],)
                 self.envelope[solution] = {'low': envelope_low,
                                            'high': envelope_high}
             else:
                 self.exists[solution] = False
         
         # Check density of ray traces to determine optimal interpolation method
-        if numpy.max(self.data['direct']['r']) / len(numpy.unique(self.data['direct']['theta_0'])) < 1000.:
+        if numpy.max(self.data['direct']['r']) / len(numpy.unique(self.data['direct']['theta_ant'])) < 1000.:
             self.dense_rays = True
             print 'Dense ray traces'
         else:
@@ -539,20 +539,20 @@ class RefractionLibrary:
             index_1 = numpy.argmin(distance)
             weight_1 = distance[index_1]**(-1)
             
-            distance[dic['theta_0'] == dic['theta_0'][index_1]] = 1.e10
+            distance[dic['theta_ant'] == dic['theta_ant'][index_1]] = 1.e10
             index_2 = numpy.argmin(distance)
             weight_2 = distance[index_2]**(-1)
         else:
             # This scheme works much better when the rays are spread
             # far apart.
             distance = numpy.sqrt((r - dic['r'])**2 + (z - dic['z'])**2)
-            theta_0_1 = dic['theta_0'][numpy.argmin(distance)]
-            cut_1 = dic['theta_0'] == theta_0_1
+            theta_ant_1 = dic['theta_ant'][numpy.argmin(distance)]
+            cut_1 = dic['theta_ant'] == theta_ant_1
             index_1 = numpy.nonzero(cut_1)[0][numpy.argmin(numpy.fabs(dic['z'][cut_1] - z))]
             
             distance[cut_1] = 1.e10
-            theta_0_2 = dic['theta_0'][numpy.argmin(distance)]
-            cut_2 = dic['theta_0'] == theta_0_2
+            theta_ant_2 = dic['theta_ant'][numpy.argmin(distance)]
+            cut_2 = dic['theta_ant'] == theta_ant_2
             index_2 = numpy.nonzero(cut_2)[0][numpy.argmin(numpy.fabs(dic['z'][cut_2] - z))]
             
             weight_1 = 1. / numpy.fabs(r - dic['r'][index_1])
@@ -616,11 +616,11 @@ class RefractionLibrary:
                     break
             """
             # Begin simple procedure
-            theta_0_unique = numpy.unique(self.data[solution]['theta_0'])
-            distance_array = numpy.zeros(len(theta_0_unique))
-            val_array = numpy.zeros(len(theta_0_unique))
-            for jj in range(0, len(theta_0_unique)):
-                cut = (self.data[solution]['theta_0'] == theta_0_unique[jj])
+            theta_ant_unique = numpy.unique(self.data[solution]['theta_ant'])
+            distance_array = numpy.zeros(len(theta_ant_unique))
+            val_array = numpy.zeros(len(theta_ant_unique))
+            for jj in range(0, len(theta_ant_unique)):
+                cut = (self.data[solution]['theta_ant'] == theta_ant_unique[jj])
                 r_cut = self.data[solution]['r'][cut]
                 z_cut = self.data[solution]['z'][cut]
                 val_cut = self.data[solution][field][cut]
@@ -644,7 +644,7 @@ class RefractionLibrary:
             index = numpy.argmin(distance)
             weight_1 = distance[index]**(-1)
             val_1 = self.data[solution][field][index]
-            distance[self.data[solution]['theta_0'] == self.data[solution]['theta_0'][index]] = 1.e10
+            distance[self.data[solution]['theta_ant'] == self.data[solution]['theta_ant'][index]] = 1.e10
             index = numpy.argmin(distance)
             weight_2 = distance[index]**(-1)
             val_2 = self.data[solution][field][index]
@@ -657,7 +657,7 @@ class RefractionLibrary:
             """
             r_interp_array = []
             z_interp_array = []
-            theta_0_interp_array = []
+            theta_ant_interp_array = []
             val_interp_array = []
 
             condition_set = [[False, False],
@@ -673,21 +673,21 @@ class RefractionLibrary:
 
                 r_cut = self.data[solution]['r'][cut]
                 z_cut = self.data[solution]['z'][cut]
-                theta_0_cut = self.data[solution]['theta_0'][cut]
+                theta_ant_cut = self.data[solution]['theta_ant'][cut]
                 val_cut = self.data[solution][field][cut]
                 distance = numpy.sqrt((r[ii] - r_cut)**2 + (z[ii] - z_cut)**2)
                 index = numpy.argsort(distance)
                 index_max = min(100, numpy.sum(cut))
                 r_interp_array.append(r_cut[index[0:index_max]])
                 z_interp_array.append(z_cut[index[0:index_max]])
-                theta_0_interp_array.append(theta_0_cut[index[0:index_max]])
+                theta_ant_interp_array.append(theta_ant_cut[index[0:index_max]])
                 val_interp_array.append(val_cut[index[0:index_max]])
 
                 #print ii, numpy.sum(cut), len(self.data[solution]['r'])
 
             r_interp_array = numpy.concatenate(r_interp_array)
             z_interp_array = numpy.concatenate(z_interp_array)
-            theta_0_interp_array = numpy.concatenate(theta_0_interp_array)
+            theta_ant_interp_array = numpy.concatenate(theta_ant_interp_array)
             val_interp_array = numpy.concatenate(val_interp_array)
             """
 
@@ -801,12 +801,12 @@ class RefractionLibrary:
         pylab.xlabel('Radius (m)')
         pylab.ylabel('Elevation (m)')
 
-    def makeEnvelope(self, r, z, r_full=None, z_full=None, theta_0_full=None):
+    def makeEnvelope(self, r, z, r_full=None, z_full=None, theta_ant_full=None):
         """
         Define the regions (r, z) where ray-tracing solutions exist. Normally only need
         to supply the (r, z) coordinates of the convex hull, but for regions that are 
         expected to be concave in shape (e.g., crossover solutions) should supply the 
-        full array of (r, z, theta_0) coordinates.
+        full array of (r, z, theta_ant) coordinates.
         """
 
         index_0 = numpy.argmin(r)
@@ -843,31 +843,31 @@ class RefractionLibrary:
 
         #pylab.figure()
         #r_interp = numpy.linspace(r_0, r_1, 10000)
-        #pylab.scatter(r_full, z_full, c=theta_0_full, edgecolors='none')
+        #pylab.scatter(r_full, z_full, c=theta_ant_full, edgecolors='none')
         #pylab.plot(r_interp, f_low(r_interp), c='blue')
         #pylab.plot(r_interp, f_high(r_interp), c='red')
         #pylab.scatter(r, z, c='black', edgecolors='none')
 
-        theta_0_unique = numpy.unique(theta_0_full)
+        theta_ant_unique = numpy.unique(theta_ant_full)
         for ii in [0, -1]:
             # Only one of these solutions will be the right one, but which?
-            cut_theta_0 = theta_0_full == theta_0_unique[ii]
-            r_cut_theta_0 = r_full[cut_theta_0]
-            z_cut_theta_0 = z_full[cut_theta_0]
-            cut_select = z_cut_theta_0 > f_low(r_cut_theta_0)
-            r_select = r_cut_theta_0[cut_select]
-            z_select = z_cut_theta_0[cut_select]
+            cut_theta_ant = theta_ant_full == theta_ant_unique[ii]
+            r_cut_theta_ant = r_full[cut_theta_ant]
+            z_cut_theta_ant = z_full[cut_theta_ant]
+            cut_select = z_cut_theta_ant > f_low(r_cut_theta_ant)
+            r_select = r_cut_theta_ant[cut_select]
+            z_select = z_cut_theta_ant[cut_select]
             
             if numpy.all(r_select < 1.):
                 continue
 
-            if numpy.mean(numpy.fabs(z_select - f_low(r_cut_theta_0)[cut_select])) \
-                          > numpy.mean(numpy.fabs(z_select - f_high(r_cut_theta_0)[cut_select])):
+            if numpy.mean(numpy.fabs(z_select - f_low(r_cut_theta_ant)[cut_select])) \
+                          > numpy.mean(numpy.fabs(z_select - f_high(r_cut_theta_ant)[cut_select])):
                 continue
             
             #pylab.scatter(r_select, z_select, c='gray', edgecolors='none')
             #if numpy.sum(cut_select) > 0:
-            #    print ii, numpy.mean(z_select - f_low(r_cut_theta_0)[cut_select])
+            #    print ii, numpy.mean(z_select - f_low(r_cut_theta_ant)[cut_select])
             
             if numpy.any(cut_select):
                 r_low_final = numpy.concatenate([f_low.x, r_select])
@@ -884,13 +884,13 @@ class RefractionLibrary:
         Find intersection between rays to separate the "direct" and "cross" solutions.
         """
         select_cross = []
-        theta_0_unique = numpy.unique(dic['theta_0'])
+        theta_ant_unique = numpy.unique(dic['theta_ant'])
         r_intersect = []
         z_intersect = []
-        for ii in range(0, len(theta_0_unique) - 1):
-            for jj in range(ii + 1, len(theta_0_unique)):
-                cut_1 = numpy.logical_and(dic['theta_0'] == theta_0_unique[ii], dic['z'] < 1.)
-                cut_2 = numpy.logical_and(dic['theta_0'] == theta_0_unique[jj], dic['z'] < 1.)
+        for ii in range(0, len(theta_ant_unique) - 1):
+            for jj in range(ii + 1, len(theta_ant_unique)):
+                cut_1 = numpy.logical_and(dic['theta_ant'] == theta_ant_unique[ii], dic['z'] < 1.)
+                cut_2 = numpy.logical_and(dic['theta_ant'] == theta_ant_unique[jj], dic['z'] < 1.)
                 if numpy.fabs(dic['r'][cut_1][0] - dic['r'][cut_1][-1]) < 1. \
                    or numpy.fabs(dic['r'][cut_2][0] - dic['r'][cut_2][-1]) < 1.:
                     continue
@@ -912,8 +912,8 @@ class RefractionLibrary:
                     r_intersect.append(r[index])
                     z_intersect.append(f_1(r[index]))
                     
-                    selection_1 = numpy.logical_and(dic['theta_0'] == theta_0_unique[ii], dic['r'] > r_intersect[-1])
-                    selection_2 = numpy.logical_and(dic['theta_0'] == theta_0_unique[jj], dic['r'] > r_intersect[-1])
+                    selection_1 = numpy.logical_and(dic['theta_ant'] == theta_ant_unique[ii], dic['r'] > r_intersect[-1])
+                    selection_2 = numpy.logical_and(dic['theta_ant'] == theta_ant_unique[jj], dic['r'] > r_intersect[-1])
                     
                     if dic['theta'][selection_1][0] > dic['theta'][selection_2][0]:                                                                       
                         select_cross.append(selection_1)                                                                                               
@@ -950,14 +950,14 @@ class RefractionLibrary:
     
     def plot(self, field, solution, cmap='summer'):
         """
-        field (t, d, theta, theta_0, a_v, a_h)
+        field (t, d, theta, theta_ant, a_v, a_h)
         mode (direct, crossover, reflect)
         """
 
         colorbar_dict = {'t': 'Time (ns)',
                          'd': 'Distance (m)',
                          'theta': 'Zenith Angle (deg)',
-                         'theta_0': 'Zenith Angle at Antenna (deg)',
+                         'theta_ant': 'Zenith Angle at Antenna (deg)',
                          'a_v': 'VPOL Attenuation (dB)',
                          'a_h': 'HPOL Attenuation (dB)'}
 
@@ -992,22 +992,22 @@ class RefractionLibrary:
     def plotRays(self, s=10):
         r = []
         z = []
-        theta_0 = []
+        theta_ant = []
         theta = []
         #for dic in [self.direct, self.crossover, self.reflect]:
         for solution in self.solutions:
             dic = self.data[solution]
             r.append(dic['r'])
             z.append(dic['z'])
-            theta_0.append(dic['theta_0'])
+            theta_ant.append(dic['theta_ant'])
             theta.append(dic['theta'])
         r = numpy.concatenate(r)
         z = numpy.concatenate(z)
-        theta_0 = numpy.concatenate(theta_0)
+        theta_ant = numpy.concatenate(theta_ant)
         theta = numpy.concatenate(theta)
 
         pylab.figure()
-        pylab.scatter(r, z, c=theta_0, s=s, edgecolors='none', marker='.')
+        pylab.scatter(r, z, c=theta_ant, s=s, edgecolors='none', marker='.')
         pylab.xlabel('Radius (m)')
         pylab.ylabel('Elevation (m)')
         colorbar = pylab.colorbar()
@@ -1042,7 +1042,8 @@ if __name__ == '__main__':
     #library_dir = 'library_6000_mid'
     #library_dir = 'library_-30_arthern_steph'
     #library_dir = 'library_-75_arthern_steph'
-    library_dir = 'library_-100_arthern_steph'
+    #library_dir = 'library_-100_arthern_steph'
+    library_dir = 'library_-100_arthern_steph_test'
     print 'library dir = %s'%(library_dir)
     print 'z_0 = %.2f'%(z_0)
     print 'ice model = %s'%(gnosim.earth.greenland.ice_model_default)

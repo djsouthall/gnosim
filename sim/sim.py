@@ -182,7 +182,7 @@ class Sim:
                 t_max[ii] = dic_max['t']
                 d_max[ii] = dic_max['d']
                 theta_ray_max[ii] = dic_max['theta']
-                theta_ant_max[ii] = dic_max['theta_0']
+                theta_ant_max[ii] = dic_max['theta_ant']
                 a_v_max[ii] = dic_max['a_v']
                 a_h_max[ii] = dic_max['a_h']
 
