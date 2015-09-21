@@ -159,3 +159,29 @@ def acceptance(infile, cos_theta_bins=None, electric_field_threshold=1.e-4, eart
             acceptance[0], acceptance_error_low[0], acceptance_error_high[0]
 
 ############################################################
+
+def acceptanceToVolumetricAcceptance(acceptance, energy_neutrino):
+    """
+    Given the acceptance (m^2 sr) and neutrino energy (GeV), return the water-equivalent volumetric acceptance (km^3 sr)
+    """
+    interaction_length, interaction_length_anti \
+        = gnosim.earth.earth.interactionLength(gnosim.utils.constants.density_water * gnosim.utils.constants.mass_proton,
+                                               energy_neutrino)
+    interaction_length = numpy.sqrt(interaction_length * interaction_length_anti) # m
+    volumetric_acceptance = acceptance * gnosim.utils.constants.km_to_m**(-3) * interaction_length # km^3 sr 
+    return volumetric_acceptance
+
+############################################################
+
+def volumetricAcceptanceToAcceptance(volumetric_acceptance, energy_neutrino):
+    """
+    Given the water-equivalent volumetric acceptance (km^3 sr) and neutrino energy (GeV), return the acceptance (m^2 sr)
+    """
+    interaction_length, interaction_length_anti \
+        = gnosim.earth.earth.interactionLength(gnosim.utils.constants.density_water * gnosim.utils.constants.mass_proton,
+                                               energy_neutrino)
+    interaction_length = numpy.sqrt(interaction_length * interaction_length_anti) # m
+    acceptance = volumetric_acceptance * gnosim.utils.constants.km_to_m**3 / interaction_length # m^2 sr
+    return acceptance
+
+############################################################

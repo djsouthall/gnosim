@@ -83,20 +83,26 @@ def inelasticity(energy_neutrino, mode):
 
 if __name__ == "__main__":
 
-    energy_neutrino = 1.e12 # GeV
-    mode = 'cc'
+    energy_neutrino = 1.e6 # GeV
+    #mode = 'cc'
+    mode_array = ['cc', 'nc', 'cc_anti', 'nc_anti']
     n_trials = 100000
 
-    y_array = []
-    for ii in range(0, n_trials):
-        y_array.append(inelasticity(energy_neutrino, mode))
+    y_array = {}
+    for mode in mode_array:
+        y_array[mode] = []
+        for ii in range(0, n_trials):
+            y_array[mode].append(inelasticity(energy_neutrino, mode))
 
     pylab.figure()
-    pylab.hist(y_array, bins=40, normed=True)
-    pylab.title(r'Energy Neutrino = %.e GeV, CC $\nu$N'%(energy_neutrino))
+    for mode in mode_array:
+        pylab.hist(y_array[mode], bins=40, normed=True, histtype='step', label=mode)
+    #pylab.title(r'Energy Neutrino = %.e GeV, CC $\nu$N'%(energy_neutrino))
+    pylab.title(r'Energy Neutrino = %.e GeV'%(energy_neutrino))
     pylab.xlabel('Inelasticity')
     pylab.ylabel('PDF')
+    pylab.legend(loc='upper right')
 
-    print y_array
+    #print y_array
 
 ############################################################

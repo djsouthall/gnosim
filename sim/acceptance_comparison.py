@@ -1,10 +1,33 @@
+import os
 import numpy
 import pylab
+import matplotlib
+import collections
 
 import gnosim.sim.acceptance
 import gnosim.sim.fold_spectrum
 
 pylab.ion()
+
+############################################################
+
+params = {
+    #'backend': 'eps',
+    'axes.labelsize': 20,
+    #'text.fontsize': 12,           
+    'xtick.labelsize': 18,
+    'ytick.labelsize': 18,
+    #'xtick.major.size': 3,      # major tick size in points
+    #'xtick.minor.size': 1.5,    # minor tick size in points
+    #'xtick.major.size': 3,      # major tick size in points
+    #'xtick.minor.size': 1.5,    # minor tick size in points
+    'text.usetex': True,
+    #'figure.figsize': fig_size,
+    'font.family':'serif',
+    'font.serif':'Computer Modern Roman',
+    'font.size': 12
+    }
+matplotlib.rcParams.update(params)
 
 ############################################################
 
@@ -28,6 +51,7 @@ icecube_acceptance_raw = 10**numpy.array([[5.678513731825525, 0.2536945812807882
                                           [11.00611187597985, 4.362068965517241]])
 icecube_energy = numpy.array(zip(*icecube_acceptance_raw)[0])
 icecube_acceptance = 4. * numpy.pi * numpy.array(zip(*icecube_acceptance_raw)[1]) # m^2 sr
+icecube_volumetric_acceptance = gnosim.sim.acceptance.acceptanceToVolumetricAcceptance(icecube_acceptance, icecube_energy) # km^3 sr
 
 # Single flavor
 icecube_acceptance_contained_raw = 10**numpy.array([[4.299401197604791, -2.9891107078039925],
@@ -44,12 +68,15 @@ icecube_acceptance_contained_raw = 10**numpy.array([[4.299401197604791, -2.98911
                                                     [7.000000000000001, 1.551724137931034]])
 icecube_energy_contained = numpy.array(zip(*icecube_acceptance_contained_raw)[0])
 icecube_acceptance_contained = 3. * 4. * numpy.pi * numpy.array(zip(*icecube_acceptance_contained_raw)[1]) # m^2 sr
+icecube_volumetric_acceptance_contained = gnosim.sim.acceptance.acceptanceToVolumetricAcceptance(icecube_acceptance_contained, icecube_energy_contained) # km^3 sr
 
 ############################################################
 
-save = False
+save = True
 
 energy_neutrino_array = 10**numpy.arange(5., 12.1, 1.) # GeV
+energy_neutrino_array = numpy.concatenate([[10**4.5], energy_neutrino_array])
+
 dic_configurations = {'-100': r'-100 m, 3 km, 37 stations', # $\times$ 3 yr
                       '-100 x4': r'-100 m, 3 km, 37 stations, x4', # $\times$ 3 yr
                       '-100 x20': r'-100 m, 3 km, 37 stations, x20'} # $\times$ 3 yr
@@ -61,7 +88,7 @@ dic_configurations = {'-100': r'-100 m, 3 km, 37 stations', # $\times$ 3 yr
                       #'6000': r'6000 m, 1.5 km, 1 $\times$ 0.3 yr',
                       #'6000_ross': r'6000 m, Ross, 1 $\times$ 0.3 yr',
                       #'38000': r'38000 m, 1.5 km, 1 $\times$ 0.1 yr'}
-dic_configurations = {'-100': '10 baseline stations, 16 antennas',
+dic_configurations = {'-100': '10 stations, 16 unphased antennas',
                       '-100 x4': '10 stations, 16-antenna phased arrays',
                       '-100 x20': '10 stations, 400-antenna phased arrays'}
 
@@ -89,9 +116,9 @@ dic_time = {'-100': 3.,
             '6000_ross': 0.3,
             '38000': 0.1}
 
-dic_threshold = {'-100': 1.e-4,
-                 '-100 x4': 1.e-4 / 4.,
-                 '-100 x20': 1.e-4 / 20.}
+dic_threshold = {'-100': 1.46e-4,
+                 '-100 x4': 1.46e-4 / 4.,
+                 '-100 x20': 1.46e-4 / 20.}
 
 #dic_color = {'-100': 'steelblue',
 #             '-100 x4': 'forestgreen',
@@ -136,11 +163,15 @@ for key in dic_configurations:
             #infile = 'results_2014_may_29/config_simple_%i_%.2e_GeV_100000_events_0.h5'%(int(key), energy_neutrino)
             infile = 'results_2014_may_29/config_simple_%i_%.2e_GeV_1000000_events.h5'%(int(key), energy_neutrino)
         if key in ['-2', '-30', '-100', '-100 x4', '-100 x20', '38000']: 
-            infile = 'results_2014_jun_5/config_simple_%i_%.2e_GeV_1000000_events.h5'%(int(key.split()[0]), energy_neutrino)
+            infile = 'results_2014_jun_5/config_simple_%i_%.2e_GeV_10000000_events.h5'%(int(key.split()[0]), energy_neutrino)
+            if not os.path.exists(infile):
+                infile = 'results_2014_jun_5/config_simple_%i_%.2e_GeV_1000000_events.h5'%(int(key.split()[0]), energy_neutrino)
         if key in ['6000']:
             infile = 'results_2014_aug_7/config_simple_%i_%.2e_GeV_1000000_events.h5'%(int(key), energy_neutrino)
         if key in ['6000_ross']:
             infile = 'results_2014_aug_7/config_simple_%s_%.2e_GeV_1000000_events.h5'%(key, energy_neutrino)
+
+        print infile
 
         dic_data[key]['volumetric_acceptance'][ii], \
             dic_data[key]['volumetric_acceptance_error_low'][ii], \
@@ -156,8 +187,8 @@ pylab.figure()
 pylab.xscale('log')
 pylab.yscale('log')
 
-pylab.plot(1.e-6 * icecube_energy_contained, icecube_acceptance_contained, linestyle='-', color='black', linewidth=4, label='IceCube, contained event analysis')
-pylab.plot(1.e-6 * icecube_energy, icecube_acceptance, linestyle='--', color='black', linewidth=4, label='IceCube, extremely high energy search')
+pylab.plot(1.e-6 * icecube_energy_contained, icecube_volumetric_acceptance_contained, linestyle='-', color='black', linewidth=4, label='IceCube, contained event analysis')
+pylab.plot(1.e-6 * icecube_energy, icecube_volumetric_acceptance, linestyle='--', color='black', linewidth=4, label='IceCube, extremely high energy search')
 
 for key in order:
 #for key in ['-2']:
@@ -179,23 +210,28 @@ for key in order:
     #           linestyle=dic_linestyle[key], color=dic_color[key], linewidth=dic_linewidth[key], label=dic_configurations[key])
     # THIS VERSION CURRENTLY USED FOR PAPER
 
-    pylab.errorbar(1.e-6 * energy_neutrino_array[cut], dic_adjust[key] * dic_data[key]['volumetric_acceptance'][cut],
-                   yerr=[dic_data[key]['volumetric_acceptance_error_low'][cut], dic_data[key]['volumetric_acceptance_error_high'][cut]],    
-                   label=dic_configurations[key])
+    pylab.plot(1.e-6 * energy_neutrino_array[cut], dic_adjust[key] * dic_data[key]['volumetric_acceptance'][cut], 
+               linestyle=dic_linestyle[key], color=dic_color[key], linewidth=dic_linewidth[key], label=dic_configurations[key])
+
+    #pylab.errorbar(1.e-6 * energy_neutrino_array[cut], dic_adjust[key] * dic_data[key]['volumetric_acceptance'][cut],
+    #               yerr=[dic_data[key]['volumetric_acceptance_error_low'][cut], dic_data[key]['volumetric_acceptance_error_high'][cut]],    
+    #               label=dic_configurations[key])
     
     #pylab.errorbar(energy_neutrino_array, dic_adjust[key] * dic_time[key] * dic_data[key]['volumetric_acceptance'],
     #               yerr=[dic_adjust[key] * dic_time[key] * dic_data[key]['volumetric_acceptance_error_low'], 
     #                     dic_adjust[key] * dic_time[key] * dic_data[key]['volumetric_acceptance_error_high']],    
     #               label=dic_configurations[key])
 
-pylab.xlabel('Neutrino Energy (PeV)', fontsize='large')
+pylab.xlabel('Neutrino Energy (PeV)')#, labelpad=10)
 #pylab.ylabel(r'A$\Omega$ (m$^2$ sr)', fontsize='large') # THIS VERSION CURRENTLY USED FOR PAPER
 pylab.ylabel(r'V$\Omega$ (km$^3$ sr)')
 #pylab.ylabel(r'V$\Omega$ $\times$ Livetime (km$^3$ sr yr)')
-pylab.legend(loc='lower right', fontsize=14, frameon=False)# title='Elevation, Ice Model, Livetime Factor')
+pylab.legend(loc='lower right', fontsize=15, frameon=False)# title='Elevation, Ice Model, Livetime Factor')
 #pylab.xlim([10**5.0, 10**12.])
-pylab.xlim([10**(-1.0), 10**6.])
+pylab.xlim([10**(-2.0), 10**6.])
 #pylab.ylim([1.e0, 1.e6])
+pylab.draw()
+pylab.tight_layout()
 
 if save:
     pylab.savefig('acceptance_comparison.pdf')
@@ -322,10 +358,14 @@ dic_zorder = {'-100': 2,
 
 dic_model = {'kotera_2010_optimistic': 'Kotera et al. 2010, Optimistic Cosmogenic',
              'kotera_2010_pessimistic': 'Kotera et al. 2010, Pessimistic Cosmogenic',
+             'kotera_2010_iron_high_emax': r'Kotera et al. 2010, High E$_{\rm max}$ Iron Cosmogenic',
+             'kotera_2010_iron_low_emax': r'Kotera et al. 2010, Low E$_{\rm max}$ Iron Cosmogenic',
              'icecube_2014_power_law': 'IceCube 2014, Power Law',
              'icecube_2014_exp_cutoff': 'IceCube 2014, Power Law w/ Exponential Cutoff at 1 PeV'}
 
-energy_bins = 10.**numpy.arange(5, 12.1, 1.)
+energy_bins = 10.**numpy.arange(5, 12.1, 0.5) # Was 1 bin per decade
+#energy_bins = 10.**numpy.arange(4.5, 12.1, 0.5)
+#energy_bins = numpy.concatenate([[10**4.5], energy_bins])
 
 for key_model in dic_model.keys():
     pylab.figure()
@@ -347,44 +387,65 @@ for key_model in dic_model.keys():
         print '%40s   %10.2f%10.2f%10.2f%10.2f%10.2f%10.2f%10.2f%10.2f'%(dic_configurations[key],
                                                                          values[0], values[1], values[2], values[3], values[4], values[5], values[6], numpy.sum(values))
 
-    pylab.xlabel('Neutrino Energy (PeV)', fontsize='large')
+    pylab.xlabel('Neutrino Energy (PeV)')#, labelpad=10)
     #pylab.ylabel(r'Rate above Energy Threshold (yr$^{-1}$)')                                                                                                                                              
-    pylab.ylabel('Number of Detected Events (3 Years)', fontsize='large')
+    pylab.ylabel('Number of Detected Events (3 Years)')
     #pylab.ylabel('dN/dlog(E) (Duration of Experiment)')
-    pylab.title(dic_model[key_model])
-    pylab.legend(loc='upper right', fontsize=14, frameon=False)# title='Elevation, Ice Model, Livetime Factor')
-    pylab.xlim([10**5., 10**12])
-    pylab.xlim([10**-1., 10**6])
+    pylab.title(dic_model[key_model], fontsize=20)
+    pylab.legend(loc='upper right', fontsize=16, frameon=False)# title='Elevation, Ice Model, Livetime Factor')
+    pylab.xlim([10**5, 10**12])
+    pylab.xlim([10**(-1.), 10**6])
     #pylab.xlim([5., 12.])
     #pylab.xticks([5, 6, 7, 8, 9, 10, 11, 12], [r'10^{5}', r'10^{6}', r'10^{7}', r'10^{8}', r'10^{9}', r'10^{10}', r'10^{11}', r'10^{12}'])
     #pylab.ylim([1.e-1, 1.e3])
     #pylab.ylim([0., 30.])
     pylab.ylim([0., 1.5 * numpy.max(values)])
-
+    pylab.draw()
+    pylab.tight_layout()
+    
     if save:
         pylab.savefig('hist_detected_events_linear_scale_%s.pdf'%(key_model))
 
 ############################################################
 
+"""
 dic_model_linestyle = {'kotera_2010_optimistic': '-',
                        'kotera_2010_pessimistic': '--',
+                       'kotera_2010_iron_high_emax': '-',
+                       'kotera_2010_iron_low_emax': '--',
                        'icecube_2014_power_law': ':',
                        'icecube_2014_exp_cutoff': '-.'}
+"""
+
+dic_model_linestyle = collections.OrderedDict([('kotera_2010_optimistic', '-'),
+                                               ('kotera_2010_pessimistic', '--'),
+                                               #('kotera_2010_iron_high_emax', '-'),
+                                               #('kotera_2010_iron_low_emax', '--'),
+                                               ('icecube_2014_power_law', ':'),
+                                               ('icecube_2014_exp_cutoff', '-.')])
 
 pylab.figure()
 pylab.xscale('log')
 pylab.yscale('log')
 
-for key_model in dic_model.keys():
+for key_model in dic_model_linestyle.keys():
+    print key_model
     energy, e2dNdE = zip(*gnosim.sim.fold_spectrum.model_dict[key_model])
-    pylab.plot(energy, e2dNdE, label=dic_model[key_model], linewidth=2, color='black', linestyle=dic_model_linestyle[key_model])
+    energy = numpy.array(energy)
+    if 'iron' in key_model:
+        color = 'red'
+    else:
+        color = 'black'
+    pylab.plot(1.e-6 * energy, e2dNdE, label=dic_model[key_model], linewidth=2, color=color, linestyle=dic_model_linestyle[key_model])
     
-pylab.legend(loc='upper right', frameon=False, fontsize=12)
-pylab.xlim(1.e5, 1.e12)
+pylab.legend(loc='upper center', frameon=False, fontsize=15) # Normally 14
+#pylab.xlim(1.e5, 1.e12)
+pylab.xlim(10**(-1.), 1.e6)
 pylab.ylim(10**(-10.5), 10**(-6.5))
+pylab.xlabel('Neutrino Energy (PeV)')#, labelpad=10)
+pylab.ylabel(r'E$^{2}$ dN/dE (GeV cm$^{-2}$ s$^{-1}$ sr$^{-1}$)')
+pylab.draw()
+pylab.tight_layout()
 
-pylab.xlabel('Neutrino Energy (GeV)', fontsize='large')
-pylab.ylabel(r'E$^{2}$ dN/dE (GeV cm$^{-2}$ s$^{-1}$ sr$^{-1}$)', fontsize='large')
-
-#if save:
-#      pylab.savefig('model_comparison.pdf')     
+if save:
+      pylab.savefig('model_comparison.pdf')     

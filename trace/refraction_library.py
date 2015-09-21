@@ -124,10 +124,10 @@ def rayTrace(origin, phi_0, theta_0, t_max=50000., t_step=1.): # t_max=40000, t_
     #       a dynamic t_step 
 
     # ORIGINAL
-    #n_steps =  int(t_max / t_step)
+    n_steps =  int(t_max / t_step)
     # ORIGINAL
     # NEW
-    n_steps = 100000 # 1000000, Arbitrary large number, but might be too big...
+    #n_steps = 100000 # 1000000, Arbitrary large number, but might be too big...
     # NEW
     
     # ORIGINAL
@@ -1035,19 +1035,23 @@ if __name__ == '__main__':
     #library_dir = 'library_38000_deep'
     #library_dir = 'library_38000_mid'
     #library_dir = 'library_-1500_arthern'
-    library_dir = 'library_-100_arthern'
+    #library_dir = 'library_-100_arthern'
     #library_dir = 'library_-30_arthern'
     #library_dir = 'library_-2_arthern'
     #library_dir = 'library_6000_ross'
     #library_dir = 'library_6000_mid'
+    #library_dir = 'library_-30_arthern_steph'
+    #library_dir = 'library_-75_arthern_steph'
+    library_dir = 'library_-100_arthern_steph'
     print 'library dir = %s'%(library_dir)
     print 'z_0 = %.2f'%(z_0)
     print 'ice model = %s'%(gnosim.earth.greenland.ice_model_default)
    
     #theta_array = numpy.degrees(numpy.arccos(numpy.linspace(-1, 0, 20)))
     #theta_array = numpy.linspace(10., 170., 20)
-    theta_array = numpy.linspace(0., 180., 60) # 60, THIS IS THE USUAL FOR SUBTERRANEAN CONFIGURATIONS
+    #theta_array = numpy.linspace(0., 180., 60) # 60, THIS IS THE USUAL FOR SUBTERRANEAN CONFIGURATIONS
     #theta_array = numpy.linspace(90.01, 180., 30) # TESTING ROSS ICE SHELF AND LIGHTPOST IDEA
+    theta_array = 90. - numpy.array([10., 20., 30., 40.]) # For Steph, switching from elevation angle to zenith angle
 
     """
     # WANT TO TAKE INTO ACCOUNT CURVATURE OF THE EARTH HERE

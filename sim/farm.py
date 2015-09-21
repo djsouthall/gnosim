@@ -18,7 +18,7 @@ config_file_array = ['config_simple_38000.py',
                      'config_simple_-30.py',
                      'config_simple_-100.py']
 """
-energy_neutrino_array = 10**numpy.arange(5., 5.4, 0.5) # GeV
+energy_neutrino_array = 10**numpy.arange(4., 4.4, 0.5) # GeV
 #energy_neutrino_array = 10**numpy.arange(7., 12.1, 0.5) # GeV
 #energy_neutrino_array = 10**numpy.array([9.]) # GeV
 n_events = 100000
