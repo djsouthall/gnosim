@@ -200,7 +200,7 @@ def density(z, ice_model=ice_model_default):
                   * (density_deep - (density_deep - density_critical) * numpy.exp((z - z_critical) / scale_2)) # kg m^-3
         return density / gnosim.utils.constants.mass_proton # convert from kg m^-3 to nucleons m^-3
     else:
-        print 'WARNING'
+        print ('WARNING')
         return -999
 
 ############################################################
@@ -301,7 +301,7 @@ def indexOfRefraction(z, ice_model=ice_model_default):
         value[cut_2] = 1. + (k * density(z[cut_2], ice_model=ice_model) * gnosim.utils.constants.mass_proton)
         value[cut_3] = n_air
     else:
-        print 'WARNING'
+        print ('WARNING')
         return -999
 
     if scalar:
@@ -368,7 +368,7 @@ def attenuationLength(z, frequency, ice_model=ice_model_default):
     elif ice_model in ['arthern']:
         attenuation_length = attenuationLengthBase(temperature(z), frequency) # m
     else:
-        print 'WARNING'
+        print ('WARNING')
         attenuation_length = 1000. # m
 
     if numpy.isscalar(z):

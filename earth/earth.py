@@ -305,7 +305,7 @@ if __name__ == "__main__":
     pylab.figure()
     survival_array = []
     for energy_neutrino in energy_neutrino_array:
-        print 'Energy neutrino = %e'%(energy_neutrino)
+        print ('Energy neutrino = %e'%(energy_neutrino))
         survival_array.append([])
         for theta in theta_array:
             survival_array[-1].append(probSurvival(energy_neutrino, theta))
@@ -317,7 +317,7 @@ if __name__ == "__main__":
     pylab.figure()
     survival_anti_array = []
     for energy_neutrino in energy_neutrino_array:
-        print 'Energy neutrino = %e'%(energy_neutrino)
+        print ('Energy neutrino = %e'%(energy_neutrino))
         survival_anti_array.append([])
         for theta in theta_array:
             survival_anti_array[-1].append(probSurvival(energy_neutrino, theta, anti=True))

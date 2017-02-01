@@ -8,6 +8,8 @@ import sys
 import numpy
 import h5py
 import pylab
+import json
+import yaml
 
 import gnosim.utils.quat
 import gnosim.earth.earth
@@ -24,7 +26,8 @@ class Sim:
 
     def __init__(self, config_file):
         self.config_file = config_file
-        self.config = eval(''.join(open(config_file).readlines()))
+        #self.config = eval(''.join(open(config_file).readlines()))
+        self.config = yaml.load(open(config_file))
         self.detector()
 
         # List attributes of interest
@@ -172,7 +175,7 @@ class Sim:
         #flag_reflect = numpy.zeros(events)
 
         for ii in range(0, n_events):
-            print 'Event (%i/%i)'%(ii, n_events)
+            print ('Event (%i/%i)'%(ii, n_events))
             #p_interact[ii], p_earth[ii], p_detect[ii], electric_field_direct[ii], electric_field_crossover[ii], electric_field_reflect[ii], flag_direct[ii], flag_crossover[ii], flag_reflect[ii], dic_direct, dic_crossover, dic_reflect \
             #    = self.event(energy_neutrino[ii], phi[ii], theta[ii], x[ii], y[ii], z[ii], anti=anti)
             p_interact[ii], p_earth[ii], p_detect[ii], inelasticity[ii], electric_field_max[ii], dic_max, observation_angle_max[ii], solution_max[ii], index_station_max[ii], index_antenna_max[ii] \
@@ -188,7 +191,7 @@ class Sim:
 
         for ii in range(0, n_events):
             if p_detect[ii]:
-                print r[ii], z_0[ii], electric_field_max[ii]
+                print (r[ii], z_0[ii], electric_field_max[ii])
 
         cut = (p_detect == 1.)
         cut_inv = numpy.logical_not(cut)
