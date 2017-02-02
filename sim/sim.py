@@ -10,6 +10,7 @@ import h5py
 import pylab
 import json
 import yaml
+import os
 
 import gnosim.utils.quat
 import gnosim.earth.earth
@@ -287,15 +288,19 @@ if __name__ == "__main__":
     #detector_volume_radius = float(sys.argv[5]) # m, 1200 for Ross surface, 51000 for Minna bluff, >6000 for subterranean
     #detector_volume_depth = float(sys.argv[6]) # m, 500 for Ross and Minna, 3000 for subterranean
 
-    outfile = 'results_2014_dec_5/%s_%.2e_GeV_%i_events_%i.h5'%(config_file.replace('.py', ''),
+    config_file_fix = config_file.replace('/home/chipmansb/gnosim/sim/','')
+    outfile = 'results_2014_dec_5_%s_%.2e_GeV_%i_events_%i.h5'%(config_file_fix.replace('.py', ''),
                                                                 energy_neutrino,
                                                                 n_events,
                                                                 index)
     
+    #f = h5py.File(outfile, 'w')
+     
     my_sim = Sim(config_file)
     my_sim.throw(energy_neutrino, n_events=n_events, 
                  detector_volume_radius=my_sim.config['detector_volume']['radius'],
                  detector_volume_depth=my_sim.config['detector_volume']['depth'],
                  outfile=outfile)
+    #f.close()
 
 ############################################################

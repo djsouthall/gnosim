@@ -14,22 +14,23 @@ infile = sys.argv[1]
 
 reader = h5py.File(infile, 'r')
 
-title = r'E$_{\nu}$ = %.2e GeV, Depth = %.1f, %i Events'%(float(os.path.basename(infile).split('_')[3]),
-                                                          -1. * float(os.path.basename(infile).split('_')[2]),
-                                                          int(os.path.basename(infile).split('_')[5]))
+title = 'E$_{\nu}$ = %.2e GeV, Depth = %.1f, %i Events'%(float(os.path.basename(infile).split('_')[3]),
+#                                                          -1. * float(os.path.basename(infile).split('_')[2]),
+#                                                         int(os.path.basename(infile).split('_')[5]))
+
 
 # Interaction vertex has a ray-tracing solution
 cut_seen = reader['p_detect'][...] == 1. 
 cut_unseen = numpy.logical_not(cut_seen)
 
 # Interaction vertex has ray-tracing solution, and at least 50% probability to survive Earth passage
-cut_detectable = numpy.logical_and(reader['p_detect'][...] == 1., reader['p_earth'][...] >= 0.5) 
+cut_detectable == numpy.logical_and(reader['p_detect'][...] == 1., reader['p_earth'][...] >= 0.5) 
 
 if len(sys.argv) == 3:
     electric_field_threshold = float(sys.argv[2])
 else:
     electric_field_threshold = 1.e-4 # 1.e-5
-print 'Electric field threshold = %.2e'%(electric_field_threshold)
+print ('Electric field threshold = %.2e'%(electric_field_threshold))
 
 # Interaction vertex has ray-tracing solution, and at least 50% probability to survive Earth passage, and electric field threshold crossed
 cut_detected = numpy.logical_and(reader['electric_field'][...] > electric_field_threshold, reader['p_earth'][...] >= 0.5)
@@ -40,12 +41,12 @@ cut_bottom = numpy.logical_and(reader['solution'][...] >= 3, reader['solution'][
 cut_detected_no_bottom = numpy.logical_and(cut_detected, cut_no_bottom)
 cut_detected_bottom = numpy.logical_and(cut_detected, cut_bottom)
 
-#print numpy.sum(cut_seen), numpy.sum(cut_detected), len(cut_seen)
+#print (numpy.sum(cut_seen), numpy.sum(cut_detected), len(cut_seen))
 
-print '# Events with ray-tracing solutions = %i'%(numpy.sum(cut_seen))
-print '# Events detectable                 = %i'%(numpy.sum(cut_detectable))
-print '# Events detected                   = %i'%(numpy.sum(cut_detected))
-print '# Events total                      = %i'%(len(cut_seen))
+print ('# Events with ray-tracing solutions = %i'%(numpy.sum(cut_seen)))
+print ('# Events detectable                 = %i'%(numpy.sum(cut_detectable)))
+print ('# Events detected                   = %i'%(numpy.sum(cut_detected)))
+print ('# Events total                      = %i'%(len(cut_seen)))
 
 r = numpy.sqrt(reader['x_0'][...]**2 + reader['y_0'][...]**2)
 """
@@ -229,5 +230,5 @@ volumetric_acceptance = numpy.sum(reader['p_earth'][...] \
                                   * (reader['electric_field'][...] > electric_field_threshold) \
     * reader.attrs['geometric_factor']) / float(reader['p_interact'].shape[0]) * gnosim.utils.constants.km_to_m**-3 # km^3 sr
 
-print 'Volumetric Acceptance = %.2e km^3 sr water equivalent'%(volumetric_acceptance)
-print 'Efficiency = %.2e (%.2e -- %.2e)'%(efficiency, efficiency_low, efficiency_high)
+print ('Volumetric Acceptance = %.2e km^3 sr water equivalent'%(volumetric_acceptance))
+print ('Efficiency = %.2e (%.2e -- %.2e)'%(efficiency, efficiency_low, efficiency_high))

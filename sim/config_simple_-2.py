@@ -6,7 +6,7 @@
  'antennas': {'n': 1,
               'positions': [[0., 0., 0.]],
               'types': ['simple']},
- 'antenna_definitions': {'simple': {'lib': '/home/chipmansb/gnosim/trace/library_-2_arthern/*.h5',
+ 'antenna_definitions': {'simple': {'lib': '/home/chipmansb/library_-2_arthern/*.h5',
                                     'frequency_low': 0.1, # GHz
                                     'frequency_high': 0.8, # GHz
                                     'temp': 300.}} # K

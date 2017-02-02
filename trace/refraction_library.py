@@ -529,7 +529,8 @@ class RefractionLibrary:
             print ('Sparse ray traces')
 
     def makeHull(self, dic):
-        hull = scipy.spatial.ConvexHull(zip(dic['r'], dic['z']))
+        hull = scipy.spatial.ConvexHull(list(zip(dic['r'], dic['z'])))
+        
         return dic['r'][hull.vertices], dic['z'][hull.vertices]
 
     def getValue(self, dic, r, z):
