@@ -14,17 +14,17 @@ infile = sys.argv[1]
 
 reader = h5py.File(infile, 'r')
 
-title = 'E$_{\nu}$ = %.2e GeV, Depth = %.1f, %i Events'%(float(os.path.basename(infile).split('_')[3]),
-#                                                          -1. * float(os.path.basename(infile).split('_')[2]),
-#                                                         int(os.path.basename(infile).split('_')[5]))
-
+#title = 'E$_{\nu}$ = %.2e GeV, Depth = %.1f, %i Events'%(float(os.path.basename(infile).split('_')[3]),
+ #                                                         -1. * float(os.path.basename(infile).split('_')[2]),
+  #                                                       int(os.path.basename(infile).split('_')[5]))
+title=infile + " Plot"
 
 # Interaction vertex has a ray-tracing solution
-cut_seen = reader['p_detect'][...] == 1. 
+cut_seen = reader['p_detect'][...] == 1.
 cut_unseen = numpy.logical_not(cut_seen)
 
 # Interaction vertex has ray-tracing solution, and at least 50% probability to survive Earth passage
-cut_detectable == numpy.logical_and(reader['p_detect'][...] == 1., reader['p_earth'][...] >= 0.5) 
+cut_detectable = numpy.logical_and(reader['p_detect'][...] == 1., reader['p_earth'][...] >= 0.5)
 
 if len(sys.argv) == 3:
     electric_field_threshold = float(sys.argv[2])
@@ -43,10 +43,11 @@ cut_detected_bottom = numpy.logical_and(cut_detected, cut_bottom)
 
 #print (numpy.sum(cut_seen), numpy.sum(cut_detected), len(cut_seen))
 
-print ('# Events with ray-tracing solutions = %i'%(numpy.sum(cut_seen)))
-print ('# Events detectable                 = %i'%(numpy.sum(cut_detectable)))
-print ('# Events detected                   = %i'%(numpy.sum(cut_detected)))
-print ('# Events total                      = %i'%(len(cut_seen)))
+print ('# Events with ray-tracing solutions = %s'%(numpy.sum(cut_seen)))
+print ('# Events detectable                 = %s'%(numpy.sum(cut_detectable)))
+print ('# Events detected                   = %s'%(numpy.sum(cut_detected)))
+print ('# Events total                      = %s'%(len(cut_seen)))
+#UNCOMMENT ME
 
 r = numpy.sqrt(reader['x_0'][...]**2 + reader['y_0'][...]**2)
 """
@@ -71,7 +72,8 @@ colorbar.set_label('Probability Earth')
 pylab.xlabel('Cos(Theta)')
 pylab.ylabel(r'Electric Field (V m$^{-1}$)')
 pylab.title(title)
-
+"""
+"""
 pylab.figure()
 pylab.scatter(reader['d'][cut_seen], reader['a_v'][cut_seen], edgecolors='none')
 pylab.xlabel('Distance (m)')
@@ -87,6 +89,7 @@ pylab.ylabel(r'Electric Field (V m$^{-1}$)')
 pylab.title(title)
 """
 """
+
 pylab.figure()
 pylab.yscale('log')
 pylab.scatter(reader['d'][cut_detected], reader['electric_field'][cut_detected], c=reader['observation_angle'][cut_detected], edgecolors='none')
@@ -184,7 +187,7 @@ pylab.figure()
 
 bins = numpy.linspace(0, 5000., 51)
 
-#pylab.yscale('log')
+pylab.yscale('log')
 #pylab.hist(reader['d'][cut_detected], bins=41, normed=True, color='blue', weights=reader['d'][cut_detected]**(-2))
 normed = False
 values = pylab.hist(reader['d'][cut_detected], bins=bins, normed=normed, color='blue', alpha=0.5, label='Detected')[0]
@@ -200,9 +203,11 @@ pylab.xlabel('Distance (m)')
 pylab.ylabel('PDF')
 pylab.title(title)
 pylab.legend(loc='upper left')
-
+infilefix = infile.replace('results_2014_dec_5_','')
+pylab.savefig("Graphs/" + infilefix + "_eff.png")
 pylab.figure()
-pylab.plot(bins[1:], values / v)
+#pylab.plot(bins[1:], values/v  )
+pylab.plot(bins[1:], values)
 
 """
 
@@ -232,3 +237,6 @@ volumetric_acceptance = numpy.sum(reader['p_earth'][...] \
 
 print ('Volumetric Acceptance = %.2e km^3 sr water equivalent'%(volumetric_acceptance))
 print ('Efficiency = %.2e (%.2e -- %.2e)'%(efficiency, efficiency_low, efficiency_high))
+
+
+input("press any key to exit")

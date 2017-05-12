@@ -1,9 +1,11 @@
-=== OVERVIEW ===
+READ ME 2.0=== OVERVIEW ===
 
 Greenland Neutrino Observatory Simulator (GNOSim)
 
 Keith Bechtol
 bechtol@kicp.uchicago.edu
+
+
 
 === USAGE EXAMPLES ===
 
@@ -11,6 +13,9 @@ Fast-track to running simulations. Follow these steps:
 
 1. Precompute ray-tracing libraries
    gnosim/trace/refraction_library.py
+
+   The file should be run from the user's home directory. 
+   On approximately line 1030 of the refraction_library.py file, set z_0 to the appropriate depth, and comment out the other options. Below that, comment in the appropriate file name, containing the ice model and depth being used.
 
    This will create a folder containing multiple traces through the ice corresponding
    to different elevation angles at the antenna. The RefractionLibrary class manages
@@ -33,9 +38,11 @@ Fast-track to running simulations. Follow these steps:
 
 === CODE REPOSITORY ===
 
-https://bitbucket.org/bechtol/gnosim/
+[Midway Repo]
 
 === DEPENDENCIES ===
+
+Python Version 3.4
 
 Python packages:
 numpy - http://www.numpy.org/

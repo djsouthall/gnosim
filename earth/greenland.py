@@ -422,5 +422,5 @@ if __name__ == "__main__":
     pylab.xlabel('Elevation (m)')
     pylab.ylabel('Electric Field Attenuation Length (m)')
     pylab.xlim([-3000., 0.])
-    
+    input("press any key to exit") 
 ############################################################

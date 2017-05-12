@@ -914,9 +914,16 @@ class RefractionLibrary:
                     r_intersect.append(r[index])
                     z_intersect.append(f_1(r[index]))
                     
+
+
                     selection_1 = numpy.logical_and(dic['theta_ant'] == theta_ant_unique[ii], dic['r'] > r_intersect[-1])
                     selection_2 = numpy.logical_and(dic['theta_ant'] == theta_ant_unique[jj], dic['r'] > r_intersect[-1])
-                    
+                    print(numpy.sum(selection_1))
+                    print(numpy.sum(selection_2))
+                    print (len(selection_1))
+                    print(len(selection_2))
+
+
                     if dic['theta'][selection_1][0] > dic['theta'][selection_2][0]:                                                                       
                         select_cross.append(selection_1)                                                                                               
                     else:
@@ -1027,7 +1034,7 @@ class RefractionLibrary:
 ############################################################
 
 if __name__ == '__main__':
-    z_0 = -2. # -2, -30, -100, 0, 10, 1000, 5000, 6000, 38000
+    z_0 = -50. # -2, -30, -100, 0, 10, 1000, 5000, 6000, 38000
     #library_dir = 'library_-100_deep'
     #library_dir = 'library_-30_deep'
     #library_dir = 'library_-2_deep'
@@ -1038,8 +1045,9 @@ if __name__ == '__main__':
     #library_dir = 'library_38000_mid'
     #library_dir = 'library_-1500_arthern'
     #library_dir = 'library_-100_arthern'
+    library_dir = 'library_-50_arthern'
     #library_dir = 'library_-30_arthern'
-    library_dir = 'library_-2_arthern'
+    #library_dir = 'library_-2_arthern'
     #library_dir = 'library_6000_ross'
     #library_dir = 'library_6000_mid'
     #library_dir = 'library_-30_arthern_steph'

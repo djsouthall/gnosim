@@ -47,7 +47,7 @@ def acceptance(infile, cos_theta_bins=None, electric_field_threshold=1.e-4, eart
             theta_max = theta_min
             theta_min = theta_temp
 
-        print '  Theta %.3f -- %.3f deg'%(theta_min, theta_max)
+        print ('  Theta %.3f -- %.3f deg'%(theta_min, theta_max))
 
         n_total = numpy.sum(numpy.all([reader['theta_0'][...] >= theta_min,
                                        reader['theta_0'][...] <= theta_max],
@@ -59,7 +59,7 @@ def acceptance(infile, cos_theta_bins=None, electric_field_threshold=1.e-4, eart
                                    * (reader['theta_0'][...] >= theta_min) \
                                    * (reader['theta_0'][...] <= theta_max) \
                                    * (reader['electric_field'][...] > electric_field_threshold)))
-            print 'all'
+            print ('all')
             
         elif mode_reflections == 'direct':
             cut_mode_reflections = numpy.logical_and(reader['solution'][...] >= 0, reader['solution'][...] <= 2)
@@ -69,7 +69,7 @@ def acceptance(infile, cos_theta_bins=None, electric_field_threshold=1.e-4, eart
                                    * (reader['theta_0'][...] >= theta_min) \
                                    * (reader['theta_0'][...] <= theta_max) \
                                    * (reader['electric_field'][...] > electric_field_threshold)))
-            print 'direct'
+            print ('direct')
         elif mode_reflections == 'reflect':
             cut_mode_reflections = numpy.logical_and(reader['solution'][...] >= 3, reader['solution'][...] <= 5)
             n_pass = int(numpy.sum(reader['p_earth'][...] \
@@ -78,11 +78,11 @@ def acceptance(infile, cos_theta_bins=None, electric_field_threshold=1.e-4, eart
                                    * (reader['theta_0'][...] >= theta_min) \
                                    * (reader['theta_0'][...] <= theta_max) \
                                    * (reader['electric_field'][...] > electric_field_threshold)))
-            print 'reflect'
+            print ('reflect')
         else:
-            print 'WARNING: mode reflections %s not recognized'%(mode_reflections)
+            print ('WARNING: mode reflections %s not recognized'%(mode_reflections))
 
-        print n_total, n_pass
+        print (n_total, n_pass)
 
         """
         #if allow_reflections:
@@ -91,7 +91,7 @@ def acceptance(infile, cos_theta_bins=None, electric_field_threshold=1.e-4, eart
                                           reader['theta_0'][...] <= theta_max,
                                           reader['electric_field'][...] > electric_field_threshold],
                                          axis=0))
-            print n_pass
+            print (n_pass)
         #else:
         if False:
             #print 'NO REFLECTIONS'
@@ -101,10 +101,10 @@ def acceptance(infile, cos_theta_bins=None, electric_field_threshold=1.e-4, eart
                                           reader['solution'][...] >= 0,
                                           reader['solution'][...] <= 2],
                                          axis=0))
-            print n_pass
+            print (n_pass)
         """
 
-        #print n_total, n_pass, float(n_pass) / n_total, reader.attrs['geometric_factor']
+        #print (n_total, n_pass, float(n_pass) / n_total, reader.attrs['geometric_factor'])
 
         #n_volume = numpy.sum(reader['p_earth'][...] \
         #                     * reader['p_detect'][...] \
@@ -119,8 +119,8 @@ def acceptance(infile, cos_theta_bins=None, electric_field_threshold=1.e-4, eart
         if earth:
             # Including effect of Earth attenuation
 
-            print 'test', len(reader['p_earth'][...])
-            print 'test', len(cut_mode_reflections)
+            print ('test', len(reader['p_earth'][...]))
+            print ('test', len(cut_mode_reflections))
 
             volumetric_acceptance[ii] = numpy.sum(reader['p_earth'][...] \
                                                   * cut_mode_reflections \
