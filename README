@@ -5,17 +5,21 @@ Greenland Neutrino Observatory Simulator (GNOSim)
 Keith Bechtol
 bechtol@kicp.uchicago.edu
 
-
+Shoshana Chipman (contact if there are problems)
+chipmansb@uchicago.edu
 
 === USAGE EXAMPLES ===
 
 Fast-track to running simulations. Follow these steps:
 
 1. Precompute ray-tracing libraries
-   gnosim/trace/refraction_library.py
+   gnosim/trace/refraction_library.py uses the Greenland Ice Model
+   gnosim/trace/refraction_library_beta.py uses the Antarctic Ice Model
 
-   The file should be run from the user's home directory. 
-   On approximately line 1030 of the refraction_library.py file, set z_0 to the appropriate depth, and comment out the other options. Below that, comment in the appropriate file name, containing the ice model and depth being used.
+   The file should be run from the user's home directory. It will be necessary to change the name of the home directory in the configuration file and in the outfile generator of the sim. Search for 'chipmansb'.  
+
+
+   On approximately line 1050 of the refraction library file, set z_0 to the appropriate depth, and comment out the other options. Below that, comment in the appropriate file name, containing the ice model and depth being used.
 
    This will create a folder containing multiple traces through the ice corresponding
    to different elevation angles at the antenna. The RefractionLibrary class manages
@@ -23,18 +27,31 @@ Fast-track to running simulations. Follow these steps:
    elevations, index of refraction profiles, attenuation lengths, etc.
 
 2. Set detector configuration
-   gnosim/sim/config_simple_-2.py (example)
 
-   Currently very simplistic, single station with single antenna.
+   Configuration file naming convention:
+   --number of antenna indicated by simple (1), octo(8), sedec(16)
+   --negative depth in meters
+   --"polar" indicates that it configures for the Antarctic sim
 
-3. Run simulations
+   The sample configuration files are config_octo_-100_polar.py and config_sedec_-100_polar.py, which run the antarcticsim.py and call from different refraction libraries for each antenna. The other configuration files do not yet do this. 
+
+3. Set detector
+   Antenna models currently include 'simple' and 'dipole'. Eventually, this will be routed through the configuration file, but until then, just comment in and out.  
+
+4. Run simulations
    a. One scenario at a time:
-      gnosim/sim/sim.py
-
+      gnosim/sim/sim.py uses the Greenland refraction libraries.
+      gnosim/antarcticsim.py uses the Antarctic refraction libraries.
+      Terminal input should be (from home directory):
+      python gnosim/sim/antarcticsim.py 'gnosim/sim/<config file name>.py' <energy> <number of events> 1
+      (GNOsim runs in Python 3)
    b. Multiple scenarios simultaneously on compute farm:
       gnosim/sim/farm.py
 
       Currently only syntax appropriate to Midway cluster at UChicago.
+
+5. Plot results
+   Terminal Input: python gnsoim/sim/plot_single.py '<name of sim output file>.h5'
 
 === CODE REPOSITORY ===
 
@@ -73,3 +90,6 @@ time (ns)
 frequency (GHz)
 mass (kg)
 See gnosim/utils/constants.py for unit conversions.
+
+NOTES:
+--when left off, attempting to get detector.py to read in antenna type from configuration file, and get plot_single to plot the difference in time from one antenna to the other versus theta
