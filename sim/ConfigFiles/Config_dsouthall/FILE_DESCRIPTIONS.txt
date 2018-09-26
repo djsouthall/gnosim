@@ -1,0 +1,54 @@
+List of simulations and why they differ:
+
+########
+Everything here was used to test getting out more info from the events. This means I introduced
+the 'info' key to the output h5 files, and some other things.  These used 60 rays and the 2 point
+weighted average method of value interpolation. 
+
+20766082 2018-07-16 15:08 results_2018_july_config_octo_-200_polar_1.00e+08_GeV_100000_events_2.h5
+   83439 2018-07-16 16:34 results_2018_july_config_octo_-200_polar_1.00e+08_GeV_100_events_1.h5
+  271009 2018-07-16 17:18 results_2018_july_config_octo_-200_polar_1.00e+08_GeV_1000_events_1.h5
+   83439 2018-07-16 17:45 results_2018_july_config_octo_-200_polar_1.00e+08_GeV_99_events_1.h5
+   83786 2018-07-16 18:07 results_2018_july_config_octo_-200_polar_1.00e+08_GeV_101_events_1.h5
+   93969 2018-07-17 09:32 results_2018_july_config_octo_-200_polar_1.00e+08_GeV_150_events_1.h5
+   93770 2018-07-17 09:54 results_2018_july_config_octo_-200_polar_1.00e+08_GeV_151_events_1.h5
+   92139 2018-07-17 12:00 results_2018_july_config_octo_-200_polar_1.00e+08_GeV_152_events_1.h5
+   92436 2018-07-17 12:13 results_2018_july_config_octo_-200_polar_1.00e+08_GeV_153_events_1.h5
+19818180 2018-07-17 14:07 results_2018_july_config_octo_-200_polar_1.00e+08_GeV_100000_events_3.h5
+   61440 2018-07-17 16:10 results_2018_july_config_octo_-200_polar_1.00e+08_GeV_2_events_1.h5
+   64717 2018-07-23 20:43 results_2018_july_config_octo_-200_polar_1.00e+08_GeV_20_events_1.h5
+#########
+   
+   
+   
+#########
+Everything in this section was created with the random seed = 0, with the purpose of comparing the effects of
+double the ray density to 120.  The delaunay files used the delaunay triangulation method of event
+identification.  Some of these use a 3 point weighted average similar to the 2p version.  Then 1
+uses that, but with 2/3 of the points haing half weight to compensate for 2 points on the same ray
+being double weighted.  Then the later ones use the barycentric weighting, which in general works
+much better and interpolating triangles.  All of these still have issues with a concave hull being
+used when it should be convex, so the majority of outlier points are from that.  Overall patterns
+are more likly to come from not enough rays or ray interpolation failing.  Individual explanations follow:
+
+#Seeded standard 2p weighted averaging, 60 rays:
+ 9936697 2018-07-24 10:27 results_2018_july_config_octo_-200_polar_1.00e+08_GeV_50000_events_0_seed_1.h5
+
+#Seeded standard 2p weighted averaging, 120 rays:
+ 9783982 2018-07-24 18:42 results_2018_july_config_octo_-200_polar_double_1.00e+08_GeV_50000_events_0_seed_1.h5
+ 
+#Seeded standard 3p weighted averaging using delaunay triangle vertices, 60 rays (bad run, weighting was incorrectly coded):
+10162872 2018-07-25 11:00 results_2018_july_config_octo_-200_polar_delaunay_1.00e+08_GeV_50000_events_0_seed_1.h5
+
+#Seeded standard 3p weighted averaging using delaunay triangle vertices, 60 rays (fixed weighting):
+10256846 2018-07-25 14:03 results_2018_july_config_octo_-200_polar_delaunay_1.00e+08_GeV_50000_events_0_seed_2.h5
+
+#Seeded standard 3p weighted averaging using delaunay triangle vertices, 60 rays (2/3 weights halved):
+10005739 2018-07-25 16:31 results_2018_july_config_octo_-200_polar_delaunay_1.00e+08_GeV_50000_events_0_seed_3.h5
+
+#Seeded barycentric coordinate weighted averaging using delaunay triangle vertices, 60 rays:
+ 9926937 2018-07-26 14:00 results_2018_july_config_octo_-200_polar_delaunay_1.00e+08_GeV_50000_events_0_seed_4.h5
+ 
+#Seeded barycentric coordinate weighted averaging using delaunay triangle vertices, 120 rays:
+ 9778280 2018-07-26 15:37 results_2018_july_config_octo_-200_polar_delaunay_double_1.00e+08_GeV_50000_events_0_seed_1.h5
+########

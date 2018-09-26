@@ -1,3 +1,181 @@
+READ ME 3.0=== OVERVIEW ===
+
+Greenland Neutrino Observatory Simulator (GNOSim)
+
+Keith Bechtol
+bechtol@kicp.uchicago.edu
+
+Shoshana Chipman 
+chipmansb@uchicago.edu
+
+Dan Southall (contact if there are problems)
+dsouthall@uchicago.edu
+
+=== USAGE EXAMPLES ===
+
+Fast-track to running simulations. Follow these steps:
+
+1. Precompute ray-tracing libraries
+   gnosim/trace/refraction_library.py uses the Greenland Ice Model
+   gnosim/trace/refraction_library_beta.py uses the Antarctic Ice Model
+
+   The file should be run from the user's home directory (such that any paths defined
+   in the refraction_library files such as 'gnosim.utils.constants' are appropriately 
+   found by the code).  This can be done by opening the python shell in the appropriate 
+   directory (containing the gnosim folder) and then typing: 
+   'exec(open('./gnosim/trace/refraction_library_beta.py').read())' 
+   into the shell.  Ensure you are running a version of python 3 that can 
+   import numpy, scipy, h5py, and pylab.   It will be necessary to change the name of 
+   the home directory in the configuration file and in the outfile generator of the sim. 
+   Search for 'chipmansb' or 'dsouthall' <- probably this one as I was most recently 
+   working on the code.
+
+   Creating a library with either refraction library has several options to set before
+   running:
+   
+   make_library  = True # Tells the code to throw the rays.  If you want to plot a previously 
+                        # built library wth plot_library than you likely want to set make_library to False
+
+   split_library = True # Will split the library by solution type.  This is memory intensive so it has been
+                        # included here as an option to do once seperately (rather than during each simulation)
+                        # Split libraries will be loaded by the simulation if they are available to save runtime
+                        # and memory requirements. 
+
+   plot_library  = True # Plots the thrown rays 
+
+   save_envelope = True # Will find points to use for the concave hull.  This can also be done before the actual
+                        # simulation, as it does not change based on sim params and is a characteristic of the library.
+                        # The accuracy of this algorithm is sensitive to the number of bins used when calculating it, and
+                        # this number varies with solution type.  To adjust the bins go to the algorithm and find the dir
+                        # called concave_hull.  Values I found to work for antarctic rays (~120-360 rays thrown) are:
+                        # concave_hull = {'direct':{'n_bins':1000},'cross':{'n_bins':1500},'reflect':{'n_bins':2000},'direct_2':{'n_bins':500},'cross_2':{'n_bins':400},'reflect_2':{'n_bins':2000}}
+                        # It is recommended that you check the validity of the hull using plot_envelope and then adjust
+                        # the values of n_bins as needed for each hull.  Note if r_limit is set then these numbers might
+                        # need to be adjusted.  
+                        
+   plot_envelope = True # Plots the envelopes.
+
+   z_array = [z_0,...]  # A list of depth values to create libraries for.  These should be negative.
+
+   n_rays = 360         # The number of rays to throw per library.  These will be evenly spaced between 0 and 180
+                        # It is recommended that you avoid 90deg being one of the selected rays, as this ray will see
+                        # no change in refractive index and will only go straight, negatively affecting hulls.  
+                        # (maybe I am wrong and you should ensure there isa  90 deg solution to catch any events that
+                        # occur precicely at the detector depth, but these rays are essentially non-existent so I think
+                        # you should just avoid having a ray at 90deg)
+
+   r_limit = None       # If this is NOT None, then all thrown rays will quit once they read this particular radius.  
+                        # Use with care.  If you want a simulation with r = 6300m, it might be advisable to make 
+                        # r_limit = 7000 so the boundaries of hulls are still well defined
+
+
+   This will create a folder containing multiple traces through the ice corresponding
+   to different elevation angles at the antenna. The RefractionLibrary class manages
+   the output trace files. Need to regenerate trace libraries for different antenna
+   elevations, index of refraction profiles, attenuation lengths, etc.
+
+   If you are having troubles running you may need to include a line before the first called 
+   gnosim import functions to include the path gnosim is located: sys.path.append('<where-gnosim-is>')
+
+
+2. Set detector configuration
+
+   Configuration file naming convention:
+   --number of antenna indicated by simple (1), octo(8), sedec(16)
+   --negative depth in meters
+   --"polar" indicates that it configures for the Antarctic sim
+
+   The sample configuration files can be found in the ConfigFiles directory 
+   (More up to date examples in the dsouthall subdirectory)
+
+3. Set detector
+   Detector types are currently a main focus of development and have no real options.
+   It is recommended you just follow the example config files.  The antennas currently
+   have no imposed beam shape.  Signal thresholding is done offline with single integrated
+   electric field gates in analysis after the simulation is run.  Examples of this are
+   in the volumetric_acceptance.py and arrival_times_testing.py analysis scripts.
+   Antenna models currently include 'simple' and 'dipole'. Eventually, this will be routed through the configuration file, but until then, just comment in and out.  
+
+4. Run simulations
+   a. One scenario at a time:
+      gnosim/sim/sim.py uses the Greenland refraction libraries.
+      gnosim/antarcticsim.py uses the Antarctic refraction libraries.
+      Terminal input should be (from home directory):
+      python gnosim/sim/antarcticsim.py 'gnosim/sim/<config file name>.py' <energy> <number of events> 1
+      (GNOsim runs in Python 3)
+   b. Multiple scenarios simultaneously on compute farm:
+      gnosim/sim/farm.py
+      This option might take some costumization to do exactly what you want, but is
+      extremely helpful with running many simulations (i.e. for testing volumetric
+      acceptance at various energies)
+
+      Currently only syntax appropriate to Midway cluster at UChicago.
+
+5. Plot results
+   Terminal Input: python gnosim/sim/plot_single.py '<name of sim output file>.h5'
+   Additional Analysis Scripts:
+   In python terminal:
+   exec(open('./gnosim/sim/arrival_times_testing.py').read())
+   This was a working script that used in the development/testing of the ray
+   tracing and interpolation of libraries.  Not all functions may run perfectly
+   as was used / adapted as needed and not every function was updated to work with
+   new simulation outputs.  That being said, some of the plots it makes are very
+   informative as to the state of the simulation. 
+   Other files in the analysis directory can be used as well. 
+
+=== CODE REPOSITORY ===
+
+[Midway Repo]
+
+=== DEPENDENCIES ===
+
+Python Version 3.6.1 was used for much of the recent development
+
+Python packages:
+numpy - http://www.numpy.org/
+scipy - http://www.scipy.org/
+h5py - http://www.h5py.org/
+matplotlib / pylab - http://matplotlib.org/
+
+=== CONVENTIONS ===
+
+Naming:
+package_name
+module_name.py
+ClassName
+functionName
+variable_name
+
+Coordinates:
+x = east (currently arbitrary)
+y = north
+z = elevation (negative values are below surface)
+theta = zenith angle
+phi = azimuth angle
+
+Units:
+SI units are used throughout for all electricity and magnetism calculations.
+distance (m)
+time (ns)
+frequency (GHz)
+mass (kg)
+See gnosim/utils/constants.py for unit conversions.
+
+NOTES:
+-- Since the previous version a lot has been changed in both how to run the simulation
+   from a user perspective, as well as how the simulation runs from a back end perspective.
+   Interpolation of points is done for many events at once using the scipy griddata function
+   rather than the 2 point inverse distance weighted iterpolation used previously.  
+   The refraction library code has also been changed as development went on.  The boundary
+   recognition was changed such that less deviation occurs for reflections.  
+   The simulation also outputs information for each of the antennas rather than just whichever
+   antenna in a station has the largest electric field.   These values are stored as the 'info'
+   key in the simulation output file. 
+
+-- Current development of the code will aim to update the askaryan model used to add frequency information
+   output which will eventually be used to reproduce realistic signals at each antenna.  
+
+
 READ ME 2.0=== OVERVIEW ===
 
 Greenland Neutrino Observatory Simulator (GNOSim)
@@ -16,8 +194,7 @@ Fast-track to running simulations. Follow these steps:
    gnosim/trace/refraction_library.py uses the Greenland Ice Model
    gnosim/trace/refraction_library_beta.py uses the Antarctic Ice Model
 
-   The file should be run from the user's home directory. It will be necessary to change the name of the home directory in the configuration file and in the outfile generator of the sim. Search for 'chipmansb'.  
-
+   The file should be run from the user's home directory (such that any paths defined in the refraction_library files such as 'gnosim.utils.constats' are appropriately found by the code).  This can be done by opening the python shell in the appropriate directory (containing the gnosim folder) and then typing: 'exec(open('./gnosim/trace/refraction_library_beta.py').read())' into the shell.  Ensure you are running a version of python 3 that can import numpy, scipy, h5py, and pylab.   It will be necessary to change the name of the home directory in the configuration file and in the outfile generator of the sim. Search for 'chipmansb'.
 
    On approximately line 1050 of the refraction library file, set z_0 to the appropriate depth, and comment out the other options. Below that, comment in the appropriate file name, containing the ice model and depth being used.
 
@@ -25,6 +202,9 @@ Fast-track to running simulations. Follow these steps:
    to different elevation angles at the antenna. The RefractionLibrary class manages
    the output trace files. Need to regenerate trace libraries for different antenna
    elevations, index of refraction profiles, attenuation lengths, etc.
+
+   You may need to include a line before any gnosim import functions to include the path gnosim is located: sys.path.append('<where-gnosim-is>')
+
 
 2. Set detector configuration
 
@@ -51,7 +231,7 @@ Fast-track to running simulations. Follow these steps:
       Currently only syntax appropriate to Midway cluster at UChicago.
 
 5. Plot results
-   Terminal Input: python gnsoim/sim/plot_single.py '<name of sim output file>.h5'
+   Terminal Input: python gnosim/sim/plot_single.py '<name of sim output file>.h5'
 
 === CODE REPOSITORY ===
 

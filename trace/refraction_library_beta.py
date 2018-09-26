@@ -1,4 +1,8 @@
+#!/usr/bin/env python
+
 #refractionlibrarynew
+import sys
+import os
 import glob
 import numpy
 import scipy.interpolate
@@ -6,7 +10,7 @@ import scipy.spatial
 import h5py
 import pylab
 import os
-
+sys.path.append('/home/dsouthall/Projects/GNOSim/')
 import gnosim.utils.constants
 import gnosim.utils.rf
 import gnosim.utils.plane
@@ -117,18 +121,21 @@ def testFresnel(n_low=1., n_high=1.5):
 
 ############################################################
 
-def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1.): # t_max=40000, t_max=1000 (testing)
+
+
+def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1., r_limit = None): # t_max=40000, t_max=1000 (testing)
     """
     z_0 = initial elevation (m)
     t_max = max time (ns)
     t_step = time step (ns)
     """
-
     # IDEA: let t_step grow when the index of refraction isn't changing fast, i.e.,
     #       a dynamic t_step 
 
     # ORIGINAL
+    t_step_in = t_step
     n_steps =  int(t_max / t_step)
+    #print(n_steps,' with t_step ', t_step)
     # ORIGINAL
     # NEW
     #n_steps = 100000 # 1000000, Arbitrary large number, but might be too big...
@@ -161,14 +168,46 @@ def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1.): # t_max=40000, 
     index_reflect = 0 # Latch to prevent multiple reflections at interface
     index_reflect_air = 0 # Stores index of reflection event at ice-air interface
     index_reflect_water = 0 # Stores index of reflection event at ice-water interface
-
+    max_ii = None
+    #Finding surfaces:
+    z_locate = numpy.linspace(1000,-10000,10000000)
+    dndz = numpy.divide(numpy.diff(gnosim.earth.antarctic.indexOfRefraction(z_locate)),numpy.diff(z_locate))
+    z_upward_surface = ((z_locate[1:] + z_locate[:-1]) / 2.0)[numpy.equal(dndz,numpy.amin(dndz))]
+    z_downward_surface = ((z_locate[1:] + z_locate[:-1]) / 2.0)[numpy.equal(dndz,numpy.amax(dndz))]
+    dndz = None
+    z_locate = None
+    #print('What is going on')
     for ii in range(0, n_steps):
-
+        #print('On Event',ii)
         # Dynamic time step depending on how fast the index of refraction is changing
         if gnosim.earth.antarctic.deltaIndexOfRefraction(z_array[ii]) > 1.e-4 or z_array[ii] >= 0.:
-            t_step = 1.
+            t_step = 1.*t_step_in
+            #print(t_step)
         else:
-            t_step = 5.
+            t_step = 5.*t_step_in
+            #print(t_step)
+        
+        
+        
+        potential_z_step = (t_step * gnosim.utils.constants.speed_light * numpy.cos(numpy.radians(theta_array[ii])) \
+                      / gnosim.earth.antarctic.indexOfRefraction(z_array[ii]))
+        if numpy.logical_or( (numpy.fabs(z_array[ii] - z_upward_surface) < 5.0),(numpy.fabs(z_array[ii] - z_downward_surface) < 5.0)):
+            
+            if (numpy.logical_or( (z_array[ii] + potential_z_step) > z_upward_surface , (z_array[ii] + potential_z_step) < z_downward_surface)):
+                #print_new = True
+                #print('Within 5m of a boundary at z_array[%i] = %0.2f'%(ii,z_array[ii]))
+                t_step = t_array[ii] - t_array[ii-1]
+                #print('Initial t_step is:', t_step)
+            else:
+                print_new = False
+            while (numpy.logical_or( (z_array[ii] + potential_z_step) > z_upward_surface , (z_array[ii] + potential_z_step) < z_downward_surface)):
+                t_step = t_step/2.0
+                potential_z_step = (t_step * gnosim.utils.constants.speed_light * numpy.cos(numpy.radians(theta_array[ii])) \
+                                   / gnosim.earth.antarctic.indexOfRefraction(z_array[ii]))
+            #if print_new:
+            #    print('t_step changed to' , t_step)
+            
+        
         t_array[ii + 1] = t_array[ii] + t_step
 
         if ii == 0 and z_array[ii] > 1.:
@@ -231,6 +270,10 @@ def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1.): # t_max=40000, 
         x_array[ii + 1] = x_array[ii] + x_step
         y_array[ii + 1] = y_array[ii] + y_step
         z_array[ii + 1] = z_array[ii] + z_step
+        if r_limit != None:
+            if x_array[ii + 1]**2 + y_array[ii + 1]**2 > r_limit**2:
+                max_ii = ii
+                break
 
         # Test whether the ray is refracted from upward going to downward going
         value = (gnosim.earth.antarctic.indexOfRefraction(z_array[ii]) / gnosim.earth.antarctic.indexOfRefraction(z_array[ii + 1])) \
@@ -309,15 +352,19 @@ def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1.): # t_max=40000, 
     # Convert from transmission at each step to cumulative transmission
     a_v_array = numpy.cumprod(a_v_array)
     a_h_array = numpy.cumprod(a_h_array)
-
+    if r_limit != None:
+        if max_ii != None:
+            n_steps = max_ii
+                
     return (x_array[0: n_steps], y_array[0: n_steps], z_array[0: n_steps], \
         t_array[0: n_steps], d_array[0: n_steps], phi_array[0: n_steps], \
         theta_array[0: n_steps], a_v_array[0: n_steps], a_h_array[0: n_steps], \
         index_reflect_air, index_reflect_water)
 
+
 ############################################################
 
-def makeLibrary(z_0, theta_ray_array, save=True, library_dir='library'):
+def makeLibrary(z_0, theta_ray_array, save=True, library_dir='library',r_limit = None):
     x_0 = 0.
     y_0 = 0.
     phi_0 = 0.
@@ -401,8 +448,167 @@ def makeLibrary(z_0, theta_ray_array, save=True, library_dir='library'):
 ############################################################
 
 class RefractionLibrary:
+    def __init__(self, search, pre_split = True):
+        self.infiles = glob.glob(search)
+    
+        # List attributes of interest
+        self.solutions = ['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']
+        self.keys = ['r', 'z', 't', 'd', 'theta', 'theta_ant', 'a_v', 'a_h']
 
-    def __init__(self, search):
+        # Dictionary to store data
+        self.data = {}
+        for solution in self.solutions:
+            self.data[solution] = {}
+            for key in self.keys:
+                self.data[solution][key] = []
+
+        # Ice model
+        self.ice_model = None
+        
+        #Checking if pre_split is possible:
+        if pre_split == True:
+            for solution in self.solutions:
+                if (os.path.isdir(search.replace('*.h5',solution + '/')) == False):
+                    print('WARNING! No directory' , search.replace('*.h5',solution + '/'))
+                    pre_split = False
+            if pre_split == False:
+                print('Cannot run pre_split library, running unsorted library')
+            
+        if (pre_split == False):
+            # Open data files and begin sorting solutions
+            for infile in self.infiles:
+                print (infile)
+                reader = h5py.File(infile, 'r')
+                n = len(reader['t'])
+                if self.ice_model is None:
+                    self.ice_model = reader.attrs['ice_model']
+                else:
+                    if self.ice_model != reader.attrs['ice_model']:
+                        print ('WARNING: Ice models used in ray-tracing libraries do not match, e.g., %s != %s'%(self.ice_model, 
+                                                                                                                reader.attrs['ice_model']))
+
+                if reader.attrs['index_reflect_air'] > 0:
+                    # Rays with reflections off ice-air interface
+                    cut = numpy.zeros(n, bool)
+                    cut[0: reader.attrs['index_reflect_air']] = True
+                    for key in self.keys:
+                        #Upward-going rays prior to reflection off ice-air interface 
+                        self.data['direct'][key].append(reader[key][cut])
+                    if reader.attrs['index_reflect_water'] > 0:
+                        # Additional reflection off ice-water interface
+                        cut = numpy.zeros(n, bool)
+                        cut[reader.attrs['index_reflect_air']: reader.attrs['index_reflect_water']] = True
+                        for key in self.keys:
+                            # Downward-going rays from reflection off ice-air interface 
+                            self.data['reflect'][key].append(reader[key][cut])
+                        cut = numpy.zeros(n, bool)
+                        cut[reader.attrs['index_reflect_water']:] = True
+                        for key in self.keys:
+                            # Upward-going rays from reflection off ice-water interface 
+                            self.data['reflect_2'][key].append(reader[key][cut])
+                    else:
+                        # No reflection off ice-water interface
+                        cut = numpy.zeros(n, bool)
+                        cut[reader.attrs['index_reflect_air']:] = True
+                        for key in self.keys:
+                            # Downward-going rays from reflection off ice-air interface 
+                            self.data['reflect'][key].append(reader[key][cut])
+                else:
+                    # Rays without reflections off ice-air interface
+                    if reader.attrs['index_reflect_water'] > 0:
+                        # Reflection off ice-water interface
+                        cut = numpy.zeros(n, bool)
+                        cut[0: reader.attrs['index_reflect_water']] = True
+                        for key in self.keys:
+                            # Downward-going rays before reflection off ice-water interface 
+                            self.data['direct'][key].append(reader[key][cut])
+
+                        cut = numpy.zeros(n, bool)
+                        cut[reader.attrs['index_reflect_water']:] = True
+                        for key in self.keys:
+                            # Upward-going rays after reflection off ice-water interface 
+                            self.data['direct_2'][key].append(reader[key][cut])
+                    else:
+                        # No reflection off ice-water interface
+                        cut = numpy.ones(n, bool)
+                        for key in self.keys:
+                            # Downward-going rays from reflection off ice-air interface 
+                            self.data['direct'][key].append(reader[key][cut])
+
+                
+                reader.close()
+
+            for solution in self.solutions:
+                for key in self.keys:
+                    if len(self.data[solution][key]) > 0:
+                        self.data[solution][key] = numpy.concatenate(self.data[solution][key])
+                print (solution, len(self.data[solution]['t']))
+
+            print ('Intersections...')
+            # Find intersections
+            self.data['direct'], self.data['cross'] = self.intersect(self.data['direct'])
+            #self.data['direct'] = dic_direct
+            #self.data['cross'] = dic_cross
+
+            print ('Sort solutions...')
+
+            if len(self.data['direct_2']['t']) > 0:
+                theta_ant_divide = self.data['direct']['theta_ant'][numpy.argmax(self.data['direct']['r'])]
+                cut = self.data['direct_2']['theta_ant'] < theta_ant_divide
+                for key in self.keys:
+                    self.data['cross_2'][key] = self.data['direct_2'][key][cut]
+                cut = numpy.logical_not(cut)
+                for key in self.keys:
+                    self.data['direct_2'][key] = self.data['direct_2'][key][cut]
+            
+        else:
+            #Below is what happens if the solution types are already sorted into subfolders
+            print('Loading data from pre split directories')
+            for infile in self.infiles:
+                #print (infile)
+                for solution in self.solutions:
+                    solutionfile = infile.replace(infile.split('/')[-1], solution + '/' + infile.split('/')[-1])
+                    reader = h5py.File(solutionfile, 'r')
+                    n = len(reader['t'])
+                    if self.ice_model is None:
+                        self.ice_model = reader.attrs['ice_model']
+                    else:
+                        if self.ice_model != reader.attrs['ice_model']:
+                            print ('WARNING: Ice models used in ray-tracing libraries do not match, e.g., %s != %s'%(self.ice_model, reader.attrs['ice_model']))
+                    for key in self.keys:
+                        self.data[solution][key] = numpy.append( self.data[solution][key] , reader[key][...] )
+            
+        self.exists = {}
+        self.hull = {}
+        self.envelope = {}
+        for solution in self.solutions:
+            print (solution, len(self.data[solution]['t']))
+            if len(self.data[solution]['t']) >= 3: #changed from 0, hull needs 3 points to works
+                #print('NUMBER OF t' , len(self.data[solution]['t']))
+                self.exists[solution] = True
+                r, z = self.makeHull(self.data[solution]) #should output vertices of convex hull corresponding to the r,z values in data[solution]
+                self.hull[solution] = {'r': r,
+                                       'z': z}
+                envelope_low, envelope_high = self.makeEnvelope(r, z, 
+                                                                self.data[solution]['r'], 
+                                                                self.data[solution]['z'], 
+                                                                self.data[solution]['theta_ant'],)
+                self.envelope[solution] = {'low': envelope_low,
+                                           'high': envelope_high}
+            else:
+                self.exists[solution] = False
+        
+        # Check density of ray traces to determine optimal interpolation method
+        if (numpy.max(self.data['direct']['r']) / len(numpy.unique(self.data['direct']['theta_ant']))) < 1000.:
+            self.dense_rays = True
+            print ('Dense ray traces')
+        else:
+            self.dense_rays = False
+            print ('Sparse ray traces')
+             
+    '''
+    #Below is the init prior to trying to add split directory input
+    def __init__(self, search, pre_split = False):
         self.infiles = glob.glob(search)
     
         # List attributes of interest
@@ -510,9 +716,10 @@ class RefractionLibrary:
         self.envelope = {}
         for solution in self.solutions:
             print (solution, len(self.data[solution]['t']))
-            if len(self.data[solution]['t']) > 0:
+            if len(self.data[solution]['t']) > 3: #changed from 0, hull needs 3 points to works
+                #print('NUMBER OF t' , len(self.data[solution]['t']))
                 self.exists[solution] = True
-                r, z = self.makeHull(self.data[solution])
+                r, z = self.makeHull(self.data[solution]) #should output vertices of convex hull corresponding to the r,z values in data[solution]
                 self.hull[solution] = {'r': r,
                                        'z': z}
                 envelope_low, envelope_high = self.makeEnvelope(r, z, 
@@ -531,30 +738,31 @@ class RefractionLibrary:
         else:
             self.dense_rays = False
             print ('Sparse ray traces')
-
+    '''
     def makeHull(self, dic):
         hull = scipy.spatial.ConvexHull(list(zip(dic['r'], dic['z'])))
         
         return dic['r'][hull.vertices], dic['z'][hull.vertices]
 
     def getValue(self, dic, r, z):
+        #DS:  After discussing this with Cosmin it is likely that this is an insufficient method of weighting/interpolation of values.  Likely what will need to be fixed if we want to get to a phased array simulation
         if self.dense_rays:
             # This scheme works well when the rays are densely packed, 
             # but completely fails when the rays are spread far apart.
             distance = numpy.sqrt((r - dic['r'])**2 + (z - dic['z'])**2)
-            index_1 = numpy.argmin(distance)
-            weight_1 = distance[index_1]**(-1)
+            index_1 = numpy.argmin(distance) #finding first closest trace solution
+            weight_1 = distance[index_1]**(-1) #weighting with inverse square law
             
-            distance[dic['theta_ant'] == dic['theta_ant'][index_1]] = 1.e10
-            index_2 = numpy.argmin(distance)
-            weight_2 = distance[index_2]**(-1)
+            distance[dic['theta_ant'] == dic['theta_ant'][index_1]] = 1.e10 #used to ignore first closest
+            index_2 = numpy.argmin(distance) #finding second closest solution
+            weight_2 = distance[index_2]**(-1) #again weighting with invese square law
         else:
             # This scheme works much better when the rays are spread
             # far apart.
             distance = numpy.sqrt((r - dic['r'])**2 + (z - dic['z'])**2)
             theta_ant_1 = dic['theta_ant'][numpy.argmin(distance)]
-            cut_1 = dic['theta_ant'] == theta_ant_1
-            index_1 = numpy.nonzero(cut_1)[0][numpy.argmin(numpy.fabs(dic['z'][cut_1] - z))]
+            cut_1 = dic['theta_ant'] == theta_ant_1  
+            index_1 = numpy.nonzero(cut_1)[0][numpy.argmin(numpy.fabs(dic['z'][cut_1] - z))] 
             
             distance[cut_1] = 1.e10
             theta_ant_2 = dic['theta_ant'][numpy.argmin(distance)]
@@ -571,7 +779,7 @@ class RefractionLibrary:
 
         val_dic = {}
         for key in self.keys:
-            val_dic[key] = ((weight_1 * dic[key][index_1]) + (weight_2 * dic[key][index_2])) / (weight_1 + weight_2)
+            val_dic[key] = ((weight_1 * dic[key][index_1]) + (weight_2 * dic[key][index_2])) / (weight_1 + weight_2) #weighted average of every variable associated with that solutions (time, distance traveled, etc.)
         return val_dic
 
     def query(self, r_query, z_query):
@@ -806,7 +1014,239 @@ class RefractionLibrary:
         pylab.legend(loc='lower right')
         pylab.xlabel('Radius (m)')
         pylab.ylabel('Elevation (m)')
-
+    def saveEnvelope(self, out_dir, solution_list = None,verbose = False, plot_hulls = False):
+        '''
+        Should save the necessary information for a libraries hull so it can be
+        used to create a hull later
+        
+        out_dir should be of the form '/dir1/dir2'
+        i.e. it shouldn't end with a /
+        '''
+        out_dir = out_dir + '/concave_hull'
+        os.mkdir(out_dir)
+        legend_locs = {'direct':'upper right','cross':'upper right','reflect':'upper right','direct_2':'lower right','cross_2':'lower right','reflect_2':'lower right'}        
+        concave_hull = {'direct':{'n_bins':1000},'cross':{'n_bins':1500},'reflect':{'n_bins':2000},'direct_2':{'n_bins':500},'cross_2':{'n_bins':400},'reflect_2':{'n_bins':2000}} # worked for 120 rays
+        if solution_list == None:
+            solution_list = ['direct','cross','reflect','direct_2','cross_2','reflect_2']
+            
+        for solution in solution_list:
+            if verbose:
+                print('\tSolution Type: %10s \tNumber of points: %i'%( solution , len(self.data[solution]['z'])))
+            if (len(self.data[solution]['z']) == 0):
+                print('\tNot enough points, returning 0 value hull')
+                z_out = [0]
+                r_out = [0]
+                z_in = [0]
+                r_in = [0]
+                concave_hull[solution]['z_inner_r_bound'] = z_in
+                concave_hull[solution]['r_inner_r_bound'] = r_in
+                concave_hull[solution]['z_outer_r_bound'] = z_out
+                concave_hull[solution]['r_outer_r_bound'] = r_out
+                concave_hull[solution]['z_min'] = 0
+                concave_hull[solution]['z_max'] = 0
+            else:
+                test_z = self.data[solution]['z']
+                test_r = self.data[solution]['r']
+                
+                z_bins = numpy.linspace(min(test_z),max(test_z),concave_hull[solution]['n_bins'])
+                z_out = numpy.zeros(concave_hull[solution]['n_bins']-1)
+                r_out = numpy.zeros(concave_hull[solution]['n_bins']-1)
+                z_in = numpy.zeros(concave_hull[solution]['n_bins']-1)
+                r_in = numpy.zeros(concave_hull[solution]['n_bins']-1)
+                
+                #tz = numpy.tile(test_z,(len(z_bins)-1,1))
+                #bz = numpy.tile(z_bins, (len(test_z),1)).T
+                #cut = numpy.logical_and(numpy.greater_equal(tz, bz[0:-1]),numpy.less_equal(tz , bz[1:]))
+                #use_in_interp = numpy.where(numpy.sum(cut,axis=1)!=0)[0]
+                use_in_interp = numpy.zeros(concave_hull[solution]['n_bins']-1,dtype=bool)               
+                for bin in range(1,concave_hull[solution]['n_bins']):
+                    cut = numpy.logical_and(numpy.greater_equal(test_z, z_bins[bin-1]),numpy.less_equal(test_z, z_bins[bin]))
+                    use_in_interp[bin-1] = numpy.any(cut)
+                    if use_in_interp[bin-1] == True:
+                        r_out[bin-1] = max(test_r[cut])
+                        r_in[bin-1] = min(test_r[cut])
+                        z_in[bin-1] = max(numpy.unique(test_z[cut][ numpy.where(test_r[cut] == r_in[bin-1])]))
+                        z_out[bin-1] = max(numpy.unique(test_z[cut][ numpy.where(test_r[cut] == r_out[bin-1])]))
+                        if (bin == concave_hull[solution]['n_bins']-1):
+                            #shallowest
+                            #print('Trying to adjust shallowest')
+                            r_out[bin-1] = max(test_r[numpy.isclose(test_z,max(test_z),atol = 0.5)])
+                            z_out[bin-1] = max(test_z)
+                #These could be calculated and stored in the original h5 file, then called to make interp1d and max/min within the library, this would save time.
+                z_out = z_out[use_in_interp]
+                r_out = r_out[use_in_interp]
+                z_in = z_in[use_in_interp]
+                r_in = r_in[use_in_interp]
+                
+                #concave_hull[solution]['f_inner_r_bound'] = scipy.interpolate.interp1d(z_in,r_in,bounds_error=False,fill_value = (r_in[0],r_in[-1])) #fill_value=max(r_in))#,kind='cubic') #given z, give r, want big value for fill, because this is region where solution shouldn't exist, so a test of is this > f_in then solution should be false
+                #concave_hull[solution]['f_outer_r_bound'] = scipy.interpolate.interp1d(z_out,r_out,bounds_error=False,fill_value = (r_out[0],r_out[-1]))# fill_value=min(r_out))#,kind='cubic') These make boundaries weird but I think are a necessary evil?  Unless I match each with an z_min, z_max?  Could do....,  I can give interp1d two fill values so it fits well up to min/max z
+                concave_hull[solution]['z_inner_r_bound'] = z_in
+                concave_hull[solution]['r_inner_r_bound'] = r_in
+                concave_hull[solution]['z_outer_r_bound'] = z_out
+                concave_hull[solution]['r_outer_r_bound'] = r_out
+                
+                concave_hull[solution]['z_min'] = min(z_in[0],z_out[0])
+                concave_hull[solution]['z_max'] = max(z_in[-1],z_out[-1])
+                
+            if plot_hulls:
+                fig1, ax1 = pylab.subplots()
+                if numpy.logical_and((len(self.data[solution]['r']) != 0),(len(self.data[solution]['z']) != 0)):
+                    pylab.scatter(self.data[solution]['r'],self.data[solution]['z'],c='k',s=1,label='Trace Library Points')
+                pylab.xlabel('r(m)',fontsize=20)
+                pylab.ylabel('z(m)',fontsize=20)
+                pylab.title('Convex Hull for %s'%(solution),fontsize=20)
+                pylab.scatter(concave_hull[solution]['r_outer_r_bound'],concave_hull[solution]['z_outer_r_bound'],c='r',label = 'Points Used To\nCreate Outter Bound' )
+                pylab.scatter(concave_hull[solution]['r_inner_r_bound'],concave_hull[solution]['z_inner_r_bound'],c='b',label = 'Points Used To\nCreate Inner Bound')
+                lines = pylab.hlines([concave_hull[solution]['z_min'],concave_hull[solution]['z_max']],ax1.get_xlim()[0],ax1.get_xlim()[1],lw='1.5',colors='r',linestyles = 'dotted',label='Accepted Depth Window')
+                
+                pylab.legend(loc = legend_locs[solution],fontsize=16)
+            
+            #save data into outdir
+            outname = out_dir + '/concave_hull_data_' + solution + '.h5'
+            outfile  = h5py.File(outname, 'w')
+            outfile.attrs['z_min'] = concave_hull[solution]['z_min']
+            outfile.attrs['z_max'] = concave_hull[solution]['z_max']
+            
+            outfile.create_dataset('z_inner_r_bound', (len(z_in),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            outfile.create_dataset('r_inner_r_bound', (len(r_in),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            outfile.create_dataset('z_outer_r_bound', (len(z_out),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            outfile.create_dataset('r_outer_r_bound', (len(r_out),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            
+            outfile['z_inner_r_bound'][...] = concave_hull[solution]['z_inner_r_bound']
+            outfile['r_inner_r_bound'][...] = concave_hull[solution]['r_inner_r_bound']
+            outfile['z_outer_r_bound'][...] = concave_hull[solution]['z_outer_r_bound']
+            outfile['r_outer_r_bound'][...] = concave_hull[solution]['r_outer_r_bound']
+            
+            outfile.close()
+    '''        
+    def saveEnvelope(self, out_dir, solution_list = None,verbose = False, plot_hulls = False):
+        #Should save the necessary information for a libraries hull so it can be
+        #used to create a hull later
+        #
+        #out_dir should be of the form '/dir1/dir2'
+        #i.e. it shouldn't end with a /
+        out_dir = out_dir + '/concave_hull'
+        os.mkdir(out_dir)
+        legend_locs = {'direct':'upper right','cross':'upper right','reflect':'upper right','direct_2':'lower right','cross_2':'lower right','reflect_2':'lower right'}        
+        concave_hull = {'direct':{'n_bins':1000},'cross':{'n_bins':1500},'reflect':{'n_bins':2000},'direct_2':{'n_bins':500},'cross_2':{'n_bins':400},'reflect_2':{'n_bins':2000}} # worked for 120 rays
+        if solution_list == None:
+            solution_list = ['direct','cross','reflect','direct_2','cross_2','reflect_2']
+            
+        for solution in solution_list:
+            if verbose:
+                print('\tSolution Type: %10s \tNumber of points: %i'%( solution , len(self.data[solution]['z'])))
+            if (len(self.data[solution]['z']) == 0):
+                print('\tNot enough points, returning 0 value hull')
+                z_out = [0]
+                r_out = [0]
+                z_in = [0]
+                r_in = [0]
+                concave_hull[solution]['z_inner_r_bound'] = z_in
+                concave_hull[solution]['r_inner_r_bound'] = r_in
+                concave_hull[solution]['z_outer_r_bound'] = z_out
+                concave_hull[solution]['r_outer_r_bound'] = r_out
+                concave_hull[solution]['z_min'] = 0
+                concave_hull[solution]['z_max'] = 0
+            else:
+                test_z = self.data[solution]['z']
+                test_r = self.data[solution]['r']
+                
+                z_bins = numpy.linspace(min(test_z)-1.0,max(test_z)+1.0,concave_hull[solution]['n_bins'])
+                z_out = numpy.zeros(concave_hull[solution]['n_bins']-1)
+                r_out = numpy.zeros(concave_hull[solution]['n_bins']-1)
+                z_in = numpy.zeros(concave_hull[solution]['n_bins']-1)
+                r_in = numpy.zeros(concave_hull[solution]['n_bins']-1)
+                
+                tz = numpy.tile(test_z,(len(z_bins)-1,1))
+                bz = numpy.tile(z_bins, (len(test_z),1)).T
+                cut = numpy.logical_and(numpy.greater_equal(tz, bz[0:-1]),numpy.less_equal(tz , bz[1:]))
+                use_in_interp = numpy.where(numpy.sum(cut,axis=1)!=0)[0]
+                
+                for bin in range(1,concave_hull[solution]['n_bins']):
+                    if (numpy.any(numpy.isin(use_in_interp,bin-1))):
+                        r_out[bin-1] = max(test_r[numpy.where(cut[bin-1,:]) ])
+                        r_in[bin-1] = min(test_r[numpy.where(cut[bin-1,:]) ])
+                        z_in[bin-1] = max(numpy.unique(test_z[numpy.where(cut[bin-1,:])][ numpy.where(test_r[numpy.where(cut[bin-1,:]) ] == r_in[bin-1])]))
+                        z_out[bin-1] = max(numpy.unique(test_z[numpy.where(cut[bin-1,:])][ numpy.where(test_r[numpy.where(cut[bin-1,:]) ] == r_out[bin-1])]))
+                        if (bin == concave_hull[solution]['n_bins']-1):
+                            #shallowest
+                            #print('Trying to adjust shallowest')
+                            r_out[bin-1] = max(test_r[numpy.isclose(test_z,max(test_z),atol = 0.5)])
+                            z_out[bin-1] = max(test_z)
+                #These could be calculated and stored in the original h5 file, then called to make interp1d and max/min within the library, this would save time.
+                z_out = z_out[use_in_interp]
+                r_out = r_out[use_in_interp]
+                z_in = z_in[use_in_interp]
+                r_in = r_in[use_in_interp]
+                
+                #concave_hull[solution]['f_inner_r_bound'] = scipy.interpolate.interp1d(z_in,r_in,bounds_error=False,fill_value = (r_in[0],r_in[-1])) #fill_value=max(r_in))#,kind='cubic') #given z, give r, want big value for fill, because this is region where solution shouldn't exist, so a test of is this > f_in then solution should be false
+                #concave_hull[solution]['f_outer_r_bound'] = scipy.interpolate.interp1d(z_out,r_out,bounds_error=False,fill_value = (r_out[0],r_out[-1]))# fill_value=min(r_out))#,kind='cubic') These make boundaries weird but I think are a necessary evil?  Unless I match each with an z_min, z_max?  Could do....,  I can give interp1d two fill values so it fits well up to min/max z
+                concave_hull[solution]['z_inner_r_bound'] = z_in
+                concave_hull[solution]['r_inner_r_bound'] = r_in
+                concave_hull[solution]['z_outer_r_bound'] = z_out
+                concave_hull[solution]['r_outer_r_bound'] = r_out
+                
+                concave_hull[solution]['z_min'] = min(z_in[0],z_out[0])
+                concave_hull[solution]['z_max'] = max(z_in[-1],z_out[-1])
+                
+            if plot_hulls:
+                fig1, ax1 = pylab.subplots()
+                if numpy.logical_and((len(self.data[solution]['r']) != 0),(len(self.data[solution]['z']) != 0)):
+                    pylab.scatter(self.data[solution]['r'],self.data[solution]['z'],c='k',s=1,label='Trace Library Points')
+                pylab.xlabel('r(m)',fontsize=20)
+                pylab.ylabel('z(m)',fontsize=20)
+                pylab.title('Convex Hull for %s'%(solution),fontsize=20)
+                pylab.scatter(concave_hull[solution]['r_outer_r_bound'],concave_hull[solution]['z_outer_r_bound'],c='r',label = 'Points Used To\nCreate Outter Bound' )
+                pylab.scatter(concave_hull[solution]['r_inner_r_bound'],concave_hull[solution]['z_inner_r_bound'],c='b',label = 'Points Used To\nCreate Inner Bound')
+                lines = pylab.hlines([concave_hull[solution]['z_min'],concave_hull[solution]['z_max']],ax1.get_xlim()[0],ax1.get_xlim()[1],lw='1.5',colors='r',linestyles = 'dotted',label='Accepted Depth Window')
+                
+                pylab.legend(loc = legend_locs[solution],fontsize=16)
+            
+            #save data into outdir
+            outname = out_dir + '/concave_hull_data_' + solution + '.h5'
+            outfile  = h5py.File(outname, 'w')
+            outfile.attrs['z_min'] = concave_hull[solution]['z_min']
+            outfile.attrs['z_max'] = concave_hull[solution]['z_max']
+            
+            outfile.create_dataset('z_inner_r_bound', (len(z_in),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            outfile.create_dataset('r_inner_r_bound', (len(r_in),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            outfile.create_dataset('z_outer_r_bound', (len(z_out),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            outfile.create_dataset('r_outer_r_bound', (len(r_out),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            
+            outfile['z_inner_r_bound'][...] = concave_hull[solution]['z_inner_r_bound']
+            outfile['r_inner_r_bound'][...] = concave_hull[solution]['r_inner_r_bound']
+            outfile['z_outer_r_bound'][...] = concave_hull[solution]['z_outer_r_bound']
+            outfile['r_outer_r_bound'][...] = concave_hull[solution]['r_outer_r_bound']
+            
+            outfile.close()
+    '''
+    def loadEnvelope(self, indir,store_fit_data = False):
+        '''
+        Should load the necessary information for a libraries hull so it can be
+        used
+        
+        indir should be of the form '/dir1/concave_hull'
+        i.e. it shouldn't end with a /
+        where dir2 contains the files '/concave_hull_data_[solution].h5'
+        '''
+        solution_list = numpy.array(['direct','cross','reflect','direct_2','cross_2','reflect_2'])
+        concave_hull = {}
+        infiles = glob.glob(indir + '/*.h5')
+        infile_list = []
+        
+        for infile in infiles:
+            solution = (infile.split('concave_hull_data_')[-1]).replace('.h5','')
+            concave_hull[solution] ={}
+            reader = h5py.File(infile, 'r')
+            if store_fit_data:
+                for key in list(reader.keys()):
+                    concave_hull[solution][key] = reader[key][...]
+            for attr in list(reader.attrs.keys()):
+                concave_hull[solution][attr] = reader.attrs[attr]
+            concave_hull[solution]['f_inner_r_bound'] = scipy.interpolate.interp1d(reader['z_inner_r_bound'][...],reader['r_inner_r_bound'][...],bounds_error=False,fill_value = ((reader['r_inner_r_bound'][...])[0],(reader['r_inner_r_bound'][...])[-1])) #fill_value=max(r_in))#,kind='cubic') #given z, give r, want big value for fill, because this is region where solution shouldn't exist, so a test of is this > f_in then solution should be false
+            concave_hull[solution]['f_outer_r_bound'] = scipy.interpolate.interp1d(reader['z_outer_r_bound'][...],reader['r_outer_r_bound'][...],bounds_error=False,fill_value = ((reader['r_outer_r_bound'][...])[0],(reader['r_outer_r_bound'][...])[-1]))# fill_value=min(r_out))#,kind='cubic') These make boundaries weird but I think are a necessary evil?  Unless I match each with an z_min, z_max?  Could do....,  I can give interp1d two fill values so it fits well up to min/max z
+        return concave_hull    
+        
     def makeEnvelope(self, r, z, r_full=None, z_full=None, theta_ant_full=None):
         """
         Define the regions (r, z) where ray-tracing solutions exist. Normally only need
@@ -824,8 +1264,8 @@ class RefractionLibrary:
         z_1 = z[index_1]
 
         slope = (z_1 - z_0) / (r_1 - r_0)
-        cut_low = (z <= (z_0 + (slope * (r - r_0))))
-        cut_high = (z >= (z_0 + (slope * (r - r_0))))
+        cut_low = (z <= (z_0 + (slope * (r - r_0))))    # data points below the line connecting the two extreme r values (z should be negative)
+        cut_high = (z >= (z_0 + (slope * (r - r_0))))   # data points above the line connecting the two extreme r values (z should be negative)
         
         # Make sure to get the endpoints
         cut_low[index_0] = True
@@ -835,17 +1275,17 @@ class RefractionLibrary:
 
         r_low = r[cut_low]
         z_low = z[cut_low]
-        index = numpy.argsort(r_low)
-        r_low = r_low[index]
+        index = numpy.argsort(r_low)    #indices of r_low rearanged to order r_low from low to high
+        r_low = r_low[index]            #sorted low to high
         z_low = z_low[index]
-        f_low = scipy.interpolate.interp1d(r_low, z_low, bounds_error=False, fill_value=numpy.max(z_low))
+        f_low = scipy.interpolate.interp1d(r_low, z_low, bounds_error=False, fill_value=numpy.max(z_low)) #if low is below the line, presumably would want deeper z values which are higher in mag but lower in value.  Do I want min here as the default value, not max?
 
         r_high = r[cut_high]
         z_high = z[cut_high]
         index = numpy.argsort(r_high)
         r_high = r_high[index]
         z_high = z_high[index]
-        f_high = scipy.interpolate.interp1d(r_high, z_high, bounds_error=False, fill_value=numpy.min(z_high))
+        f_high = scipy.interpolate.interp1d(r_high, z_high, bounds_error=False, fill_value=numpy.min(z_high))#if high is above the line, presumably would want less deep z values which are lower in mag but higher in value.  Do I want max here as the default value, not min?
 
         
         """
@@ -861,18 +1301,19 @@ class RefractionLibrary:
         theta_ant_unique = numpy.unique(theta_ant_full)
         for ii in [0, -1]:
             # Only one of these solutions will be the right one, but which?
-            cut_theta_ant = theta_ant_full == theta_ant_unique[ii]
+            cut_theta_ant = theta_ant_full == theta_ant_unique[ii] #it is assuming this is sorted at this point.  It probably is, but perhaps it should use max min, not 0,-1, or sort the list of angles
             r_cut_theta_ant = r_full[cut_theta_ant]
-            z_cut_theta_ant = z_full[cut_theta_ant]
-            cut_select = z_cut_theta_ant > f_low(r_cut_theta_ant)
+            z_cut_theta_ant = z_full[cut_theta_ant] #selects either max or min theta_ant rays
+            cut_select = z_cut_theta_ant > f_low(r_cut_theta_ant) # slices upper half of ray
             r_select = r_cut_theta_ant[cut_select]
             z_select = z_cut_theta_ant[cut_select]
             
-            if numpy.all(r_select < 1.):
+            if numpy.all(r_select < 1.): #DS ??? What is this doing.  These are radius values, not logic.  Why are we continuing if they are all less than 1?  When does that occur why is it significant?  Why is none of this commented??  Maybe this is just excluding the vertical ray?
                 continue
 
+            #why do f_low(r_cut_theta_ant)[cut_select] and not f_low(r_cut_theta_ant[cut_select]), seems like just a waste computationally.
             if numpy.mean(numpy.fabs(z_select - f_low(r_cut_theta_ant)[cut_select])) \
-                          > numpy.mean(numpy.fabs(z_select - f_high(r_cut_theta_ant)[cut_select])):
+                          > numpy.mean(numpy.fabs(z_select - f_high(r_cut_theta_ant)[cut_select])):  
                 continue
             
             #pylab.scatter(r_select, z_select, c='gray', edgecolors='none')
@@ -888,22 +1329,20 @@ class RefractionLibrary:
                 #pylab.plot(r_interp, f_low(r_interp), c='green')
 
         return f_low, f_high
-         
 
     def intersect(self, dic):
         """
         Find intersection between rays to separate the "direct" and "cross" solutions.
         """
-        select_cross = []
+        select_cross = numpy.array([],dtype=int)
         theta_ant_unique = numpy.unique(dic['theta_ant'])
         r_intersect = []
         z_intersect = []
         for ii in range(0, len(theta_ant_unique) - 1):
+            cut_1 = numpy.logical_and(dic['theta_ant'] == theta_ant_unique[ii], dic['z'] < 1.)
             for jj in range(ii + 1, len(theta_ant_unique)):
-                cut_1 = numpy.logical_and(dic['theta_ant'] == theta_ant_unique[ii], dic['z'] < 1.)
                 cut_2 = numpy.logical_and(dic['theta_ant'] == theta_ant_unique[jj], dic['z'] < 1.)
-                if numpy.fabs(dic['r'][cut_1][0] - dic['r'][cut_1][-1]) < 1. \
-                   or numpy.fabs(dic['r'][cut_2][0] - dic['r'][cut_2][-1]) < 1.:
+                if numpy.logical_or(numpy.fabs(dic['r'][cut_1][0] - dic['r'][cut_1][-1]) < 1. , numpy.fabs(dic['r'][cut_2][0] - dic['r'][cut_2][-1]) < 1.):
                     continue
                 r_min = max(numpy.min(dic['r'][cut_1]), numpy.min(dic['r'][cut_2]))
                 r_max = min(numpy.max(dic['r'][cut_1]), numpy.max(dic['r'][cut_2]))
@@ -926,22 +1365,21 @@ class RefractionLibrary:
                     selection_1 = numpy.logical_and(dic['theta_ant'] == theta_ant_unique[ii], dic['r'] > r_intersect[-1])
                     selection_2 = numpy.logical_and(dic['theta_ant'] == theta_ant_unique[jj], dic['r'] > r_intersect[-1])
                     
-
                     if (numpy.sum(selection_1) == 0):
                         continue
                     if (numpy.sum(selection_2) == 0):
                         continue
                 
-                    
-                    if  dic['theta'][selection_1][0] > dic['theta'][selection_2][0]:                                                                           
-                        select_cross.append(selection_1)                                                                                               
+                    if  dic['theta'][selection_1][0] > dic['theta'][selection_2][0]:
+                        select_cross = numpy.unique(numpy.append(select_cross,numpy.where(selection_1)[0]))
                     else:
-                        select_cross.append(selection_2)
-
+                        select_cross = numpy.unique(numpy.append(select_cross,numpy.where(selection_2)[0]))
         r_intersect = numpy.array(r_intersect)
         z_intersect = numpy.array(z_intersect)
         dic_direct = {}
         dic_cross = {}
+        cross_cut = numpy.zeros(len(dic[self.keys[0]][...]),dtype=bool)
+        cross_cut[select_cross] = True
         if len(r_intersect) == 0:
             # No intersections found, so do nothing
             dic_direct = dic
@@ -950,15 +1388,12 @@ class RefractionLibrary:
                 dic_cross[key] = numpy.array([])
         else:
             # Intersections found, so partition the traces
-            select_cross = numpy.any(select_cross, axis=0)
-            
             # Apply cut for to select cross points
             for key in self.keys:
-                dic_cross[key] = dic[key][select_cross]
+                dic_cross[key] = dic[key][cross_cut]
             # Then select direct points
             for key in self.keys:
-                dic_direct[key] = dic[key][numpy.logical_not(select_cross)]
-
+                dic_direct[key] = dic[key][numpy.logical_not(cross_cut)]
         """       
         pylab.figure()
         pylab.scatter(dic_direct['r'], dic_direct['z'], c='blue', edgecolors='none')
@@ -1047,62 +1482,135 @@ class RefractionLibrary:
 ############################################################
 
 if __name__ == '__main__':
-    z_0 = -207. # -2, -30, -100, 0, 10, 1000, 5000, 6000, 38000
-    #library_dir = 'library_-100_deep'
-    #library_dir = 'library_-30_deep'
-    #library_dir = 'library_-2_deep'
-    #library_dir = 'library_0_ross'
-    #library_dir = 'library_1000_ross'
-    #library_dir = 'library_5000_ross'
-    #library_dir = 'library_38000_deep'
-    #library_dir = 'library_38000_mid'
-    #library_dir = 'library_-1500_arthern'
-    #library_dir = 'library_-100_arthern'
-    #library_dir = 'library_-50_arthern'
-    #library_dir = 'library_-101_antarctica'
-    #library_dir = 'library_-30_arthern'
-    #library_dir = 'library_-2_arthern'
-    #library_dir = 'library_6000_ross'
-    #library_dir = 'library_6000_mid'
-    #library_dir = 'library_-30_arthern_steph'
-    #library_dir = 'library_-75_arthern_steph'
-    #library_dir = 'library_-100_arthern_steph'
-    #library_dir = 'library_-100_arthern_steph_test'
-    library_dir = 'library_-207_polar'
-    #library_dir = 'debugging'
-    print ('library dir = %s'%(library_dir))
-    print ('z_0 = %.2f'%(z_0))
-    print ('ice model = %s'%(gnosim.earth.antarctic.ice_model_default))
-   
-    #theta_array = numpy.degrees(numpy.arccos(numpy.linspace(-1, 0, 20)))
-    #theta_array = numpy.linspace(10., 170., 20)
-    theta_array = numpy.linspace(0., 180., 60) # 60, THIS IS THE USUAL FOR SUBTERRANEAN CONFIGURATIONS
-    #theta_array = numpy.linspace(90.01, 180., 30) # TESTING ROSS ICE SHELF AND LIGHTPOST IDEA
-    #theta_array = 90. - numpy.array([10., 20., 30., 40.]) # For Steph, switching from elevation angle to zenith angle
+    make_library = False#True
+    split_library = True#False
+    plot_library = False#True
+    save_envelope = True#True
+    plot_envelope = False#True
+    z_array = [-200.,-201.,-202.,-203.,-204.,-205.,-206.,-207.]
+    n_rays = 360
+    r_limit = None #Note if this is NOT None, then all thrown rays will quit once they read this particular radius.  Use with care.  If you want a simulation with r = 6300m, it might be advisable to make r_limit = 7000 so the boundaries of hulls are still well defined
+    for z_0 in z_array:
+        library_dir = 'library_%i_polar_%i_rays'%(int(z_0),n_rays)
 
-    """
-    # WANT TO TAKE INTO ACCOUNT CURVATURE OF THE EARTH HERE
-    #theta_array = numpy.degrees(numpy.arctan2(numpy.linspace(0., 50000., 120), -1000.)) # MINNA BLUFF
-    theta_horizon = 90. + gnosim.earth.earth.horizon(z_0)[1] + 1.e-3 # deg
-    x_horizon = -1. * z_0 * numpy.tan(numpy.radians(theta_horizon)) # m
-    #theta_array = numpy.degrees(numpy.arctan2(numpy.linspace(0., x_horizon, 120), -1. * z_0)) # MINNA BLUFF
-    theta_array = numpy.degrees(numpy.arctan2(numpy.linspace(0., x_horizon, 120), -1. * z_0)) # MINNA BLUFF
-    """
+        print ('library dir = %s'%(library_dir))
+        print ('z_0 = %.2f'%(z_0))
+        print ('ice model = %s'%(gnosim.earth.antarctic.ice_model_default))
+       
+        theta_array = numpy.linspace(0., 180., n_rays) # 60, Trying double the density
+        #Below is an attemopt to enure more rays are thrown in the region surrounding the reflect/cross hull partition.
+        #theta_reflect = numpy.rad2deg(numpy.arcsin(gnosim.earth.antarctic.indexOfRefraction(-0.01,ice_model=gnosim.earth.antarctic.ice_model_default)/gnosim.earth.antarctic.indexOfRefraction(z_0,ice_model=gnosim.earth.antarctic.ice_model_default)))
+        #theta_array = numpy.append(theta_array,0.99*theta_reflect)
+        #theta_array = numpy.append(theta_array,1.01*theta_reflect)
+        
+        
+        if make_library == True:
+            os.mkdir(library_dir)
+            makeLibrary(z_0, theta_array, save=True, library_dir=library_dir,r_limit = r_limit)
+            
+        if numpy.any([plot_library == True,split_library == True,save_envelope == True]):
+            print('\n'+library_dir+'/*.h5\n')
+            pre_split = (split_library == False)
+            test_lib = RefractionLibrary(library_dir+'/*.h5',pre_split = pre_split)
+            
+        if split_library == True:
+            def sortTraceFileByAng(infiles):
+                infile_theta = numpy.zeros(len(infiles))
+                for index, f in enumerate(infiles):
+                    infile_theta[index] = f.split('theta_')[-1].split('_n')[-2]
+                sorted_infiles = numpy.zeros_like(infiles)
+                for new,old in enumerate(numpy.argsort(infile_theta)):
+                    sorted_infiles[new] = infiles[old]
+                return sorted_infiles , numpy.sort(infile_theta)
 
-    # FULLY ACCOUNTING FOR EARTH CURVATURE, USE THIS FOR HIGH-ALTITUDE CONFIGURATIONS
-    #theta_array = gnosim.earth.earth.curvatureToTheta(z_0, numpy.linspace(0., gnosim.earth.earth.horizon(z_0)[2] - 1., 60)) # 30, 60
-    #print (theta_array)
-    #import sys
-    #sys.exit('DONE')
+            infiles, infile_angles = sortTraceFileByAng(glob.glob(library_dir + '/*.h5'))
+            in_path = infiles[0].replace(infiles[0].split('/')[-1],'')
+            in_dir = infiles[0].split('/')[-2] 
 
-    #theta_array = numpy.linspace(80., 100., 20)
-    #theta_array = numpy.array([68.9473684211])
-    #theta_array = numpy.array([30.])
-   
-    os.mkdir(library_dir)
+            for solution in list(test_lib.data.keys()):
+                sub_dir = in_dir + '/' + solution
+                while os.path.isdir(in_path.replace(in_dir,sub_dir)):
+                    print('Outfile path:' , in_path.replace(in_dir,sub_dir),'exists, appending _new to path')
+                    sub_dir = sub_dir + '_new'
+                os.mkdir(in_path.replace(in_dir,sub_dir) + '/')
+                
+                for ang_index, infile in enumerate(infiles):
+                    print('Saving Split:\t' , infile)
+                    reader = h5py.File(infile, 'r')
+                    file = h5py.File(in_path.replace(in_dir,sub_dir) + '/' + infile.split('/')[-1], 'w')
+                    theta_ant_cut = numpy.where(numpy.isclose(test_lib.data[solution]['theta_ant'],infile_angles[ang_index], atol = 0.99*min(numpy.diff(infile_angles))))[0]
+                    file.attrs['solution_type'] = solution
+                    for attr in list(reader.attrs):
+                        file.attrs[attr] = reader.attrs[attr]
+                    print('Saving',len(theta_ant_cut),'values for solution type:',solution,'\ttheta_ant = ',infile_angles[ang_index])
+                    for key in list(test_lib.data[solution].keys()):
+                        file.create_dataset(key, (len(theta_ant_cut),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+                        if len(theta_ant_cut != 0):
+                            file[key][...] = test_lib.data[solution][key][theta_ant_cut]
+
+                    file.close()
+
+        if plot_library == True: 
+            color_key = {'direct':'r', 'cross':'darkgreen', 'reflect':'blue', 'direct_2':'gold', 'cross_2':'lawngreen', 'reflect_2':'purple'}           
+            pylab.figure()
+            solution_list = numpy.array(['direct','cross','reflect','direct_2','cross_2','reflect_2'])
+            for solution in solution_list:
+                if numpy.logical_and(len(test_lib.data[solution]['r']) > 0, len(test_lib.data[solution]['z']) > 0):
+                    pylab.scatter( test_lib.data[solution]['r'], test_lib.data[solution]['z'],label=solution,color=color_key[solution])#,s=1)
+            pylab.legend(loc='upper right')
+            pylab.xlabel('r(m)',fontsize=16)
+            pylab.ylabel('z(m)',fontsize=16)
+            pylab.ylim(-3010,10)
+            pylab.xlim(-10,6310)
+            
+        if save_envelope == True:
+            test_lib.saveEnvelope(library_dir,solution_list = None,verbose = True, plot_hulls = False)
+            
+        if plot_envelope == True:
+            color_key = {'direct':'r', 'cross':'darkgreen', 'reflect':'blue', 'direct_2':'gold', 'cross_2':'lawngreen', 'reflect_2':'purple'}
+            solution_list = numpy.array(['direct','cross','reflect','direct_2','cross_2','reflect_2'])
+            concave_hull = {}
+            infiles = glob.glob('./'+library_dir+'/concave_hull/*.h5')
+            if len(infiles) == 0:
+                print('Error loading concave hull files.  Ensure they are saved and in dir\n./'+library_dir+'/concave_hull/')
+                continue
+            infile_list = []
+            fig,ax = pylab.subplots()
+            for infile in infiles:
+                solution = (infile.split('concave_hull_data_')[-1]).replace('.h5','')
+                if numpy.isin(solution,solution_list):
+                    concave_hull[solution] ={}
+                    reader = h5py.File(infile, 'r')
+                    z = numpy.linspace(reader.attrs['z_min'],reader.attrs['z_max'],3000)
+                    f_in = scipy.interpolate.interp1d(reader['z_inner_r_bound'][...],reader['r_inner_r_bound'][...],bounds_error=False,fill_value = ((reader['r_inner_r_bound'][...])[0],(reader['r_inner_r_bound'][...])[-1]),kind='cubic') 
+                    f_out = scipy.interpolate.interp1d(reader['z_outer_r_bound'][...],reader['r_outer_r_bound'][...],bounds_error=False,fill_value = ((reader['r_outer_r_bound'][...])[0],(reader['r_outer_r_bound'][...])[-1]),kind='cubic')
+                    pylab.scatter(f_in(z),z,label = solution+' inner',color=color_key[solution],marker = '<')
+                    pylab.scatter(f_out(z),z,label = solution+' outer',color=color_key[solution],marker = '>')
+                    ax.fill_betweenx(z,f_in(z),f_out(z),color=color_key[solution],alpha=0.2)
+            pylab.legend(loc='upper right')
+            pylab.ylim(-3010,10)
+            pylab.xlim(-10,6310)
+            
+            pylab.show()
 
 
-    makeLibrary(z_0, theta_array, save=True, library_dir=library_dir)
+"""
+#From before DS worked on the code
+# WANT TO TAKE INTO ACCOUNT CURVATURE OF THE EARTH HERE
+#theta_array = numpy.degrees(numpy.arctan2(numpy.linspace(0., 50000., 120), -1000.)) # MINNA BLUFF
+theta_horizon = 90. + gnosim.earth.earth.horizon(z_0)[1] + 1.e-3 # deg
+x_horizon = -1. * z_0 * numpy.tan(numpy.radians(theta_horizon)) # m
+#theta_array = numpy.degrees(numpy.arctan2(numpy.linspace(0., x_horizon, 120), -1. * z_0)) # MINNA BLUFF
+theta_array = numpy.degrees(numpy.arctan2(numpy.linspace(0., x_horizon, 120), -1. * z_0)) # MINNA BLUFF
 
-############################################################
+
+# FULLY ACCOUNTING FOR EARTH CURVATURE, USE THIS FOR HIGH-ALTITUDE CONFIGURATIONS
+#theta_array = gnosim.earth.earth.curvatureToTheta(z_0, numpy.linspace(0., gnosim.earth.earth.horizon(z_0)[2] - 1., 60)) # 30, 60
+#print (theta_array)
+#import sys
+#sys.exit('DONE')
+"""
+
+
+
 

@@ -4,7 +4,7 @@ import numpy
 import h5py
 import pylab
 
-
+sys.path.append("/home/dsouthall/Projects/GNOSim/")
 import gnosim.utils.constants
 import gnosim.utils.bayesian_efficiency
 import gnosim.earth.greenland
@@ -636,8 +636,10 @@ pylab.xlabel('Distance (m)')
 pylab.ylabel('PDF')
 pylab.title(title)
 pylab.legend(loc='upper left')
-infilefix = infile.replace('results_2014_dec_5_','')
-pylab.savefig("Graphs/" + infilefix + "_eff.png")
+
+infilefix = infile.replace('Output/','Output/Graphs/')
+
+pylab.savefig(infilefix.replace('.h5','_eff.png'))
 pylab.figure()
 #pylab.plot(bins[1:], values/v  )
 pylab.plot(bins[1:], values)
