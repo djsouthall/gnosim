@@ -25,6 +25,5 @@ plt.plot(range(len(h)), h,label='h')
 plt.plot(range(len(h)), sys,label='sys')
 plt.xlabel("Time [NOT NS]")
 plt.ylabel("abu")
-plt.legend()
-plt.show()
+#plt.show()
 

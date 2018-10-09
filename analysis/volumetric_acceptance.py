@@ -70,6 +70,7 @@ def electricFieldThreshold( snr , gain, temperature, bandwidth, frequency, verbo
         print('Bandwidth = %.2f MHz'%(bandwidth*1000))
         print('Thresh = %0.3e V/m'%(thresh))
     return thresh
+    
 def getInfo(reader,snr,gain,frequency, verbose = True):
     #reader = h5py.File(setup['reader_file'], 'r')
     config = yaml.load(open(reader.attrs['config']))
