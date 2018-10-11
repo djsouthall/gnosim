@@ -6,6 +6,7 @@ file_elect = np.load("./ara_elect_response.npy")
 
 freqs, h_fft = np.hsplit(file_ant, 2)
 freqs, sys_fft = np.hsplit(file_elect, 2)
+freqs = freqs[:,0]
 h_fft = np.ravel(h_fft)
 sys_fft = np.ravel(sys_fft)
 
