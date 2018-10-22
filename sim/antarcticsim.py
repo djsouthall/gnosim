@@ -20,6 +20,7 @@ import gnosim.utils.quat
 import gnosim.earth.earth
 import gnosim.earth.antarctic
 import gnosim.trace.refraction_library_beta
+from gnosim.trace.refraction_library_beta import *
 import gnosim.interaction.askaryan
 import gnosim.sim.detector
 
@@ -30,7 +31,7 @@ pylab.ion()
 
 class Sim:
 
-    def __init__(self, config_file,pre_split = False):
+    def __init__(self, config_file,solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']),pre_split = False):
         #pre_split False unless using a library already sorted into different
         #directories by solution type.
         self.config_file = config_file
@@ -47,7 +48,7 @@ class Sim:
     def detector(self):
         self.lib = {}
         for key in self.config['antenna_definitions'].keys():
-            self.lib[key] = gnosim.trace.refraction_library_beta.RefractionLibrary(self.config['antenna_definitions'][key]['lib'],pre_split = self.pre_split)
+            self.lib[key] = gnosim.trace.refraction_library_beta.RefractionLibrary(self.config['antenna_definitions'][key]['lib'],solutions=solutions,pre_split = self.pre_split)
             #if library is split, I want to invoke it here with some flag.  I will need an altered version of RefractionLibrary
         self.stations = []
         for ii in range(0, self.config['stations']['n']):
@@ -63,208 +64,245 @@ class Sim:
                                                       self.config)
                 self.stations[ii].antennas.append(antenna)
 
-    def event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, anti=False):
-            p_interact = gnosim.earth.earth.probInteract(energy_neutrino, z_0, anti=anti)
+    def event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, anti=False,electricFieldDomain = 'freq',plot=False,summed_signals=False,save_fig=False):
+        p_interact = gnosim.earth.earth.probInteract(energy_neutrino, z_0, anti=anti)
+    
+        # Probability for neutrino to make it through the Earth
+        p_earth = gnosim.earth.earth.probSurvival(energy_neutrino, theta_0, elevation=z_0, anti=anti)
+
+        # Placeholders
+        inelasticity = -999.
+        #electric_field_max = 0. Now per antenna, not event
+        dic_max = {}
+        observation_angle_max = -999.
+        solution_max = -999.
+        index_station_max = -999.
+        index_antenna_max = -999.
         
-            # Probability for neutrino to make it through the Earth
-            p_earth = gnosim.earth.earth.probSurvival(energy_neutrino, theta_0, elevation=z_0, anti=anti)
-
-            p_detect = 0.
-
-            # Placeholders
-            inelasticity = -999.
-            #electric_field_max = 0. Now per antenna, not event
-            dic_max = {}
-            observation_angle_max = -999.
-            solution_max = -999.
-            index_station_max = -999.
-            index_antenna_max = -999.
-            
-            info = numpy.zeros(  self.n_antenna  , dtype = self.info_dtype) #was using numpy.empy, switch to 0s
-            #Old indexing -> (len(self.stations)*len(self.stations[0].antennas))
-            
-            # Loop over stations
-            for index_station in range(0, len(self.stations)):
-                # Loop over station antennas
-                station_label = 'station'+str(index_station)
-                for index_antenna in range(0, len(self.stations[index_station].antennas)):
-                    electric_field_max = 0. #This clearly makes no sense.  Reset every antenna??  Why?  So bizarre.  My info object outputs more info. 
-                    x_antenna = self.stations[index_station].antennas[index_antenna].x
-                    y_antenna = self.stations[index_station].antennas[index_antenna].y
-                    z_antenna = self.stations[index_station].antennas[index_antenna].z
-                    r = numpy.sqrt((x_0 - x_antenna)**2 + (y_0 - y_antenna)**2)
-                    detector_type = ['simple0','simple1','simple2','simple3','simple4','simple5','simple6','simple7'][index_antenna] #temporary
-                    flag_array = [self.in_flag_array[station_label][detector_type]['direct'][eventid],self.in_flag_array[station_label][detector_type]['cross'][eventid],self.in_flag_array[station_label][detector_type]['reflect'][eventid],self.in_flag_array[station_label][detector_type]['direct_2'][eventid],self.in_flag_array[station_label][detector_type]['cross_2'][eventid],self.in_flag_array[station_label][detector_type]['reflect_2'][eventid]]
-                    #flag_array, dic_array = self.stations[index_station].antennas[index_antenna].lib.event(r, z_0)                                              
-                    temporary_info = numpy.zeros(  numpy.size(self.stations[index_station].antennas[index_antenna].lib.solutions)  , dtype = self.info_dtype)
-                    #temporary_info['eventid'] = eventid
-                    #temporary_info['station'] = index_station
-                    #temporary_info['antenna'] = index_antenna
-                    has_solution = 0
-                    #temporary_info['has_solution'] = 0
-                    if numpy.any(flag_array):
-                        has_solution = 1
-                        p_detect = 1.  #This essentially flags if any detector sees any solution type.
-                        #temporary_info['has_solution'] = 1
-                        #want an antenna specific p_detect that flags if a particular detector sees any solution type.  
-                        inelasticity = gnosim.interaction.inelasticity.inelasticity(energy_neutrino, mode='cc') # GENERALIZE THIS LATER #DS not sure why this is in the loop.  Does not depend on any loop variables, only need to calculate once.  Maybe because it was going to be 'generalized'?
-                        frequency = numpy.linspace(self.stations[index_station].antennas[index_antenna].frequency_low,
-                                                   self.stations[index_station].antennas[index_antenna].frequency_high,
-                                                   100) # GHz
-                        index_of_refraction = gnosim.earth.antarctic.indexOfRefraction(z_0, ice_model=self.config['detector_volume']['ice_model'])
-                        vector_neutrino = gnosim.utils.quat.angToVec(phi_0, theta_0) # Direction neutrino came from
-                        phi_ray = numpy.degrees(numpy.arctan2(y_0 - y_antenna, x_0 - x_antenna)) % 360. # deg
-                        
-                        for ii, solution in enumerate(self.stations[index_station].antennas[index_antenna].lib.solutions):
-                            #if flag_array[ii]:
-                            if self.in_flag_array[station_label][detector_type][solution][eventid]:
-                                # Direction of outgoing ray from antenna to interaction vertex
+        info = numpy.zeros(  self.n_antenna  , dtype = self.info_dtype) #was using numpy.empy, switch to 0s
+        #Old indexing -> (len(self.stations)*len(self.stations[0].antennas))
+        
+        # Loop over stations
+        if electricFieldDomain == 'time':
+            u_signals = {}
+            E_signals = {}
+        for index_station in range(0, len(self.stations)):
+            # Loop over station antennas
+            station_label = 'station'+str(index_station)
+            if electricFieldDomain == 'time':
+                u_signals[station_label] = {}
+                E_signals[station_label] = {}
+            for index_antenna in range(0, len(self.stations[index_station].antennas)):
+                antenna_label = self.config['antennas']['types'][index_antenna]
+                if electricFieldDomain == 'time':
+                    u_signals[station_label][antenna_label] = {}
+                    E_signals[station_label][antenna_label] = {}
+                    for solution in self.stations[index_station].antennas[index_antenna].lib.solutions:
+                        u_signals[station_label][antenna_label][solution] = []
+                        E_signals[station_label][antenna_label][solution] = []
+                electric_field_max = 0. #This clearly makes no sense.  Reset every antenna??  Why?  So bizarre.  My info object outputs more info. 
+                x_antenna = self.stations[index_station].antennas[index_antenna].x
+                y_antenna = self.stations[index_station].antennas[index_antenna].y
+                z_antenna = self.stations[index_station].antennas[index_antenna].z
+                r = numpy.sqrt((x_0 - x_antenna)**2 + (y_0 - y_antenna)**2)
+                
+                flag_array = []
+                for solution in self.stations[index_station].antennas[index_antenna].lib.solutions:
+                    flag_array.append(self.in_flag_array[station_label][antenna_label][solution][eventid])
+                    
+                #flag_array = [self.in_flag_array[station_label][antenna_label]['direct'][eventid],self.in_flag_array[station_label][antenna_label]['cross'][eventid],self.in_flag_array[station_label][antenna_label]['reflect'][eventid],self.in_flag_array[station_label][antenna_label]['direct_2'][eventid],self.in_flag_array[station_label][antenna_label]['cross_2'][eventid],self.in_flag_array[station_label][antenna_label]['reflect_2'][eventid]]
+                #flag_array, dic_array = self.stations[index_station].antennas[index_antenna].lib.event(r, z_0)                                              
+                temporary_info = numpy.zeros(  numpy.size(self.stations[index_station].antennas[index_antenna].lib.solutions)  , dtype = self.info_dtype)
+                #print('len(temporary_info)',len(temporary_info))
+                for i in range(len(temporary_info)):
+                    temporary_info[i] = numpy.array([(eventid,index_station,index_antenna,0,'',-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0)],dtype = self.info_dtype)
+                #temporary_info['has_solution'] = 0
+                if numpy.any(flag_array):
+                    has_solution = 1
+                    #p_detect = 1.  #This essentially flags if any detector sees any solution type.
+                    #temporary_info['has_solution'] = 1
+                    #want an antenna specific p_detect that flags if a particular detector sees any solution type.  
+                    inelasticity = gnosim.interaction.inelasticity.inelasticity(energy_neutrino, mode='cc') # GENERALIZE THIS LATER #DS not sure why this is in the loop.  Does not depend on any loop variables, only need to calculate once.  Maybe because it was going to be 'generalized'?
+                    frequency = numpy.linspace(self.stations[index_station].antennas[index_antenna].frequency_low,
+                                               self.stations[index_station].antennas[index_antenna].frequency_high,
+                                               100) # GHz
+                    index_of_refraction = gnosim.earth.antarctic.indexOfRefraction(z_0, ice_model=self.config['detector_volume']['ice_model'])
+                    vector_neutrino = gnosim.utils.quat.angToVec(phi_0, theta_0) # Direction neutrino came from
+                    phi_ray = numpy.degrees(numpy.arctan2(y_0 - y_antenna, x_0 - x_antenna)) % 360. # deg
+                    
+                    for ii, solution in enumerate(self.stations[index_station].antennas[index_antenna].lib.solutions):
+                        #if flag_array[ii]:
+                        if self.in_flag_array[station_label][antenna_label][solution][eventid]:
+                            # Direction of outgoing ray from antenna to interaction vertex
+                            
+                            #vector_ray = gnosim.utils.quat.angToVec(phi_ray, dic_array[ii]['theta'])
+                            vector_ray = gnosim.utils.quat.angToVec(phi_ray, self.in_dic_array[station_label][antenna_label][solution]['theta'][eventid])
+                            observation_angle = gnosim.utils.quat.angTwoVec(vector_neutrino, vector_ray) # deg
+                            d = self.in_dic_array[station_label][antenna_label][solution]['d'][eventid] # m
+                            
+                            if electricFieldDomain == 'time':
+                                #this must output a single value for the electric field in the same way old does
+                                #must also output a weighted frequency of sorts.  i.e. the most dominant frequency.
+                                #might need to account for polarity swap on reflection.  Not sure if this is an effect.  
                                 
-                                #vector_ray = gnosim.utils.quat.angToVec(phi_ray, dic_array[ii]['theta'])
-                                vector_ray = gnosim.utils.quat.angToVec(phi_ray, self.in_dic_array[station_label][detector_type][solution]['theta'][eventid])
-                                observation_angle = gnosim.utils.quat.angTwoVec(vector_neutrino, vector_ray) # deg
-                                d = self.in_dic_array[station_label][detector_type][solution]['d'][eventid] # m
+                                electric_array, u, weighted_freq = gnosim.interaction.askaryan.electricFieldTimeDomainSignal(numpy.deg2rad(observation_angle),self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],energy_neutrino*inelasticity,index_of_refraction,h_fft=self.h_fft,sys_fft=self.sys_fft,freqs=self.freqs_response,return_pos = True,out_dom_freq=True,plot=False)
+                                u = u + self.in_dic_array[station_label][antenna_label][solution]['t'][eventid]
+                                electric_array *= self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid]
+                                electric_field = max(numpy.fabs(electric_array)) #maybe should be some integral?
+                                E_signals[station_label][antenna_label][solution] = electric_array
+                                u_signals[station_label][antenna_label][solution] = u
+                            else:
+                                if electricFieldDomain != 'freq':
+                                    print('Electric field domain selection did not fit one of the\ntwo expected values.  Defaulting to freq.')
+                                    
                                 electric_field \
-                                    = gnosim.interaction.askaryan.electricField(frequency, d, observation_angle,
+                                    = gnosim.interaction.askaryan.electricFieldFrequencyDomainRaw(frequency, d, observation_angle,
                                                                                 energy_neutrino, inelasticity, 
                                                                                 'cc', index_of_refraction) # V m^-1 GHz^-1, dimensionless
-                                electric_field *= self.in_dic_array[station_label][detector_type][solution]['a_v'][eventid] # COME BACK TO GENERALIZE THIS
-                                electric_array, electric_field, weighted_freq = self.stations[index_station].antennas[index_antenna].electricField(frequency, electric_field, self.in_dic_array[station_label][detector_type][solution]['theta_ant'][eventid]) # V m^-1 #THIS WAS CHANGED THETA WAS ADDED
-                                
-                                temporary_info[ii] = numpy.array([(eventid,index_station,index_antenna,has_solution,solution,self.in_dic_array[station_label][detector_type][solution]['t'][eventid],self.in_dic_array[station_label][detector_type][solution]['d'][eventid],self.in_dic_array[station_label][detector_type][solution]['theta_ant'][eventid],observation_angle,electric_field,weighted_freq,self.in_dic_array[station_label][detector_type][solution]['a_h'][eventid],self.in_dic_array[station_label][detector_type][solution]['a_v'][eventid])],dtype = self.info_dtype)
-                                if electric_field > electric_field_max:
-                                    electric_field_max = electric_field;
-                                    observation_angle_max = observation_angle
-                                    solution_max = ii
-                                    solution_type_max = solution
-                                    max_eventid = eventid
-                                    index_station_max = index_station
-                                    index_antenna_max = index_antenna
-                        #NEED WAY TO HANDLE SCENARIO WHERE NONE!!! ARE A SOLUTION.  PICK UP ON THIS.
-                        dic_max['d'] = self.in_dic_array[station_label][detector_type][solution_type_max]['d'][max_eventid]
-                        dic_max['r'] = self.in_dic_array[station_label][detector_type][solution_type_max]['r'][max_eventid]
-                        dic_max['t'] = self.in_dic_array[station_label][detector_type][solution_type_max]['t'][max_eventid]
-                        dic_max['theta'] = self.in_dic_array[station_label][detector_type][solution_type_max]['theta'][max_eventid]
-                        dic_max['theta_ant'] = self.in_dic_array[station_label][detector_type][solution_type_max]['theta_ant'][max_eventid]
-                        dic_max['a_h'] = self.in_dic_array[station_label][detector_type][solution_type_max]['a_h'][max_eventid]
-                        dic_max['a_v'] = self.in_dic_array[station_label][detector_type][solution_type_max]['a_v'][max_eventid]
-                        dic_max['z'] = self.in_dic_array[station_label][detector_type][solution_type_max]['z'][max_eventid]
-                        info[ sum([len(self.stations[s].antennas) for s in range(0,index_station)]) + index_antenna] = temporary_info[numpy.argmax(temporary_info['electric_field'])]
-                    #self.in_flag_array[station_label][antenna_label][solution] #Want a way to include this in info.  I.e. a binary has_solution flag for each antenna for each event
-                    else:
-                        #This event has no solution for this antenna
-                        has_solution = 0
-                        info[ sum([len(self.stations[s].antennas) for s in range(0,index_station)]) + index_antenna] = numpy.array([(eventid,index_station,index_antenna,has_solution,'',-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0)],dtype = self.info_dtype)
+                                electric_field *= self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid] # COME BACK TO GENERALIZE THIS
+                                electric_array, electric_field, weighted_freq = self.stations[index_station].antennas[index_antenna].totalElectricField(frequency, electric_field, self.in_dic_array[station_label][antenna_label][solution]['theta_ant'][eventid]) # V m^-1 #THIS WAS CHANGED THETA WAS ADDED
+                            
+                            temporary_info[ii] = numpy.array([(eventid,index_station,index_antenna,has_solution,solution,self.in_dic_array[station_label][antenna_label][solution]['t'][eventid],self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],self.in_dic_array[station_label][antenna_label][solution]['theta_ant'][eventid],observation_angle,electric_field,weighted_freq,self.in_dic_array[station_label][antenna_label][solution]['a_h'][eventid],self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid])],dtype = self.info_dtype)
+                            if electric_field >= electric_field_max:
+                                electric_field_max = electric_field
+                                observation_angle_max = observation_angle
+                                solution_max = ii
+                                solution_type_max = solution
+                                max_eventid = eventid
+                                index_station_max = index_station
+                                index_antenna_max = index_antenna
                     
-
-            return p_interact, p_earth, p_detect, inelasticity, electric_field_max, dic_max, observation_angle_max, solution_max, index_station_max, index_antenna_max, info
-            #return p_interact, p_earth, p_detect, electric_field_direct, electric_field_crossover, electric_field_reflect,  dic_direct, dic_crossover, dic_reflect
-    
-    
-    def make_Envelope(self, plot_hulls = False,verbose = False):
-        '''
-        Creates two functions for each antenna/solution type pair.  These take a depth value
-        and output a corresponding bounding r value at that depth.  The pair of functions can
-        be used as an inner and outer bound.  The dictionary that contains these functions also
-        contains bounding depth values for each pair of functions, outside of which the functions
-        are extrapolating, so these should be used as an initial gate as to whether an r-z pair
-        is of a paticular solution type. These outputs are all within self.concave_hull.  This is
-        currently all done on the simulation side, but this can and should eventually be part of 
-        the library itself.
-        
-        If @plot_hulls is True than a plot of the libraries set of trace points, and the provided hull
-        are produced for each solution type. 
-        
-        The n_bins values in self.concave_hull are tuned by eye using these plots, are vary depending
-        the ray density/point spacing.  They should be double checked each time a new libary is
-        created.  Try not to erase the current values, and just comment out.  
-        '''
-        
-        legend_locs = {'direct':'upper right','cross':'upper right','reflect':'upper right','direct_2':'lower right','cross_2':'lower right','reflect_2':'lower right'}        
-        self.concave_hull = {}
-        for antenna_label in self.lib.keys():
-            if verbose:
-                print('Making Envelopes for:', antenna_label)
-            self.concave_hull[antenna_label] = {'direct':{'n_bins':1000},'cross':{'n_bins':1500},'reflect':{'n_bins':2000},'direct_2':{'n_bins':500},'cross_2':{'n_bins':400},'reflect_2':{'n_bins':2000}} # worked for 120 rays
-            #self.concave_hull[antenna_label] = {'direct':{'n_bins':300},'cross':{'n_bins':1500},'reflect':{'n_bins':2000},'direct_2':{'n_bins':500},'cross_2':{'n_bins':400},'reflect_2':{'n_bins':2000}} # worked for 60 rays
-            for solution_type in ['direct','cross','reflect','direct_2','cross_2','reflect_2']:
-                if verbose:
-                    print('\tSolution Type: %10s \tNumber of points: %i'%( solution_type , len(self.lib[antenna_label].data[solution_type]['z'])))
-                if (len(self.lib[antenna_label].data[solution_type]['z']) == 0):
-                    print('\tNot enough points, returning 0 value hull')
-                    self.concave_hull[antenna_label][solution_type]['z_min'] = 0.0001
-                    self.concave_hull[antenna_label][solution_type]['z_max'] = -0.0001#Want upper bound to be smaller than lower bound so you can never be appropriately between them in error scenario. 
-                    self.concave_hull[antenna_label][solution_type]['f_inner_r_bound'] = scipy.interpolate.interp1d([-1000000,1000000],[0.0001,0.0001],bounds_error=False,fill_value = 0.0001)
-                    self.concave_hull[antenna_label][solution_type]['f_outer_r_bound'] = scipy.interpolate.interp1d([-1000000,1000000],[-0.0001,-0.0001],bounds_error=False,fill_value = -0.0001) #Want outer bound to be smaller than in bound so you can never be appropriately between them in error scenario. 
+                    if plot == True:
+                        origin = []
+                        for index_antenna in temporary_info[temporary_info['has_solution'] == 1]['antenna']:
+                            origin.append([self.stations[index_station].antennas[index_antenna].x,self.stations[index_station].antennas[index_antenna].y,self.stations[index_station].antennas[index_antenna].z])
+                
+                        #origin = [x_antenna,y_antenna,z_antenna]
+                        neutrino_loc = [x_0, y_0, z_0]
+                        if len(temporary_info[temporary_info['has_solution'] == 1]) > 0:
+                            fig = plotGeometry(origin,neutrino_loc,phi_0,temporary_info[temporary_info['has_solution'] == 1])
+                            if save_fig == True:
+                                try:
+                                    fig.savefig('./%s_antenna%i_all_solutions-event%i.pdf'%(self.outfile.split('/')[-1].replace('.h5',''),index_antenna,eventid),bbox_inches='tight')
+                                    pylab.close(fig)
+                                except:
+                                    print('Failed to save image ./%s_antenna%i_all_solutions-event%i.pdf'%(self.outfile.split('/')[-1].replace('.h5',''),index_antenna,eventid))
+                            else:
+                                print('Attempted to plot, but no signals for this event are present')
+                    #NEED WAY TO HANDLE SCENARIO WHERE NONE!!! ARE A SOLUTION.  PICK UP ON THIS.
+                    dic_max['d'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['d'][max_eventid]
+                    dic_max['r'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['r'][max_eventid]
+                    dic_max['t'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['t'][max_eventid]
+                    dic_max['theta'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['theta'][max_eventid]
+                    dic_max['theta_ant'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['theta_ant'][max_eventid]
+                    dic_max['a_h'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['a_h'][max_eventid]
+                    dic_max['a_v'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['a_v'][max_eventid]
+                    dic_max['z'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['z'][max_eventid]
+                    info[ sum([len(self.stations[s].antennas) for s in range(0,index_station)]) + index_antenna] = temporary_info[numpy.argmax(temporary_info['electric_field'])]
+                #self.in_flag_array[station_label][antenna_label][solution] #Want a way to include this in info.  I.e. a binary has_solution flag for each antenna for each event
                 else:
-                    test_z = self.lib[antenna_label].data[solution_type]['z']
-                    test_r = self.lib[antenna_label].data[solution_type]['r']
-                    
-                    z_bins = numpy.linspace(min(test_z)-1.0,max(test_z)+1.0,self.concave_hull[antenna_label][solution_type]['n_bins'])
-                    z_out = numpy.zeros(self.concave_hull[antenna_label][solution_type]['n_bins']-1)
-                    r_out = numpy.zeros(self.concave_hull[antenna_label][solution_type]['n_bins']-1)
-                    z_in = numpy.zeros(self.concave_hull[antenna_label][solution_type]['n_bins']-1)
-                    r_in = numpy.zeros(self.concave_hull[antenna_label][solution_type]['n_bins']-1)
-                    
-                    tz = numpy.tile(test_z,(len(z_bins)-1,1))
-                    bz = numpy.tile(z_bins, (len(test_z),1)).T
-                    cut = numpy.logical_and(numpy.greater_equal(tz, bz[0:-1]),numpy.less_equal(tz , bz[1:]))
-                    use_in_interp = numpy.where(numpy.sum(cut,axis=1)!=0)[0]
-                    
-                    for bin in range(1,self.concave_hull[antenna_label][solution_type]['n_bins']):
-                        if (numpy.any(numpy.isin(use_in_interp,bin-1))):
-                            r_out[bin-1] = max(test_r[numpy.where(cut[bin-1,:]) ])
-                            r_in[bin-1] = min(test_r[numpy.where(cut[bin-1,:]) ])
-                            z_in[bin-1] = max(numpy.unique(test_z[numpy.where(cut[bin-1,:])][ numpy.where(test_r[numpy.where(cut[bin-1,:]) ] == r_in[bin-1])]))
-                            z_out[bin-1] = max(numpy.unique(test_z[numpy.where(cut[bin-1,:])][ numpy.where(test_r[numpy.where(cut[bin-1,:]) ] == r_out[bin-1])]))
-                            if (bin == self.concave_hull[antenna_label][solution_type]['n_bins']-1):
-                                #shallowest
-                                #print('Trying to adjust shallowest')
-                                r_out[bin-1] = max(test_r[numpy.isclose(test_z,max(test_z),atol = 0.5)])
-                                z_out[bin-1] = max(test_z)
-                    #These could be calculated and stored in the original h5 file, then called to make interp1d and max/min within the library, this would save time.
-                    z_out = z_out[use_in_interp]
-                    r_out = r_out[use_in_interp]
-                    z_in = z_in[use_in_interp]
-                    r_in = r_in[use_in_interp]
-                    
-                    self.concave_hull[antenna_label][solution_type]['f_inner_r_bound'] = scipy.interpolate.interp1d(z_in,r_in,bounds_error=False,fill_value = (r_in[0],r_in[-1])) #fill_value=max(r_in))#,kind='cubic') #given z, give r, want big value for fill, because this is region where solution shouldn't exist, so a test of is this > f_in then solution should be false
-                    self.concave_hull[antenna_label][solution_type]['f_outer_r_bound'] = scipy.interpolate.interp1d(z_out,r_out,bounds_error=False,fill_value = (r_out[0],r_out[-1]))# fill_value=min(r_out))#,kind='cubic') These make boundaries weird but I think are a necessary evil?  Unless I match each with an z_min, z_max?  Could do....,  I can give interp1d two fill values so it fits well up to min/max z
-                    
-                    self.concave_hull[antenna_label][solution_type]['z_min'] = min(z_in[0],z_out[0])
-                    self.concave_hull[antenna_label][solution_type]['z_max'] = max(z_in[-1],z_out[-1])
-
-                if plot_hulls:
-                    fig1, ax1 = pylab.subplots()
-                    library = pylab.scatter(test_r,test_z,c='b')
-                    pylab.xlabel('r(m)',fontsize=20)
-                    pylab.ylabel('z(m)',fontsize=20)
-                    pylab.title('Convex Hull for %s'%(solution_type),fontsize=20)
-                    pylab.scatter(r_out,z_out,c='m')
-                    pylab.scatter(r_in,z_in,c='m')
-                    lines = pylab.hlines([self.concave_hull[antenna_label][solution_type]['z_min'],self.concave_hull[antenna_label][solution_type]['z_max']],ax1.get_xlim()[0],ax1.get_xlim()[1],lw='1.5',colors='r',linestyles = 'dotted')
-                    
-                    plot_z = numpy.linspace(min(test_z),max(test_z),10000)
-                    plot_z[0] = min(test_z)
-                    plot_z[-1] = max(test_z)
-                    in_plot = pylab.plot(self.concave_hull[antenna_label][solution_type]['f_inner_r_bound'](plot_z),plot_z,c='r',lw=4)
-                    pylab.plot(self.concave_hull[antenna_label][solution_type]['f_outer_r_bound'](plot_z),plot_z,c='r',lw=4)
-                    #plot_r = numpy.linspace(min(test_r),max(test_r),10000)
-                    #plot_r[0] = min(test_r)
-                    #plot_r[-1] = max(test_r)
-                    #low_plot = pylab.plot(plot_r,self.lib[antenna_label].envelope[solution_type]['low'](plot_r),c='g',lw=4,linestyle = '--')
-                    #pylab.plot(plot_r,lib[antenna_label].envelope[solution_type]['high'](plot_r),c='g',lw=4,linestyle = '--')
-                    out_points = pylab.scatter(r_out,z_out,c='m',s=50)
-                    in_points = pylab.scatter(r_in,z_in,c='c',s=50)
-                    pylab.legend((library,in_plot[0],lines,out_points,in_points),('Trace Library Points','Concave Hull', 'Accepted Depth Window', 'Points Used To\nCreate Outter Bound','Points Used To\nCreate Inner Bound' ),loc = legend_locs[solution_type],fontsize=16)
-                    #pylab.legend((library,low_plot[0],in_plot[0],lines,out_points,in_points),('Trace Library Points','Old Hull','New Hull', 'Accepted Depth Window', 'Points Used To\nCreate Outter Bound','Points Used To\nCreate Inner Bound' ),loc = legend_locs[solution_type],fontsize=16)
-                if plot_hulls:
-                    input("Press any key to clear current antenna plots and move to next")
-            if plot_hulls:
-                input("Press any key to clear all antenna plots and continue simulation")
-
-            
-            
+                    #This event has no solution for this antenna
+                    has_solution = 0
+                    info[ sum([len(self.stations[s].antennas) for s in range(0,index_station)]) + index_antenna] = numpy.array([(eventid,index_station,index_antenna,has_solution,'',-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0)],dtype = self.info_dtype)
+            if plot == True:
+                origin = []
+                for index_antenna in info[info['has_solution'] == 1]['antenna']:
+                    origin.append([self.stations[index_station].antennas[index_antenna].x,self.stations[index_station].antennas[index_antenna].y,self.stations[index_station].antennas[index_antenna].z])
+                
+                #x_antenna = self.stations[index_station].antennas[index_antenna].x
+                neutrino_loc = [x_0, y_0, z_0]
+                if len(info[info['has_solution'] == 1]) > 0:
+                    fig = plotGeometry(origin,neutrino_loc,phi_0,info[info['has_solution'] == 1])
+                    if save_fig == True:
+                        try:
+                            fig.savefig('./%s_all_antennas-event%i.pdf'%(self.outfile.split('/')[-1].replace('.h5',''),eventid),bbox_inches='tight')
+                            pylab.close(fig)
+                        except:
+                            print('Failed to save image ./%s_antenna%i_all_solutions-event%i.pdf'%(self.outfile.split('/')[-1].replace('.h5',''),index_antenna,eventid))
+                    else:
+                        print('Attempted to plot, but no signals for this event are present')        
+        p_detect = numpy.any(info['has_solution'])
+        
+        if electricFieldDomain == 'time':
+            summed_signals = True
+            for index_station in range(0, len(self.stations)):
+                station_label = 'station'+str(index_station)
+                for index_antenna in range(0, len(self.stations[index_station].antennas)):
+                    antenna_label = self.config['antennas']['types'][index_antenna]                    
+                    u_in = []
+                    E_in = []
+                    if summed_signals == False:
+                        max_E_in_val = 0
+                        max_E_val_solution_type = ''
+                    for solution in self.stations[index_station].antennas[index_antenna].lib.solutions:
+                        u_in.append(u_signals[station_label][antenna_label][solution])
+                        E_in.append(E_signals[station_label][antenna_label][solution])
+                        if summed_signals == False:
+                            if self.in_flag_array[station_label][antenna_label][solution][eventid]:
+                                if max(numpy.fabs(E_signals[station_label][antenna_label][solution])) >= max_E_in_val:
+                                    max_E_in_val = max(abs(E_signals[station_label][antenna_label][solution]))
+                                    max_E_val_solution_type = solution
+                    #u_in/E_in should be an array of times with dimensions (n_signal , n_timestep )
+                    if numpy.size(u_in) != 0:
+                        #print(numpy.size(u_in))
+                        #print(numpy.shape(u_in))
+                        #print(u_in)
+                        #print(numpy.size(E_in))
+                        #print(numpy.shape(E_in))
+                        #print(E_in)
+                        if summed_signals == True:
+                            u_out, E_out = gnosim.interaction.askaryan.addSignals(u_in,E_in,plot=False)
+                            u_signals[station_label][antenna_label] = u_out
+                            E_signals[station_label][antenna_label] = E_out
+                        else:
+                            E_in = numpy.array(E_in)
+                            u_in = numpy.array(u_in)
+                            
+                            u_signals[station_label][antenna_label] = u_signals[station_label][antenna_label][max_E_val_solution_type]
+                            E_signals[station_label][antenna_label] = E_signals[station_label][antenna_label][max_E_val_solution_type]
+                    else:
+                        u_signals[station_label][antenna_label] = []
+                        E_signals[station_label][antenna_label] = []
+                if plot == True:
+                    #might need to account for when signals are not present in certain detectors
+                    if len(self.stations[index_station].antennas) > 4:
+                        ax = pylab.subplot((len(self.stations[index_station].antennas)+1)//2,2,1)
+                    else:
+                        ax = pylab.subplot(len(self.stations[index_station].antennas),1,1)
+                    pylab.title('Event %i'%(eventid))
+                    u_min = 1e20
+                    u_max = -1e20
+                    E_min = 1e20
+                    E_max = -1e20
+                    for index_antenna in range(0, len(self.stations[index_station].antennas)):
+                        if numpy.size(u_signals[station_label][antenna_label]) != 0:
+                            u_min = numpy.min([u_min,min(u_signals[station_label][antenna_label])])
+                            u_max = numpy.max([u_max,max(u_signals[station_label][antenna_label])])
+                            E_min = numpy.min([E_min,min(E_signals[station_label][antenna_label])])
+                            E_max = numpy.max([E_max,max(E_signals[station_label][antenna_label])])
+                    if numpy.logical_and(u_min != 1e20, u_max != -1e20) == True:
+                        pylab.xlim(u_min,u_max)
+                        pylab.ylim(min(E_min*0.99,E_min*1.01),max(E_max*0.99,E_max*1.01))
+                        for index_antenna in range(0, len(self.stations[index_station].antennas)):
+                            pylab.subplot(len(self.stations[index_station].antennas),1,index_antenna+1,sharex=ax,sharey=ax)
+                            pylab.plot(u_signals[station_label][antenna_label],E_signals[station_label][antenna_label],label='s%ia%i'%(index_station,index_antenna),linewidth=0.1)
+                            pylab.ylabel('E$_{%i}$ (V/m)'%(eventid),fontsize=12)
+                            pylab.legend(fontsize=8)
+                        pylab.xlabel('t-t_emit (ns)',fontsize=12)
+                        #pylab.show(block=True)
+                        if save_fig == True:
+                            try:
+                                pylab.savefig('./%s-event%i.pdf'%(self.outfile.split('/')[-1].replace('.h5',''),eventid),bbox_inches='tight')
+                            except:
+                                print('Failed to save image ./%s-event%i.pdf'%(self.outfile,eventid))
+                        else:
+                            print('Attempted to plot, but no signals for this event are present')
+            #By this point the signals for each antenna should be selected.  Here is where they could be plotted
+            #or where phasing could take place. 
+        
+        return p_interact, p_earth, p_detect, inelasticity, electric_field_max, dic_max, observation_angle_max, solution_max, index_station_max, index_antenna_max, info
+        #return p_interact, p_earth, p_detect, electric_field_direct, electric_field_crossover, electric_field_reflect,  dic_direct, dic_crossover, dic_reflect
+    
     def griddata_Event(self, x_query, y_query , z_query, method = 'cubic'):
         '''
         This function takes a set of x,y,z coordinates and determines whether each set
@@ -301,7 +339,7 @@ class Sim:
                 
                 self.in_dic_array[station_label][antenna_label] = {}
                 self.in_flag_array[station_label][antenna_label] = {}
-                for solution in self.lib[antenna_label].data.keys():
+                for solution in self.stations[index_station].antennas[index_antenna].lib.solutions:
                     print('\tSolution Type:', solution)
                     self.in_dic_array[station_label][antenna_label][solution] = {}
 
@@ -324,26 +362,46 @@ class Sim:
                     #no_solution_index = numpy.where(simplices_index == -1) #make sure this is as I want.  
                     self.in_flag_array[station_label][antenna_label][solution] = has_solution
                     
-                    # New weighting method using barycentric coordinates
-                                  
+                    
+                    events_per_calc = 100000
+                    left_event = 0
+                    
+                    for key in self.lib[antenna_label].data[solution].keys():
+                        self.in_dic_array[station_label][antenna_label][solution][key] = numpy.zeros_like(z_query)
+                    
+                    while left_event < len(z_query):
+                        cut = numpy.arange(left_event,min(left_event+events_per_calc,len(z_query)))
+                        for key in self.lib[antenna_label].data[solution].keys():
+                            self.in_dic_array[station_label][antenna_label][solution][key][cut] = numpy.ma.filled(numpy.ma.masked_array(scipy.interpolate.griddata((self.lib[antenna_label].data[solution]['r'],self.lib[antenna_label].data[solution]['z']),self.lib[antenna_label].data[solution][key],(rm_query[cut], zm_query[cut]),method=method,fill_value=-999.0),mask = ~has_solution[cut],fill_value = -999.0))
+                        print('\t\t%s : %i/%i'%(solution,min(left_event+events_per_calc,len(z_query)),len(z_query)))
+                        left_event += events_per_calc
+                    
+                        #Currently can poduce nan values if griddata thinks it is extrapolating but hull says it is in region 
+                    
+                    
+                    '''
                     for key in self.lib[antenna_label].data[solution].keys():
                         self.in_dic_array[station_label][antenna_label][solution][key] = numpy.ma.filled(numpy.ma.masked_array(scipy.interpolate.griddata((self.lib[antenna_label].data[solution]['r'],self.lib[antenna_label].data[solution]['z']),self.lib[antenna_label].data[solution][key],(rm_query, zm_query),method=method,fill_value=-999.0),mask = ~has_solution,fill_value = -999.0))
                         #Currently can poduce nan values if griddata thinks it is extrapolating but hull says it is in region 
+                    '''
         print('Finished griddata_Event')
         #return self.in_dic_array[station_label], self.in_flag_array
 
     def throw(self, energy_neutrino=1.e9, 
               theta_0=None, phi_0=None, x_0=None, y_0=None, z_0=None, 
               anti=False, n_events=10000, detector_volume_radius=6000., detector_volume_depth=3000., 
-              outfile=None,seed = None,method = 'cubic'):
-              
+              outfile=None,seed = None,method = 'cubic',electricFieldDomain = 'freq'):
+        '''
+        electricFieldDomain should be either freq or time.  The freq domain uses
+        the older electric field calculation, while the 'time' uses the new one.
+        '''
+        self.outfile = outfile
         #seed for testing purposes (if want replicated data)
         if (seed != None):
             numpy.random.seed(seed)
             
         #Loading Hulls (or creating if hulls have not been previously determined in the necessary folder)
         self.concave_hull = {}
-        #self.make_Envelope(plot_hulls=False, verbose = True)
         for lkey in self.lib.keys():
             print('Loading Hull For:', lkey)
             self.concave_hull[lkey] = {}
@@ -418,16 +476,26 @@ class Sim:
         #If memory becomes an issue this might need to be adapted to run for chunks of events 
         self.griddata_Event(x_0, y_0, z_0, method = method)   
         print('Succesfully ran griddata_Event:')
-        
+        if electricFieldDomain == 'time':
+            print('Loading Response Functions')
+            self.h_fft,self.sys_fft,self.freqs_response = gnosim.interaction.askaryan.loadSignalResponse()
+            
         ############################################################################
         #Using interpolated values for further calculations on an event/event basis:
         ############################################################################
         for ii in range(0, n_events):
             if(ii%(n_events/100) == 0):
                 print ('Event (%i/%i)'%(ii, n_events)) #might want to comment out these print statements to run faster and spew less
-            
+            if (ii%(n_events/10) == 0):
+                plot = True  
+                #right now this is a quick way to check some events.  In the future 
+                #might want to save triggered events only?  Will need to figure out 
+                #a better trigger method to do that.  For large simulations would 
+                #risk saving crazy amounts of figures.
+            else:
+                plot = False
             p_interact[ii], p_earth[ii], p_detect[ii], inelasticity[ii], electric_field_max[ii], dic_max, observation_angle_max[ii], solution_max[ii], index_station_max[ii], index_antenna_max[ii], info[(ii * self.n_antenna ):((ii+1) * self.n_antenna )] \
-                = self.event(energy_neutrino[ii], phi_0[ii], theta_0[ii], x_0[ii], y_0[ii], z_0[ii], ii, anti=anti)
+                = self.event(energy_neutrino[ii], phi_0[ii], theta_0[ii], x_0[ii], y_0[ii], z_0[ii], ii, anti=anti,electricFieldDomain = electricFieldDomain,plot=plot,save_fig=plot)
 
             if p_detect[ii] == 1.:
                 t_max[ii] = dic_max['t']
@@ -520,11 +588,13 @@ if __name__ == "__main__":
     energy_neutrino = float(sys.argv[2]) # GeV
     n_events = int(sys.argv[3])
     index = int(sys.argv[4])
+    #solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2'])
+    solutions = numpy.array(['direct', 'cross', 'reflect'])
     #detector_volume_radius = float(sys.argv[5]) # m, 1200 for Ross surface, 51000 for Minna bluff, >6000 for subterranean
     #detector_volume_depth = float(sys.argv[6]) # m, 500 for Ross and Minna, 3000 for subterranean
 
     #SEED FOR TESTNG:
-    seed = 0
+    seed = None
     config_file_fix = config_file.replace('/home/dsouthall/Projects/GNOSim/','')
     config_file_fix = config_file_fix.replace('gnosim/sim/ConfigFiles/Config_dsouthall/','')
     config_file_fix = config_file_fix.replace('./','')
@@ -549,11 +619,11 @@ if __name__ == "__main__":
             
     #f = h5py.File(outfile, 'w')
    
-    my_sim = Sim(config_file, pre_split = True)
+    my_sim = Sim(config_file, solutions=solutions,pre_split = True)
     my_sim.throw(energy_neutrino, n_events=n_events, 
                  detector_volume_radius=my_sim.config['detector_volume']['radius'],
                  detector_volume_depth=my_sim.config['detector_volume']['depth'],
-                 outfile=outfile,seed=seed)
+                 outfile=outfile,seed=seed,electricFieldDomain = 'time')
 
     #python /home/dsouthall/Projects/GNOSim/sim/antarcticsim.py config energy n_events index 
     #python /home/dsouthall/Projects/GNOSim/gnosim/sim/antarcticsim.py /home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_octo_-200_polar_120_rays.py 1.0e8 50000 1 

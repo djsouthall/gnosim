@@ -65,13 +65,16 @@ class Antenna:
         frequency_array = numpy.linspace(self.frequency_low, self.frequency_high, n_steps)
         return numpy.sum(f(frequency_array)) * delta_frequency * numpy.sin(numpy.deg2rad(theta_ant)) # V m^-1
     '''
-    def electricField(self, frequency, electric_field, theta_ant, n_steps=100):
+    def totalElectricField(self, frequency, electric_field, theta_ant, n_steps=100):
         f = scipy.interpolate.interp1d(frequency, electric_field, bounds_error=False, fill_value=0.)
         delta_frequency = (self.frequency_high - self.frequency_low) / n_steps
         frequency_array = numpy.linspace(self.frequency_low, self.frequency_high, n_steps)
         electric_array = f(frequency_array) * numpy.sin(numpy.deg2rad(theta_ant))
         integrated_field = numpy.sum(electric_array) * delta_frequency # V m^-1
-        weighted_freq = numpy.sum(frequency_array * electric_array) / numpy.sum(electric_array)
+        if numpy.sum(electric_array) != 0:
+            weighted_freq = numpy.sum(frequency_array * electric_array) / numpy.sum(electric_array)
+        else:
+            weighted_freq = min(frequency)
         return electric_array, integrated_field, weighted_freq # V m^-1
 
 ############################################################

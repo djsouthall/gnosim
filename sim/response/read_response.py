@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pylab
 
 file_ant = np.load("./ara_antenna_response.npy")
 file_elect = np.load("./ara_elect_response.npy")
@@ -27,5 +28,5 @@ plt.plot(range(len(h)), sys,label='sys')
 plt.xlabel("Time [NOT NS]")
 plt.ylabel("abu")
 plt.legend()
-plt.show()
+#plt.show()
 

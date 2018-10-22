@@ -22,6 +22,8 @@ pylab.ion()
 ############################################################
 
 
+
+
 def fresnel(n_1, n_2, incidence_angle, mode):
     """
     Reflected or transmitted power for different polarizations.
@@ -361,7 +363,38 @@ def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1., r_limit = None):
         theta_array[0: n_steps], a_v_array[0: n_steps], a_h_array[0: n_steps], \
         index_reflect_air, index_reflect_water)
 
-
+def plotGeometry(origin,neutrino_loc,phi_0,info):
+    '''
+    origin shuold be of the form [[x_0, y_0, z_0],[x_1, y_1, z_1],[x_2, y_2, z_2]]
+    neutrino_loc should be similar but for neutrino location
+    
+    '''
+    if len(numpy.shape(origin)) == 1:
+        origin = [origin]
+    #print(origin)
+    #print(neutrino_loc)
+    neutrino_loc_r = numpy.sqrt(neutrino_loc[0]**2 + neutrino_loc[1]**2)
+    if len(numpy.unique(info['eventid'])) == 1:
+        eventid = numpy.unique(info['eventid'])
+        fig = pylab.figure()
+        pylab.title('Event %i'%(eventid))
+        pylab.scatter(neutrino_loc_r,neutrino_loc[2],label='Neutrino Loc')
+        sub_info = info[info['eventid'] == eventid]
+        for counter,antenna in enumerate(sub_info['antenna']):
+            origin_r = numpy.sqrt(origin[counter][0]**2 + origin[counter][1]**2)
+            pylab.scatter(origin_r,origin[counter][2],label='Antenna %i'%(antenna))
+            ssub_info = sub_info[sub_info['antenna'] == antenna]
+            
+            for solution in ssub_info['solution']:
+                x, y, z, t, d, phi, theta, a_v, a_h, index_reflect_air, index_reflect_water = gnosim.trace.refraction_library_beta.rayTrace(origin[counter], phi_0, ssub_info['theta_ant'][ssub_info['solution'] == solution])
+                r = numpy.sqrt(x**2 + y**2)
+                label = 'A%i %s'%(antenna,solution)
+                print(label)
+                pylab.plot(r,z,label=label)
+        pylab.legend()
+    else:
+        print('Info should be input with only one event, otherwise this breaks')
+    return fig
 ############################################################
 
 def makeLibrary(z_0, theta_ray_array, save=True, library_dir='library',r_limit = None):
@@ -448,11 +481,18 @@ def makeLibrary(z_0, theta_ray_array, save=True, library_dir='library',r_limit =
 ############################################################
 
 class RefractionLibrary:
-    def __init__(self, search, pre_split = True):
+    def __init__(self, search, solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']), pre_split = True):
         self.infiles = glob.glob(search)
-    
+        default_solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2'])
         # List attributes of interest
-        self.solutions = ['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']
+        self.solutions = default_solutions[numpy.isin(default_solutions,solutions)]
+        if len(self.solutions) == 0:
+            print('Selection of solution types did not match predefined values.  Using default types.')
+            self.solutions = default_solutions
+        elif numpy.logical_and(pre_split == False,numpy.logical_not(numpy.all(numpy.equal(self.solutions , default_solutions )))):
+            print('Limiting Solution Types Currently only works for pre_split = True, using default solution types.')
+            self.solutions = default_solutions
+            
         self.keys = ['r', 'z', 't', 'd', 'theta', 'theta_ant', 'a_v', 'a_h']
 
         # Dictionary to store data
@@ -471,6 +511,7 @@ class RefractionLibrary:
                 if (os.path.isdir(search.replace('*.h5',solution + '/')) == False):
                     print('WARNING! No directory' , search.replace('*.h5',solution + '/'))
                     pre_split = False
+                    self.solutions = default_solutions
             if pre_split == False:
                 print('Cannot run pre_split library, running unsorted library')
             
@@ -1483,12 +1524,12 @@ class RefractionLibrary:
 
 if __name__ == '__main__':
     make_library = False#True
-    split_library = True#False
-    plot_library = False#True
-    save_envelope = True#True
-    plot_envelope = False#True
-    z_array = [-200.,-201.,-202.,-203.,-204.,-205.,-206.,-207.]
-    n_rays = 360
+    split_library = False
+    plot_library = True
+    save_envelope = False#True
+    plot_envelope = True
+    z_array = [-200.,-207.]#[-200.,-201.,-202.,-203.,-204.,-205.,-206.,-207.]
+    n_rays = 120
     r_limit = None #Note if this is NOT None, then all thrown rays will quit once they read this particular radius.  Use with care.  If you want a simulation with r = 6300m, it might be advisable to make r_limit = 7000 so the boundaries of hulls are still well defined
     for z_0 in z_array:
         library_dir = 'library_%i_polar_%i_rays'%(int(z_0),n_rays)
@@ -1503,7 +1544,8 @@ if __name__ == '__main__':
         #theta_array = numpy.append(theta_array,0.99*theta_reflect)
         #theta_array = numpy.append(theta_array,1.01*theta_reflect)
         
-        
+        #solution_list = numpy.array(['direct','cross','reflect','direct_2','cross_2','reflect_2'])
+        solution_list = numpy.array(['direct','cross','reflect'])
         if make_library == True:
             os.mkdir(library_dir)
             makeLibrary(z_0, theta_array, save=True, library_dir=library_dir,r_limit = r_limit)
@@ -1553,10 +1595,9 @@ if __name__ == '__main__':
         if plot_library == True: 
             color_key = {'direct':'r', 'cross':'darkgreen', 'reflect':'blue', 'direct_2':'gold', 'cross_2':'lawngreen', 'reflect_2':'purple'}           
             pylab.figure()
-            solution_list = numpy.array(['direct','cross','reflect','direct_2','cross_2','reflect_2'])
             for solution in solution_list:
                 if numpy.logical_and(len(test_lib.data[solution]['r']) > 0, len(test_lib.data[solution]['z']) > 0):
-                    pylab.scatter( test_lib.data[solution]['r'], test_lib.data[solution]['z'],label=solution,color=color_key[solution])#,s=1)
+                    pylab.scatter( test_lib.data[solution]['r'], test_lib.data[solution]['z'],label=solution,color=color_key[solution],s=1)
             pylab.legend(loc='upper right')
             pylab.xlabel('r(m)',fontsize=16)
             pylab.ylabel('z(m)',fontsize=16)
@@ -1568,7 +1609,6 @@ if __name__ == '__main__':
             
         if plot_envelope == True:
             color_key = {'direct':'r', 'cross':'darkgreen', 'reflect':'blue', 'direct_2':'gold', 'cross_2':'lawngreen', 'reflect_2':'purple'}
-            solution_list = numpy.array(['direct','cross','reflect','direct_2','cross_2','reflect_2'])
             concave_hull = {}
             infiles = glob.glob('./'+library_dir+'/concave_hull/*.h5')
             if len(infiles) == 0:
