@@ -14,6 +14,7 @@ import os
 import os.path
 import glob
 import scipy
+import scipy.signal
 
 sys.path.append("/home/dsouthall/Projects/GNOSim/")
 import gnosim.utils.quat
@@ -145,10 +146,22 @@ class Sim:
                                 #must also output a weighted frequency of sorts.  i.e. the most dominant frequency.
                                 #might need to account for polarity swap on reflection.  Not sure if this is an effect.  
                                 
-                                electric_array, u, weighted_freq = gnosim.interaction.askaryan.electricFieldTimeDomainSignal(numpy.deg2rad(observation_angle),self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],energy_neutrino*inelasticity,index_of_refraction,h_fft=self.h_fft,sys_fft=self.sys_fft,freqs=self.freqs_response,return_pos = True,out_dom_freq=True,plot=False)
+                                #up_sample_factor dictates the timestep that the entire calculation is done at.
+                                #the time resolution required for an accurent vector potential calculation varies,
+                                #but likely less than 0.05ns is preferred.  If up_sample_factor = 0 then the 
+                                #time step is closer to 0.32ns.  Near cone the required timing resolution increases. 
+                                cherenkov_angle_deg = numpy.rad2deg(numpy.arccos(1./index_of_refraction))
+                                if abs(observation_angle-cherenkov_angle_deg) < 0.5:
+                                    up_sample_factor = 30 #it might be fine to do this at 20
+                                elif abs(observation_angle-cherenkov_angle_deg) < 10:
+                                    up_sample_factor = 20
+                                else:
+                                    up_sample_factor = 10 #maybe could reduce for reaaally far off cone.  
+                                electric_array, u, weighted_freq = gnosim.interaction.askaryan.electricFieldTimeDomainSignal(numpy.deg2rad(observation_angle),self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],energy_neutrino*inelasticity,index_of_refraction,h_fft=self.h_fft,sys_fft=self.sys_fft,freqs=self.freqs_response,return_pos = True,out_dom_freq=True,plot=False,up_sample_factor=up_sample_factor,deriv_mode = 'time')
+                                #note that electric_array here should be measured voltage if the response function is correct (ignoring attenuation done below). 
                                 u = u + self.in_dic_array[station_label][antenna_label][solution]['t'][eventid]
                                 electric_array *= self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid]
-                                electric_field = max(numpy.fabs(electric_array)) #maybe should be some integral?
+                                electric_field = max(numpy.abs(scipy.signal.hilbert(electric_array))) #Right now this takes the max value of the hilbert envelope
                                 E_signals[station_label][antenna_label][solution] = electric_array
                                 u_signals[station_label][antenna_label][solution] = u
                             else:
@@ -224,7 +237,7 @@ class Sim:
         p_detect = numpy.any(info['has_solution'])
         
         if electricFieldDomain == 'time':
-            summed_signals = True
+            summed_signals = False
             for index_station in range(0, len(self.stations)):
                 station_label = 'station'+str(index_station)
                 for index_antenna in range(0, len(self.stations[index_station].antennas)):
@@ -251,7 +264,7 @@ class Sim:
                         #print(numpy.shape(E_in))
                         #print(E_in)
                         if summed_signals == True:
-                            u_out, E_out = gnosim.interaction.askaryan.addSignals(u_in,E_in,plot=False)
+                            E_out, u_out = gnosim.interaction.askaryan.addSignals(u_in,E_in,plot=False)
                             u_signals[station_label][antenna_label] = u_out
                             E_signals[station_label][antenna_label] = E_out
                         else:
@@ -486,7 +499,7 @@ class Sim:
         for ii in range(0, n_events):
             if(ii%(n_events/100) == 0):
                 print ('Event (%i/%i)'%(ii, n_events)) #might want to comment out these print statements to run faster and spew less
-            if (ii%(n_events/10) == 0):
+            if (ii%(n_events/20) == 0):
                 plot = True  
                 #right now this is a quick way to check some events.  In the future 
                 #might want to save triggered events only?  Will need to figure out 
@@ -599,14 +612,14 @@ if __name__ == "__main__":
     config_file_fix = config_file_fix.replace('gnosim/sim/ConfigFiles/Config_dsouthall/','')
     config_file_fix = config_file_fix.replace('./','')
     if (seed != None):
-        outfile = '/home/dsouthall/Projects/GNOSim/Output/results_2018_Sep_%s_%.2e_GeV_%i_events_%i_seed_%i.h5'%(config_file_fix.replace('.py', ''),
+        outfile = '/home/dsouthall/Projects/GNOSim/Output/results_2018_Oct_%s_%.2e_GeV_%i_events_%i_seed_%i.h5'%(config_file_fix.replace('.py', ''),
                                                                     energy_neutrino,
                                                                     n_events,
                                                                     seed,
                                                                     index)
         print('!!!Using Seed!!! Seed: ', seed, '\nOutfile Name: \n', outfile)
     else:
-        outfile = '/home/dsouthall/Projects/GNOSim/Output/results_2018_Sep_%s_%.2e_GeV_%i_events_%i.h5'%(config_file_fix.replace('.py', ''),
+        outfile = '/home/dsouthall/Projects/GNOSim/Output/results_2018_Oct_%s_%.2e_GeV_%i_events_%i.h5'%(config_file_fix.replace('.py', ''),
                                                                 energy_neutrino,
                                                                 n_events,
                                                                 index)

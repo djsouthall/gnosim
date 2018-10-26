@@ -32,6 +32,28 @@ pylab.ion()
 
 ############################################################
 
+def loadSignalResponse(mode='v2'):
+    '''
+    Returns the fft's of the signals, and their frequencies.  
+    Eventually these file locations should be part of the config file such that
+    individual response functions could be input per antenna.  
+    '''
+    if mode == 'v1':
+        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response.npy')
+        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_elect_response.npy')
+        
+    elif mode == 'v2':
+        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v2.npy')
+        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_elect_response_v2.npy')
+    else:
+        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v2.npy')
+        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_elect_response_v2.npy')
+    freqs, h_fft = numpy.hsplit(antenna_response, 2)
+    freqs, sys_fft = numpy.hsplit(electronic_response, 2)
+    h_fft = numpy.ravel(h_fft)
+    sys_fft = numpy.ravel(sys_fft)
+    return h_fft,sys_fft,freqs[:,0]
+
 def RA(Energy_GeV,t_ns):
     '''
     Ideally this would be a function of index of refraction as well, right now
@@ -111,6 +133,16 @@ def vectorPotentialTimeDomain(theta_obs_rad,R,Energy_GeV,n,u,plot = False):
     if abs(alpha) < 0.001:
         A = ( gnosim.utils.constants.mu_0 * numpy.sin(theta_obs_rad) * LQ * fp / (4. * numpy.pi * R) ) 
         #u = u_step * numpy.linspace(-(len(fp)-1)/2,(len(fp)-1)/2,len(fp))
+        A_fft = numpy.fft.rfft(A)
+        #A = numpy.fft.fftshift(A)
+        #time_step = (u[1]-u[0]) #ns
+        #freq_step = 1/(len(u)*(time_step*1e-9))
+        #max_freq = 1/(2*(time_step*1e-9))
+        #freqs = numpy.arange(len(A_fft))*freq_step #might be off by 1 step somewhere
+        #E_fft = -1j*2*numpy.pi*numpy.multiply(A_fft , freqs)
+        #E = numpy.fft.irfft(E_fft,n=len(u)) #/ (len(E_fft) / (max(u) - min(u)))
+        #E = numpy.fft.fftshift(E)
+        
         if plot == True:
             pylab.figure()
             pylab.subplot(211)
@@ -140,14 +172,31 @@ def vectorPotentialTimeDomain(theta_obs_rad,R,Energy_GeV,n,u,plot = False):
         q = Q(u/alpha)
         q = numpy.multiply(scipy.signal.tukey(len(q),alpha=0.05),q)
         #q = numpy.pad(q,pad_width=int(len(q)/2),mode='constant')
-        
-        fourier_fp = scipy.fftpack.fft(fp)
-        fourier_q = scipy.fftpack.fft(q)
-        
+        fourier_fp = numpy.fft.rfft(fp)
+        fourier_q = numpy.fft.rfft(q)
+
         convo = numpy.multiply(fourier_fp,fourier_q)
         
-        inverse_convo = scipy.fftpack.fftshift(scipy.fftpack.ifft(convo))
-        A = ( gnosim.utils.constants.mu_0 * numpy.sin(theta_obs_rad) / (4. * numpy.pi * R ) ) * (inverse_convo / ( abs(alpha) * len(inverse_convo) / (max(u) - min(u)))) #abs alpha because in the u sub the bounds swap when alpha < 0, but then alpha <0 so the two negatives cancel.
+        #time_step = (u[1]-u[0]) #ns
+        #freq_step = 1/(len(u)*(time_step*1e-9))
+        #max_freq = 1/(2*(time_step*1e-9))
+        #freqs = numpy.arange(len(convo))*freq_step #might be off by 1 step somewhere
+        #freqs = numpy.arange(0,max_freq+freq_step,freq_step)
+        #deriv_convo = 1j*2*numpy.pi*numpy.multiply(convo , freqs)
+        #print('max_freq =',max_freq)
+        #print('max(freqs) =',max(freqs))
+        #print('len(freqs)=',len(freqs))
+        #print('len(convo)=',len(convo)) 
+        
+        inverse_convo_A = numpy.fft.irfft(convo,n=len(u))
+        inverse_convo_A = numpy.fft.fftshift(inverse_convo_A) #might not need to do this, but it moves padding after signal to before signal
+        
+        #inverse_convo_E = numpy.fft.irfft(deriv_convo,n=len(u))
+        #inverse_convo_E = numpy.fft.fftshift(inverse_convo_E)
+        
+        #inverse_convo = scipy.fftpack.fftshift(scipy.fftpack.ifft(convo)) #maybe could divide my 2*pi*f here to get directly 
+        A = ( gnosim.utils.constants.mu_0 * numpy.sin(theta_obs_rad) / (4. * numpy.pi * R ) ) * (inverse_convo_A / ( abs(alpha) * len(inverse_convo_A) / (max(u) - min(u)))) #abs alpha because in the u sub the bounds swap when alpha < 0, but then alpha <0 so the two negatives cancel.
+        #E = -( gnosim.utils.constants.mu_0 * numpy.sin(theta_obs_rad) / (4. * numpy.pi * R ) ) * (inverse_convo_E / ( abs(alpha) * len(inverse_convo_E) / (max(u) - min(u))))# the extra negative comes from the E being -dA/dt
         if plot == True:
             pylab.figure()
             pylab.subplot(311)
@@ -168,65 +217,54 @@ def vectorPotentialTimeDomain(theta_obs_rad,R,Energy_GeV,n,u,plot = False):
             pylab.subplots_adjust(left=0.08, bottom=0.05, right=0.98, top=0.97, wspace=None, hspace=None)
     return A , u
 
-def electricFieldTimeDomainRaw(theta_obs_rad,R,Energy_GeV,n,u,plot = False):
+def electricFieldTimeDomainRaw(theta_obs_rad,R,Energy_GeV,n,u,plot = False,deriv_mode = 'time'):
     '''
     Calculates the time domain electric field using the method from 
     Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283.  This stage has not 
     accounted for any system responses and is just the signal as emitted.  
+    
     '''
-    A,u = vectorPotentialTimeDomain(theta_obs_rad,R,Energy_GeV,n,u)
-    E = - numpy.divide(numpy.gradient(A),numpy.gradient(u)) * 1e9
+    A, u = vectorPotentialTimeDomain(theta_obs_rad,R,Energy_GeV,n,u)
+    if deriv_mode == 'freq':
+        A_fft = numpy.fft.rfft(A)
+        time_step = (u[1]-u[0]) #ns
+        freq_step = 1/(len(u)*(time_step*1e-9))
+        max_freq = 1/(2*(time_step*1e-9))
+        freqs = numpy.arange(len(A_fft))*freq_step #might be off by 1 step somewhere
+        E_fft = -1j*2*numpy.pi*numpy.multiply(A_fft , freqs)
+        E = numpy.fft.irfft(E_fft)
+    else:
+        E = - numpy.divide(numpy.gradient(A),numpy.gradient(u)) * 1e9
     if plot == True:
             pylab.figure()
-            pylab.title('E = %g \t$\\theta$=%0.3f \tn = %0.2f'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n))
+            pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n))
             pylab.ylabel('$R|\\vec{E}|$ (V)',fontsize=16)
             pylab.xlabel('t (ns)',fontsize=16)
             pylab.plot(u,R*E,label = '$R|\\vec{E}_{raw}|$ ')
     return  E , u
 
-def loadSignalResponse(mode='v2'):
-    '''
-    Returns the fft's of the signals, and their frequencies.  
-    Eventually these file locations should be part of the config file such that
-    individual response functions could be input per antenna.  
-    '''
-    if mode == 'v1':
-        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response.npy')
-        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_elect_response.npy')
-        
-    elif mode == 'v2':
-        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v2.npy')
-        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_elect_response_v2.npy')
-    else:
-        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v2.npy')
-        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_elect_response_v2.npy')
-    freqs, h_fft = numpy.hsplit(antenna_response, 2)
-    freqs, sys_fft = numpy.hsplit(electronic_response, 2)
-    h_fft = numpy.ravel(h_fft)
-    sys_fft = numpy.ravel(sys_fft)
-    return h_fft,sys_fft,freqs[:,0]
-    
-def electricFieldTimeDomainSignal(theta_obs_rad,R,Energy_GeV,n,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = False,return_pos = False,mode='v2'):  
+def electricFieldTimeDomainSignal(theta_obs_rad,R,Energy_GeV,n,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = False,return_pos = False,mode='v2',up_sample_factor=10,deriv_mode = 'time'):  
     '''
     Calculates the full electric field, including response function calculations.
     '''
     if any([numpy.size(h_fft) ==1,numpy.size(sys_fft)==1,numpy.size(freqs)==1]):
         h_fft,sys_fft,freqs = loadSignalResponse(mode=mode)
     freqs = numpy.absolute(freqs)
-    if plot == True:
-        up_sample_factor = 20 #smoother signals, higher computation time, turn on for plotting
-    else:
-        up_sample_factor = 4 #smoother signals, higher computation time, turn on for plotting
+    t_step_old = 1/(2*max(freqs))*1e9 #ns
+    n_old = len(freqs)
     
     h_fft = numpy.append(h_fft,numpy.zeros(up_sample_factor*len(h_fft)))
     sys_fft = numpy.append(sys_fft,numpy.zeros(up_sample_factor*len(sys_fft)))
     freqs = numpy.arange(len(sys_fft))*(freqs[1]-freqs[0])
     t_step = 1/(2*max(freqs))*1e9 #ns
+    n_new = len(freqs)
     
-    tmin = 1000 #the time window will not go under this number
-    n_points = int(max(tmin//t_step,2*(len(sys_fft)-1)))#n_points in time
+    tmin = 500 #the time window will not go under this number
+    #n_points = int(max(tmin//t_step,2*(len(sys_fft)-1)))#n_points in time
+    n_points = int(2*(len(sys_fft)-1))#n_points in time
     freq_step = 1/(n_points*t_step*1e-9) #Hz
-    if n_points != 2*len(sys_fft):
+    '''
+    if n_points != 2*(len(sys_fft)-1):
         #need to pad in time domain to make final signal reach further temporally
         h = numpy.fft.irfft(h_fft)
         sys = numpy.fft.irfft(sys_fft) 
@@ -234,29 +272,29 @@ def electricFieldTimeDomainSignal(theta_obs_rad,R,Energy_GeV,n,h_fft=None,sys_ff
         sys = numpy.append(sys,numpy.zeros(n_points - len(sys)))
         h_fft = numpy.fft.rfft(h)
         sys_fft = numpy.fft.rfft(sys) 
-        
+    '''    
     f = numpy.arange(len(h_fft))*freq_step
     response_fft = numpy.multiply(h_fft,sys_fft)
         
     u = numpy.arange(-n_points/2,n_points/2)*t_step
     
-    E_sig, u = electricFieldTimeDomainRaw(theta_obs_rad,R,Energy_GeV,n,u,plot=plot)
+    E_sig, u = electricFieldTimeDomainRaw(theta_obs_rad,R,Energy_GeV,n,u,plot=plot,deriv_mode = deriv_mode)
     E_fft = numpy.fft.rfft(E_sig)
     V_fft = numpy.multiply(E_fft,response_fft)
     V = numpy.fft.irfft(V_fft,n=len(u))
     
     if plot == True:
         pylab.figure()
-        pylab.title('E = %g \t$\\theta$=%0.3f \tn = %0.2f'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n))
+        pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n))
         pylab.plot(u,V)
         pylab.ylabel('Signal (V)',fontsize=16)
         pylab.xlabel('t (ns)',fontsize=16)
         
         pylab.figure()
-        pylab.title('E = %g \t$\\theta$=%0.3f \tn = %0.2f'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n))
+        pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n))
         pylab.plot(f/1e6,20.0 * numpy.log10(numpy.absolute(E_fft)),label='Raw Signal (fft)')
-        pylab.plot(f/1e6,20.0 * numpy.log10(numpy.absolute(h_fft)),label='Antenna Response')
         pylab.plot(f/1e6,20.0 * numpy.log10(numpy.absolute(sys_fft)),label='System Response')
+        pylab.plot(f/1e6,20.0 * numpy.log10(numpy.absolute(h_fft)),label='Antenna Response')
         pylab.plot(f/1e6,20.0 * numpy.log10(numpy.absolute(V_fft)),label='Processed Signal (fft)')
         
         pylab.xlabel('Freq. [MHz]',fontsize=16)
@@ -282,7 +320,8 @@ def addSignals(u_in,E_in,plot=False):
     added wiggle becomes a problem. 
     '''
     u_out = numpy.concatenate(u_in)
-    u_out = numpy.arange(min(u_out),max(u_out),abs(u_out[1]-u_out[0]))
+    u_step = abs(u_out[1]-u_out[0])
+    u_out = numpy.arange(min(u_out),max(u_out)+u_step,u_step)
     E_out = numpy.zeros_like(u_out)
     if plot == True:
         pylab.figure()    
@@ -291,12 +330,21 @@ def addSignals(u_in,E_in,plot=False):
     for i in range(numpy.shape(E_in)[0]):
         E = E_in[i]
         u = u_in[i]
+        
         if len(u) == 0:
             u = u_out
-            E = numpy.zeros_like(u_out)      
-        
-        E_out[numpy.argmin(abs(u_out - min(u))):numpy.argmin(abs(u_out - min(u)))+len(u)] += E
-
+            E = numpy.zeros_like(u_out)   
+        #print('Lengths:')
+        #print(len(E))
+        #print(len(u))
+        #print('%i:%i ->%i'%(numpy.argmin(abs(u_out - min(u))),numpy.argmin(abs(u_out - min(u)))+len(u),len(E_out[numpy.argmin(abs(u_out - min(u))):numpy.argmin(abs(u_out - min(u)))+len(u)])))
+        left_index = numpy.argmin(abs(u_out - min(u)))
+        right_index = left_index + len(E)
+        #print('left_index',left_index)
+        #print('right_index',right_index)
+        cut = numpy.arange(left_index,right_index)
+        #print(len(cut))
+        E_out[cut] += E
         if plot == True:
             pylab.subplot(numpy.shape(E_in)[0]+1,1,i+1,sharex=ax)
             pylab.plot(u,E,label='Signal %i'%(i))
@@ -310,7 +358,7 @@ def addSignals(u_in,E_in,plot=False):
         pylab.xlabel('t-t_emit (ns)',fontsize=16)
         pylab.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=0.4)
         pylab.legend(fontsize=14)
-    return u_out,E_out
+    return E_out,u_out
 
 
 ############################################################
@@ -531,15 +579,216 @@ if __name__ == "__main__":
     #fig = plotGeometry(origin,neutrino_loc,phi_0,sub_info)
     
     
+    angles = numpy.linspace(cherenkov_angle_deg-2,cherenkov_angle_deg+2,10)
+    angles = numpy.append( angles,cherenkov_angle_deg)
     
     
+    #angles = [numpy.rad2deg(cherenkov_angle)+0.01,numpy.rad2deg(cherenkov_angle)]
+    pylab.figure()
+    pylab.title('Electric Field With Response for Various Angles ($\\theta_{Cherenkov}$ = %f, R = %0.2f, n = %0.2f)'%(numpy.rad2deg(cherenkov_angle),R,n),fontsize=16)
+    pylab.ylabel('E (arb)',fontsize=16)
+    pylab.xlabel('t (ns)',fontsize=16)
+    for angle in angles:
+        E_sig, u = electricFieldTimeDomainSignal(numpy.deg2rad(angle),R,energy_neutrino,n,plot=False,deriv_mode='freq')
+        pylab.plot(u,E_sig,label='$\\theta$ = %.2f deg'%(angle))
+    pylab.legend() 
+    pylab.xlim([0,50])
     
-    u,V,f_dom = electricFieldTimeDomainSignal(numpy.deg2rad(50),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=True,out_dom_freq = True,return_pos = True,mode='v2')
-    u,V,f_dom = electricFieldTimeDomainSignal(numpy.deg2rad(60),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=True,out_dom_freq = True,return_pos = True,mode='v2')    
-    #V_fft = numpy.multiply(E_fft,response_fft)
+    angles = numpy.linspace(cherenkov_angle_deg-2,cherenkov_angle_deg+2,10)
+    angles = numpy.append( angles,cherenkov_angle_deg)
     
     
+    #angles = [numpy.rad2deg(cherenkov_angle)+0.01,numpy.rad2deg(cherenkov_angle)]
+    pylab.figure()
+    pylab.title('Electric Field With Response for Various Angles ($\\theta_{Cherenkov}$ = %f, R = %0.2f, n = %0.2f)'%(numpy.rad2deg(cherenkov_angle),R,n),fontsize=16)
+    pylab.ylabel('E (arb)',fontsize=16)
+    pylab.xlabel('t (ns)',fontsize=16)
+    for angle in angles:
+        E_sig, u = electricFieldTimeDomainSignal(numpy.deg2rad(angle),R,energy_neutrino,n,plot=False,deriv_mode='time')
+        pylab.plot(u,E_sig,label='$\\theta$ = %.2f deg'%(angle))
+    pylab.legend() 
+    pylab.xlim([0,50])
     
+    
+    #V,u,f_dom = electricFieldTimeDomainSignal(numpy.deg2rad(50),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=True,out_dom_freq = True,return_pos = True,mode='v2')
+    #'''
+
+    #'''
+    #######################
+    
+    test_angle = cherenkov_angle_deg-0.3
+    
+    #######################
+    
+    upsamples = numpy.arange(0,15)
+    pylab.figure()
+    
+    pylab.subplot(311)
+    pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f'%(energy_neutrino,test_angle,n))
+    pylab.ylabel('Max Voltage (V)',fontsize=16)
+    pylab.xlabel('time step',fontsize=16)
+    pylab.subplot(312)
+    pylab.xlabel('time window',fontsize=16)
+    pylab.ylabel('Max Voltage (V)',fontsize=16)
+    pylab.subplot(313)
+    pylab.xlabel('N_points',fontsize=16)
+    pylab.ylabel('Max Voltage (V)',fontsize=16)
+    #pylab.subplot(414)
+    #pylab.xlabel('Upsample')
+    #pylab.ylabel('Max Voltage (V)')
+    
+    timesteps = numpy.array([])
+    timewindows = numpy.array([])
+    N_points = numpy.array([])
+    max_V = numpy.array([])
+    for upsample in upsamples:
+        V1,u1,f_dom1 = electricFieldTimeDomainSignal(numpy.deg2rad(test_angle),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = True,return_pos = False,mode='v2',up_sample_factor = upsample)    
+        V1_hilbert = scipy.signal.hilbert(V1)
+        V1_envelope = numpy.abs(V1_hilbert)
+        timesteps = numpy.append(timesteps,u1[1]-u1[0])
+        timewindows = numpy.append(timewindows,u1[-1]-u1[0])
+        N_points = numpy.append(N_points,len(u1))
+        max_V = numpy.append(max_V,max(V1_envelope))
+    
+    pylab.subplot(311)
+    pylab.scatter(timesteps,max_V)
+    pylab.subplot(312)
+    pylab.scatter(timewindows,max_V)
+    pylab.subplot(313)
+    pylab.scatter(N_points ,max_V)
+    #pylab.subplot(414)
+    #pylab.scatter(upsamples ,max_V)
+    #####################
+    
+    
+    upsamples = [0,1,5,10,20]
+    pylab.figure()
+    
+    pylab.subplot(211)
+    pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f'%(energy_neutrino,test_angle,n))
+    pylab.ylabel('Voltage (V)',fontsize=16)
+    pylab.subplot(212)
+    pylab.xlabel('t (ns)',fontsize=16)
+    pylab.ylabel('Voltage (V)',fontsize=16)
+    
+    for upsample in upsamples:
+        V1,u1,f_dom1 = electricFieldTimeDomainSignal(numpy.deg2rad(test_angle),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = True,return_pos = False,mode='v2',up_sample_factor = upsample)    
+        V1_hilbert = scipy.signal.hilbert(V1)
+        V1_envelope = numpy.abs(V1_hilbert)
+        #print('max(V1_envelope)',max(V1_envelope))
+        #print('len(u1)',len(u1))
+        #print('u1[1]-u1[0]',u1[1]-u1[0])
+        pylab.subplot(211)
+        pylab.scatter(u1,V1,label='V_signal Upsample = %i'%(upsample))
+        pylab.subplot(212)
+        pylab.scatter(u1,V1_envelope,label='V_evelope Upsample = %i'%(upsample))
+    
+    pylab.subplot(211)
+    pylab.legend()
+    pylab.xlim(0,100)
+    pylab.subplot(212)
+    pylab.legend()
+    pylab.xlim(0,100)
+    ##################################################
+    
+    
+    pylab.figure()
+    pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f'%(energy_neutrino,test_angle,n))
+    pylab.xlabel('f(MHz)',fontsize=16)
+    pylab.ylabel('V_fft',fontsize=16)
+    for upsample in upsamples:
+        V1,u1,f_dom1 = electricFieldTimeDomainSignal(numpy.deg2rad(test_angle),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = True,return_pos = False,mode='v2',up_sample_factor = upsample)    
+        V1_fft = numpy.fft.rfft(V1)
+        time_step = (u1[1]-u1[0]) #ns
+        freq_step = 1/(len(u1)*(time_step*1e-9))
+        max_freq = 1/(2*(time_step*1e-9))
+        freqs = numpy.arange(len(V1_fft))*freq_step
+        pylab.semilogy(freqs/1e6,numpy.absolute(V1_fft),label='n_points = %i'%(len(freqs)))
+    pylab.xlim(0,1000)
+    pylab.legend()
+    
+    pylab.figure()
+    pylab.subplot(311)
+    pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f'%(energy_neutrino,test_angle,n))
+    pylab.ylabel('R|A| (V s)',fontsize=16)
+    pylab.xlabel('t (ns)',fontsize=16)
+    pylab.subplot(312)
+    pylab.ylabel('Time Domain Derivative\n R $\cdot$ E$_{raw}$ (V)',fontsize=16)
+    pylab.xlabel('t (ns)',fontsize=16)
+    pylab.subplot(313)
+    pylab.ylabel('Freq Domain Derivative\nR $\cdot$ E$_{raw}$ (V)',fontsize=16)
+    pylab.xlabel('t (ns)',fontsize=16)
+    for upsample in upsamples:
+        V1,u1,f_dom1 = electricFieldTimeDomainSignal(numpy.deg2rad(test_angle),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = True,return_pos = False,mode='v2',up_sample_factor = upsample)    
+        
+        A,u = vectorPotentialTimeDomain(numpy.deg2rad(test_angle),R,energy_neutrino,n,u1)
+        pylab.subplot(311)
+        pylab.plot(u,R*numpy.absolute(A),label='len(u) = %i'%(len(u)))
+        
+        E,u = electricFieldTimeDomainRaw(numpy.deg2rad(test_angle),R,energy_neutrino,n,u,plot = False,deriv_mode = 'time')
+        pylab.subplot(312)
+        pylab.plot(u,R*E,label='len(u) = %i'%(len(u)))
+        
+        E,u = electricFieldTimeDomainRaw(numpy.deg2rad(test_angle),R,energy_neutrino,n,u,plot = False,deriv_mode = 'freq')
+        pylab.subplot(313)
+        pylab.plot(u,R*E,label='len(u) = %i'%(len(u)))
+    
+    pylab.subplot(311)
+    pylab.xlim(-1,1)
+    pylab.legend(loc='upper right')
+    pylab.subplot(312)
+    pylab.xlim(-1,1)
+    pylab.legend(loc='upper right')
+    pylab.subplot(313)
+    pylab.xlim(-1,1)
+    pylab.legend(loc='upper right')
+        
+    pylab.figure()
+    pylab.subplot(211)
+    pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f'%(energy_neutrino,test_angle,n))
+    pylab.ylabel('fp',fontsize=16)
+    pylab.xlabel('u (ns)',fontsize=16)
+    pylab.subplot(212)
+    pylab.xlabel('f(MHz)',fontsize=16)
+    pylab.ylabel('fourier_fp',fontsize=16)
+    for upsample in upsamples:
+        V1,u1,f_dom1 = electricFieldTimeDomainSignal(numpy.deg2rad(test_angle),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = True,return_pos = False,mode='v2',up_sample_factor = upsample)    
+        fp = F_p(energy_neutrino,u1,n,1)
+        pylab.subplot(211)
+        pylab.plot(u1,fp,label='n_points = %i'%(len(u1)))
+        fourier_fp = numpy.fft.rfft(fp)
+        fourier_fp = fourier_fp/len(fourier_fp)
+        
+        time_step = (u1[1]-u1[0]) #ns
+        freq_step = 1/(len(u1)*(time_step*1e-9))
+        max_freq = 1/(2*(time_step*1e-9))
+        freqs = numpy.arange(len(fourier_fp))*freq_step #might be off by 1 step somewhere
+        pylab.subplot(212)
+        pylab.plot(freqs/1e6,numpy.absolute(fourier_fp),label='n_points = %i'%(len(freqs)))
+    pylab.subplot(211)
+    pylab.xlim(-1.5,1.5)
+    pylab.legend()
+    pylab.subplot(212)
+    pylab.legend()
+       
+       
+    V,u,f_dom = electricFieldTimeDomainSignal(numpy.deg2rad(cherenkov_angle_deg-0.3),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=True,out_dom_freq = True,return_pos = False,mode='v2',up_sample_factor = 15)
+    pylab.figure()
+    pylab.ylabel('Voltage (V)',fontsize=16)
+    pylab.xlabel('t (ns)',fontsize=16)
+    V_hilbert = scipy.signal.hilbert(V)
+    V_envelope = numpy.abs(V_hilbert)
+    pylab.scatter(u,V,label='V_signal')
+    pylab.scatter(u,V_envelope,label='V_envelope')
+    pylab.legend(fontsize=16)
+    ''' 
+    if abs(theta_deg-theta_cherenkov_deg) < 0.5:
+        up_sample_factor = 30
+    elif abs(theta_deg-theta_cherenkov_deg) < 10:
+        up_sample_factor = 20
+    else:
+        up_sample_factor = 10
+    '''
     #reduce_by = 2**7
     #lenu = len(sys)*reduce_by
     #u = numpy.arange(-(lenu*t_step/reduce_by)/2,(lenu*t_step/reduce_by)/2,t_step/reduce_by)

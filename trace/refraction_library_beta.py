@@ -379,7 +379,7 @@ def plotGeometry(origin,neutrino_loc,phi_0,info):
         fig = pylab.figure()
         pylab.title('Event %i'%(eventid))
         pylab.scatter(neutrino_loc_r,neutrino_loc[2],label='Neutrino Loc')
-        sub_info = info[info['eventid'] == eventid]
+        sub_info = numpy.unique(info[info['eventid'] == eventid])
         for counter,antenna in enumerate(sub_info['antenna']):
             origin_r = numpy.sqrt(origin[counter][0]**2 + origin[counter][1]**2)
             pylab.scatter(origin_r,origin[counter][2],label='Antenna %i'%(antenna))
@@ -489,7 +489,7 @@ class RefractionLibrary:
         if len(self.solutions) == 0:
             print('Selection of solution types did not match predefined values.  Using default types.')
             self.solutions = default_solutions
-        elif numpy.logical_and(pre_split == False,numpy.logical_not(numpy.all(numpy.equal(self.solutions , default_solutions )))):
+        elif numpy.logical_and(pre_split == False,numpy.logical_not(len(self.solutions) == len(default_solutions))):
             print('Limiting Solution Types Currently only works for pre_split = True, using default solution types.')
             self.solutions = default_solutions
             
