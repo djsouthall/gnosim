@@ -16,7 +16,8 @@ import os.path
 import glob
 import scipy
 import scipy.signal
-
+import time
+import math
 sys.path.append("/home/dsouthall/Projects/GNOSim/")
 
 import gnosim.utils.constants
@@ -31,6 +32,37 @@ import gnosim.sim.detector
 pylab.ion()
 
 ############################################################
+
+import cProfile, pstats, io
+
+def profile(fnc):
+    """
+    A decorator that uses cProfile to profile a function
+    This is lifted from https://osf.io/upav8/
+    
+    Required imports:
+    import cProfile, pstats, io
+    
+    To use, decorate function of interest by putting @profile above
+    its definition.
+    """
+    
+    def inner(*args, **kwargs):
+        
+        pr = cProfile.Profile()
+        pr.enable()
+        retval = fnc(*args, **kwargs)
+        pr.disable()
+        s = io.StringIO()
+        sortby = 'cumulative'
+        ps = pstats.Stats(pr, stream=s)
+        ps.strip_dirs().sort_stats(sortby)
+        ps.print_stats()
+        print(s.getvalue())
+        return retval
+
+    return inner
+
 
 def loadSignalResponse(mode='v2'):
     '''
@@ -112,9 +144,9 @@ def F_p(Energy_GeV,t_ns,n,LQ):
     And then convolved with the charge profile Q to determine the vector potential. 
     '''
     
-    cherenkov_angle = numpy.arccos(1./n)
+    #cherenkov_angle = numpy.arccos(1./n)
     #mu_0 = gnosim.utils.constants.mu_0 # m kg s^-2 A^-2
-    prefactor = 4. * numpy.pi /( gnosim.utils.constants.mu_0 * numpy.sin(cherenkov_angle))
+    prefactor = 4. * numpy.pi /( gnosim.utils.constants.mu_0 * math.sqrt(1-1/n**2))#note that math.sqrt(1-1/1.78**2) is a faster form of numpy.sin(cherenkov_angle)
     ra = RA(Energy_GeV,t_ns)  
     #print(ra)
     return prefactor * ra / LQ
@@ -123,7 +155,7 @@ def vectorPotentialTimeDomain(theta_obs_rad,R,Energy_GeV,n,u,plot = False):
     '''
     This should do it all?
     '''
-    cherenkov_angle = numpy.arccos(1./n)
+    #cherenkov_angle = numpy.arccos(1./n)
     LQ = excessProjectedTrackLength(Q)
     alpha = (1. - n*numpy.cos(theta_obs_rad))/gnosim.utils.constants.speed_light #scaling factor of u substitution units of ns/m
 
@@ -172,10 +204,10 @@ def vectorPotentialTimeDomain(theta_obs_rad,R,Energy_GeV,n,u,plot = False):
         q = Q(u/alpha)
         q = numpy.multiply(scipy.signal.tukey(len(q),alpha=0.05),q)
         #q = numpy.pad(q,pad_width=int(len(q)/2),mode='constant')
-        fourier_fp = numpy.fft.rfft(fp)
-        fourier_q = numpy.fft.rfft(q)
+        fp_fft = numpy.fft.rfft(fp)
+        q_fft = numpy.fft.rfft(q)
 
-        convo = numpy.multiply(fourier_fp,fourier_q)
+        convo = numpy.multiply(fp_fft,q_fft)
         
         #time_step = (u[1]-u[0]) #ns
         #freq_step = 1/(len(u)*(time_step*1e-9))
@@ -310,11 +342,12 @@ def electricFieldTimeDomainSignal(theta_obs_rad,R,Energy_GeV,n,h_fft=None,sys_ff
         return V, u, dominant_freq
     else:
         return V, u
-    
-def addSignals(u_in,E_in,plot=False):
+
+ 
+def addSignals(u_in,V_in,plot=False):
     '''
     u_in should be an array of times with dimensions (n_signal , n_timestep )
-    E_in should be an array of electric fields with dimensions (n_signal , n_timestep )
+    V_in should be an array of electric fields with dimensions (n_signal , n_timestep )
     Not that the timing of signals may be shifted by up to a u-step here to align 
     descretized timing values.  There may be a more elegant want do this if this
     added wiggle becomes a problem. 
@@ -322,45 +355,392 @@ def addSignals(u_in,E_in,plot=False):
     u_out = numpy.concatenate(u_in)
     u_step = abs(u_out[1]-u_out[0])
     u_out = numpy.arange(min(u_out),max(u_out)+u_step,u_step)
-    E_out = numpy.zeros_like(u_out)
+    V_out = numpy.zeros_like(u_out)
     if plot == True:
         pylab.figure()    
-        ax = pylab.subplot(numpy.shape(E_in)[0]+1,1,numpy.shape(E_in)[0]+1)
+        ax = pylab.subplot(numpy.shape(V_in)[0]+1,1,numpy.shape(V_in)[0]+1)
         pylab.xlim((min(u_out),max(u_out)))
-    for i in range(numpy.shape(E_in)[0]):
-        E = E_in[i]
+    for i in range(numpy.shape(V_in)[0]):
+        V = V_in[i]
         u = u_in[i]
         
         if len(u) == 0:
             u = u_out
-            E = numpy.zeros_like(u_out)   
+            V = numpy.zeros_like(u_out)   
         #print('Lengths:')
-        #print(len(E))
+        #print(len(V))
         #print(len(u))
-        #print('%i:%i ->%i'%(numpy.argmin(abs(u_out - min(u))),numpy.argmin(abs(u_out - min(u)))+len(u),len(E_out[numpy.argmin(abs(u_out - min(u))):numpy.argmin(abs(u_out - min(u)))+len(u)])))
+        #print('%i:%i ->%i'%(numpy.argmin(abs(u_out - min(u))),numpy.argmin(abs(u_out - min(u)))+len(u),len(V_out[numpy.argmin(abs(u_out - min(u))):numpy.argmin(abs(u_out - min(u)))+len(u)])))
         left_index = numpy.argmin(abs(u_out - min(u)))
-        right_index = left_index + len(E)
+        right_index = left_index + len(V)
         #print('left_index',left_index)
         #print('right_index',right_index)
         cut = numpy.arange(left_index,right_index)
         #print(len(cut))
-        E_out[cut] += E
+        V_out[cut] += V
         if plot == True:
-            pylab.subplot(numpy.shape(E_in)[0]+1,1,i+1,sharex=ax)
-            pylab.plot(u,E,label='Signal %i'%(i))
-            pylab.ylabel('E (V/m)',fontsize=16)
+            pylab.subplot(numpy.shape(V_in)[0]+1,1,i+1,sharex=ax)
+            pylab.plot(u,V,label='Signal %i'%(i))
+            pylab.ylabel('V (V)',fontsize=16)
             pylab.xlabel('t-t_emit (ns)',fontsize=16)
             pylab.legend(fontsize=14)
     if plot == True:
-        pylab.subplot(numpy.shape(E_in)[0]+1,1,numpy.shape(E_in)[0]+1)
-        pylab.plot(u_out,E_out,label='Total Signal')
-        pylab.ylabel('E (V/m)',fontsize=16)
+        pylab.subplot(numpy.shape(V_in)[0]+1,1,numpy.shape(V_in)[0]+1)
+        pylab.plot(u_out,V_out,label='Total Signal')
+        pylab.ylabel('V (V)',fontsize=16)
         pylab.xlabel('t-t_emit (ns)',fontsize=16)
         pylab.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=0.4)
         pylab.legend(fontsize=14)
-    return E_out,u_out
+    return V_out,u_out
 
 
+def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = False,mode='v2',up_sample_factor=10):  
+    '''
+    This should do the entire calculatuon, mostly in the frequency domain. 
+    '''
+    #Loading in response function and setting frequency / time steps
+    if any([numpy.size(h_fft) ==1,numpy.size(sys_fft)==1,numpy.size(freqs)==1]):
+        h_fft,sys_fft,freqs = loadSignalResponse(mode=mode)
+
+    if up_sample_factor <= 0:
+        up_sample_factor = 1
+
+    freqs = numpy.absolute(freqs)
+    freq_step = freqs[1]-freqs[0] #1/(n_points*t_step*1e-9) #Hz
+    possible_lengths = 2**numpy.arange(0,25)
+    n_points_freq = possible_lengths[possible_lengths >= up_sample_factor*len(h_fft)][0] + 1 #Want 2^n events in time domain, so 2^n  #upsamples to the closest power of two to upsample*original_length
+    freqs = numpy.arange(n_points_freq)*freq_step
+    
+    h_fft = numpy.append(h_fft,numpy.zeros(n_points_freq - len(h_fft)))
+    sys_fft = numpy.append(sys_fft,numpy.zeros(n_points_freq - len(sys_fft)))
+    response_fft = numpy.multiply(h_fft,sys_fft)
+    
+    t_step = 1/(2*max(freqs))*1e9 #ns
+    u = numpy.arange(-(n_points_freq-1),(n_points_freq-1))*t_step
+    
+    #Calculating the vector potential
+    #cherenkov_angle = numpy.arccos(1./n)
+    LQ = 1#excessProjectedTrackLength(Q,int_min=min(u),int_max=max(u),n_steps = len(u)) #can probably set to 1 for now as this Q is normalized?
+    alpha = (1. - n*numpy.cos(theta_obs_rad))/gnosim.utils.constants.speed_light #scaling factor of u substitution units of ns/m
+
+    #calling the below was slow, so I put it just calculate it in this function
+    #fp = F_p(Energy_GeV,u,n,LQ)
+    #fp = numpy.multiply(scipy.signal.tukey(len(fp),alpha=0.05),fp)
+    ra = RA(Energy_GeV,u)  
+    fp = (4. * numpy.pi /(LQ * gnosim.utils.constants.mu_0 * math.sqrt(1-1/n**2))) * ra #note that math.sqrt(1-1/1.78**2) is a faster form of numpy.sin(cherenkov_angle) = numpy.sin(numpy.arccos(1/n))
+    fp = numpy.multiply(scipy.signal.tukey(len(fp),alpha=0.05),fp)
+    fp_fft = numpy.fft.rfft(fp)
+    
+    if abs(alpha) < 0.001:
+        print('alpha < 0.001')
+        A_fft = fp_fft * ( gnosim.utils.constants.mu_0 * numpy.sin(theta_obs_rad) * LQ / (4. * numpy.pi * R) ) 
+        
+    else:
+        #For calculation Q(u/alpha) below here is my explaination:
+        #The scale factor is added to modify this function by scaling the z' input
+        #such that the convolution described in Eq17 of arXiv:1106.6283.
+        #Essentially in trying to understand how to implement the convolution described
+        #by that equation I decided a u substitution had to be done where 
+        #u = z' * alpha where alpha = (1-n*cos(theta))/c.  
+        #The convolution is then 1/alpha INT du Q(u/alpha)*Fp(dt - u).  The scale
+        #factor is meant to account for the scaling in Q to make it appear more
+        #like a convolution: 1/alpha INT du Q'(u)*Fp(dt - u), where Q' scales u. 
+        #The scaling factor not being one implies the input x is some value of ns
+        #that was converted from meters using the scale factor.
+        
+        
+        #calling the below was slow, so I put it just as a line of code with force a/b parameters.  
+        #q = Q(u/alpha)
+        #q = numpy.multiply(scipy.signal.tukey(len(q),alpha=0.05),q)
+        
+        q = 0.60 * scipy.stats.gamma.pdf( 0.60 * u/alpha , a = 4.85 ) #This seems to be rate limiting.  If you think of faster way to calculate you can save some time.
+        q_fft = numpy.fft.rfft(q)
+        A_fft = numpy.multiply(fp_fft,q_fft) * ( gnosim.utils.constants.mu_0 * numpy.sin(theta_obs_rad) / (4. * numpy.pi * R ) ) * ( t_step/abs(alpha) ) #the t_step already accounts for scaling required with irffting.  Might not want here?  unsure
+        
+        A = numpy.fft.irfft(A_fft,n=len(u))
+        A = numpy.fft.fftshift(A)
+        if plot == True:
+            pylab.figure()
+            pylab.subplot(311)
+            pylab.title('alpha = %0.3f, $\\theta$ = %0.2f deg'%(alpha,numpy.rad2deg(theta_obs_rad)),fontsize=20)
+            pylab.plot(u,fp,label='fp')
+            pylab.ylabel('$F_p$ ($Amps$)',fontsize=16)
+            pylab.xlim(-10,50)
+            pylab.subplot(312)
+            pylab.plot(u,q,label='q')
+            pylab.ylabel('$Q (arb)$ ',fontsize=16)
+            pylab.xlim(-10,50)
+            pylab.subplot(313)
+            pylab.semilogy(u,numpy.fabs(R*numpy.absolute(A)),label='RA')
+            pylab.ylabel('$R|A|$ ',fontsize=16)
+            pylab.xlabel('$\Delta t$',fontsize=16)
+            pylab.xlim(-10,50)
+    
+    #calculating E_raw_fft    
+    E_raw_fft = -1j*2*numpy.pi*numpy.multiply(A_fft , freqs) #negitive sign because E = -dA/dt
+    
+    #calculating V_fft
+    V_fft = numpy.multiply(E_raw_fft,response_fft)    
+    
+    V = numpy.fft.irfft(V_fft,n=len(u))
+    if abs(alpha) >= 0.001:
+        V = numpy.fft.fftshift(V) #This centres V so it occurs at t=0. and ensures it is located temporaly in the same place for if the calculation was done using the exception or on cone or not
+        V *= attenuation
+    if plot==True:
+        E_raw = numpy.fft.irfft(E_raw_fft,n=len(u)) #should just be the signal, as A_fft already divided by scaling factor of t_step?
+        E_raw *= attenuation
+        A = numpy.fft.irfft(A_fft,n=len(u))
+        A *= attenuation
+        if abs(alpha) >= 0.001:
+            E_raw = numpy.fft.fftshift(E_raw) #This centres E so it occurs at t=0. and ensures it is located temporaly in the same place for if the calculation was done using the exception or on cone or not
+            A = numpy.fft.fftshift(A) #This centres A so it occurs at t=0. and ensures it is located temporaly in the same place for if the calculation was done using the exception or on cone or not
+            
+        pylab.figure()
+        pylab.subplot(311)
+        pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f\tt_step = %g ns'%(energy_neutrino,numpy.rad2deg(theta_obs_rad),n,t_step),fontsize=20)
+        pylab.ylabel('R*|A| (V s)')
+        pylab.xlabel('t (ns)')
+        #pylab.scatter(u,R*numpy.absolute(A),s=1)
+        pylab.plot(u,R*numpy.absolute(A))
+        
+        pylab.subplot(312)
+        pylab.ylabel('$R \cdot E_{raw}$ (V)')
+        pylab.xlabel('t (ns)')
+        #pylab.scatter(u,R*E_raw,s=1)
+        pylab.plot(u,R*E_raw)
+        
+        pylab.subplot(313)
+        pylab.ylabel('Voltage (V)')
+        pylab.xlabel('t (ns)')
+        #pylab.scatter(u,V,s=1)
+        pylab.plot(u,V)
+        
+        pylab.figure()
+        pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n))
+        pylab.plot(freqs/1e6,20.0 * numpy.log10(numpy.absolute(E_raw_fft)),label='Raw Signal (fft)')
+        pylab.plot(freqs/1e6,20.0 * numpy.log10(numpy.absolute(sys_fft)),label='System Response')
+        pylab.plot(freqs/1e6,20.0 * numpy.log10(numpy.absolute(h_fft)),label='Antenna Response')
+        pylab.plot(freqs/1e6,20.0 * numpy.log10(numpy.absolute(V_fft)),label='Processed Signal (fft)')
+        
+        pylab.xlabel('Freq. [MHz]',fontsize=16)
+        pylab.ylabel('dB',fontsize=16)
+        pylab.ylim(-50,100)
+        pylab.xlim(0,1000)
+        pylab.legend()
+    u += t_offset
+    if out_dom_freq == True:
+        dominant_freq = freqs[numpy.argmax(numpy.absolute(V_fft))]
+        return V, u, dominant_freq
+    else:
+        return V, u
+
+@profile  
+def quickSignalMulti(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = False,mode='v2',up_sample_factor=10,add_signals = False):  
+    '''
+    This should do the entire calculatuon, mostly in the frequency domain. 
+    The length of theta_obs_rad, and R, and attenuation should be the same. 
+    Attenuation is assumed to correspond to a single number per R theta_obs_rad (meaning
+    it is not a function of frequency, but rather an overall multiplier). 
+    '''
+    if numpy.size(theta_obs_rad) != numpy.size(R):
+        print('Error in quickSignal, theta_obs_rad and R must have same dimension')
+        
+    #Loading in response function and setting frequency / time steps
+    if any([numpy.size(h_fft) ==1,numpy.size(sys_fft)==1,numpy.size(freqs)==1]):
+        h_fft,sys_fft,freqs = loadSignalResponse(mode=mode)
+
+    if up_sample_factor <= 0:
+        up_sample_factor = 5
+    
+    freqs = numpy.absolute(freqs)
+    freq_step = freqs[1]-freqs[0] #1/(n_points*t_step*1e-9) #Hz
+    possible_lengths = 2**numpy.arange(0,25)
+    n_points_freq = possible_lengths[possible_lengths >= up_sample_factor*len(h_fft)][0] #upsamples to the closest power of two to upsample*original_length
+    freqs = numpy.arange(n_points_freq)*freq_step
+    
+    h_fft = numpy.append(h_fft,numpy.zeros(n_points_freq - len(h_fft)))
+    sys_fft = numpy.append(sys_fft,numpy.zeros(n_points_freq - len(sys_fft)))
+    response_fft = numpy.multiply(h_fft,sys_fft)
+    
+    t_step = 1/(2*max(freqs))*1e9 #ns
+    u = numpy.arange(-(n_points_freq-1),(n_points_freq-1))*t_step
+    
+    #Calculating the vector potential
+    #cherenkov_angle = numpy.arccos(1./n)
+    LQ = 1#excessProjectedTrackLength(Q,int_min=min(u),int_max=max(u),n_steps = len(u)) #can probably set to 1 for now as this Q is normalized?
+    #print(LQ)
+    alphas = (1. - n*numpy.cos(theta_obs_rad))/gnosim.utils.constants.speed_light #scaling factor of u substitution units of ns/m
+    
+    #calling the below was slow, so I put it just calculate it in this function
+    #fp = F_p(Energy_GeV,u,n,LQ)
+    #fp = numpy.multiply(scipy.signal.tukey(len(fp),alpha=0.05),fp)
+    ra = RA(Energy_GeV,u)  
+    fp = (4. * numpy.pi /(LQ * gnosim.utils.constants.mu_0 * math.sqrt(1-1/n**2))) * ra #note that math.sqrt(1-1/1.78**2) is a faster form of numpy.sin(cherenkov_angle) = numpy.sin(numpy.arccos(1/n))
+    fp = numpy.multiply(scipy.signal.tukey(len(fp),alpha=0.05),fp)
+    fp_fft = numpy.fft.rfft(fp)
+
+    A_fft = numpy.zeros((len(R),len(fp_fft)),dtype=complex) #complex dtype needed for the phase is lost when adding to this empty array
+    
+    for index, alpha in enumerate(alphas):
+        if abs(alpha) < 0.001:
+            A_fft[index,:] = fp_fft * ( gnosim.utils.constants.mu_0 * numpy.sin(theta_obs_rad[index]) * LQ / (4. * numpy.pi * R[index]) ) 
+        else:
+            #For calculation Q(u/alpha) below here is my explaination:
+            #The scale factor is added to modify this function by scaling the z' input
+            #such that the convolution described in Eq17 of arXiv:1106.6283.
+            #Essentially in trying to understand how to implement the convolution described
+            #by that equation I decided a u substitution had to be done where 
+            #u = z' * alpha where alpha = (1-n*cos(theta))/c.  
+            #The convolution is then 1/alpha INT du Q(u/alpha)*Fp(dt - u).  The scale
+            #factor is meant to account for the scaling in Q to make it appear more
+            #like a convolution: 1/alpha INT du Q'(u)*Fp(dt - u), where Q' scales u. 
+            #The scaling factor not being one implies the input x is some value of ns
+            #that was converted from meters using the scale factor.
+            q = 0.60 * scipy.stats.gamma.pdf( 0.60 * u/alpha , a = 4.85 ) #This seems to be rate limiting.  If you think of faster way to calculate you can save some time.
+            
+            #calling the below was slow, so I put it just as a line of code with force a/b parameters.  
+            #q = Q(u/alpha)
+            #q = numpy.multiply(scipy.signal.tukey(len(q),alpha=0.05),q)
+            q_fft = numpy.fft.rfft(q)
+            
+            #print('alpha %g, theta %g, R %g'%(alpha,numpy.rad2deg(theta_obs_rad[index]),R[index]))
+            A_fft[index,:] = numpy.multiply(fp_fft,q_fft) * ( gnosim.utils.constants.mu_0 * numpy.sin(theta_obs_rad[index]) / (4. * numpy.pi * R[index] ) ) * ( t_step/abs(alpha) ) #the t_step already accounts for scaling required with irffting.  Might not want here?  unsure
+            '''
+            #This plot is interesting for debugging but I am commenting it out for now
+            if plot == True:
+                tempA = numpy.fft.fftshift(numpy.fft.irfft(A_fft[index,:],n=len(u)))
+                pylab.figure()
+                pylab.subplot(311)
+                pylab.title('E = %g GeV \tn = %0.2f \tR = %0.2f \t$\\theta$ - %0.2f'%(Energy_GeV,n,R[index],numpy.rad2deg(theta_obs_rad[index])),fontsize=20)
+                pylab.plot(u,fp,label='fp')
+                pylab.ylabel('$F_p$ ($Amps$)',fontsize=16)
+                pylab.xlim(-10,50)
+                pylab.subplot(312)
+                pylab.plot(u,q,label='q')
+                pylab.ylabel('$Q (arb)$ ',fontsize=16)
+                pylab.xlim(-10,50)
+                pylab.subplot(313)
+                #pylab.semilogy(u,R*A,label='RA')
+                pylab.semilogy(u,numpy.fabs(R[index]*numpy.absolute(tempA)),label='RA')
+                pylab.ylabel('$R|A|$ ',fontsize=16)
+                pylab.xlabel('$\Delta t$',fontsize=16)
+                pylab.xlim(-10,50)
+                pylab.subplots_adjust(left=0.08, bottom=0.05, right=0.98, top=0.97, wspace=None, hspace=None)
+            '''
+    #calculating E_raw_fft    
+    E_raw_fft = -1j*2*numpy.pi*numpy.multiply(A_fft , numpy.tile(freqs,(len(R),1))) #negitive sign because E = -dA/dt
+    
+    #calculating V_fft
+    V_fft = numpy.multiply(E_raw_fft, numpy.tile(response_fft,(len(R),1)))
+    if out_dom_freq == True:
+        max_freqs = freqs[numpy.argmax(numpy.absolute(V_fft),axis=1)]
+        if add_signals == True:
+            max_V = numpy.max(numpy.absolute(V_fft),axis=1)
+            max_freqs = max_freqs[ numpy.argmax(max_V) ]
+            
+    V = numpy.fft.irfft(V_fft,n=len(u),axis=1)
+    for index, alpha in enumerate(alphas):
+        if abs(alpha) >= 0.001:
+            V[index,:] = numpy.fft.fftshift(V[index,:]) #This fftshift centres V so it occurs at t=0. and ensures it is located temporaly in the same place for if the calculation was done using the exception or on cone or not
+        V[index,:] *= attenuation[index]
+        
+    #plotting
+    if plot==True:
+        E_raw = numpy.fft.irfft(E_raw_fft,n=len(u),axis=1) #should just be the signal, as A_fft already divided by scaling factor of t_step?
+        A = numpy.fft.irfft(A_fft,n=len(u),axis=1)
+        for index, alpha in enumerate(alphas):
+            if abs(alpha) >= 0.001:
+                E_raw[index,:] = numpy.fft.fftshift(E_raw[index,:])*attenuation[index] #This fftshift centres V so it occurs at t=0. and ensures it is located temporaly in the same place for if the calculation was done using the exception or on cone or not
+                A[index,:] = numpy.fft.fftshift(A[index,:])*attenuation[index] #This fftshift centres V so it occurs at t=0. and ensures it is located temporaly in the same place for if the calculation was done using the exception or on cone or not
+            pylab.figure()
+            pylab.title('E = %g GeV \tn = %0.2f \tR = %0.2f \t$\\theta$ - %0.2f'%(Energy_GeV,n,R[index],numpy.rad2deg(theta_obs_rad[index])),fontsize=20)
+            pylab.plot(freqs/1e6,20.0 * numpy.log10(numpy.absolute(E_raw_fft[index,:])),label='Raw Signal (fft) (No attenuation)')
+            pylab.plot(freqs/1e6,20.0 * numpy.log10(numpy.absolute(sys_fft)),label='System Response')
+            pylab.plot(freqs/1e6,20.0 * numpy.log10(numpy.absolute(h_fft)),label='Antenna Response')
+            pylab.plot(freqs/1e6,20.0 * numpy.log10(numpy.absolute(V_fft[index,:])),label='Processed Signal (fft)')
+            
+            pylab.xlabel('Freq. [MHz]',fontsize=16)
+            pylab.ylabel('dB',fontsize=16)
+            #pylab.ylim(-50,100)
+            pylab.xlim(0,1000)
+            pylab.legend()
+        pylab.figure()
+        pylab.subplot(311)
+        pylab.title('E = %g GeV    n = %0.2f    t_step = %g ns'%(energy_neutrino,n,t_step),fontsize=20)
+        pylab.ylabel('R*|A| (V s)')
+        pylab.xlabel('t (ns)')
+        
+        pylab.subplot(312)
+        pylab.ylabel('$R \cdot E_{raw}$ (V)')
+        pylab.xlabel('t (ns)')
+        
+        pylab.subplot(313)
+        pylab.ylabel('Voltage (V)')
+        pylab.xlabel('t (ns)')
+        
+        for index in range(len(R)):
+            pylab.subplot(311)
+            pylab.plot(u,R[index]*numpy.absolute(A[index,:]),label='$theta$=%0.3f deg,attenuation = %g'%(numpy.rad2deg(theta_obs_rad[index]),attenuation[index]))
+            pylab.subplot(312)
+            pylab.plot(u,R[index]*E_raw[index,:],label='$theta$=%0.3f deg,attenuation = %g'%(numpy.rad2deg(theta_obs_rad[index]),attenuation[index]))
+            pylab.subplot(313)
+            pylab.plot(u,V[index,:],label='$theta$=%0.3f deg,attenuation = %g'%(numpy.rad2deg(theta_obs_rad[index]),attenuation[index]))
+            
+        pylab.subplot(311)
+        pylab.legend()
+        pylab.subplot(312)
+        pylab.legend()
+        pylab.subplot(313)
+        pylab.legend()
+    
+    ### ADDING SIGNALS 
+    
+    
+    if add_signals == True: 
+        min_u_in  = min(u)
+        min_u_out = min(t_offset)+min(u)
+        max_u_out = max(t_offset)+max(u)     
+        u_out = numpy.arange(min_u_out,max_u_out+t_step,t_step)
+        V_out = numpy.zeros_like(u_out)
+        if plot == True:
+            pylab.figure()    
+            ax = pylab.subplot(numpy.shape(V)[0]+1,1,numpy.shape(V)[0]+1)
+            pylab.xlim((min_u_out,max_u_out))
+        for i in range(numpy.shape(V)[0]):
+            #V_i = V[i]
+            u_i = u+t_offset[i]
+            
+            left_index = numpy.argmin(abs(u_out - (min_u_in + t_offset[i])))
+            right_index = left_index + len(V[i])
+            #print('left_index',left_index)
+            #print('right_index',right_index)
+            cut = numpy.arange(left_index,right_index)
+            #print(len(cut))
+            V_out[cut] += V[i]
+            if plot == True:
+                pylab.subplot(numpy.shape(V)[0]+1,1,i+1,sharex=ax)
+                pylab.plot(u_i,V[i],label='Signal %i'%(i))
+                pylab.ylabel('V (V)',fontsize=16)
+                #pylab.xlabel('t-t_emit (ns)',fontsize=16)
+                pylab.legend(fontsize=14)
+        if plot == True:
+            pylab.subplot(numpy.shape(V)[0]+1,1,numpy.shape(V)[0]+1)
+            pylab.plot(u_out,V_out,label='Total Signal')
+            pylab.ylabel('V (V)',fontsize=16)
+            pylab.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=0.4)
+            pylab.legend(fontsize=14)  
+            pylab.xlabel('t-t_emit (ns)',fontsize=16) #only want to apply to the last subplot.    
+        
+        if out_dom_freq == True:
+            return V_out, u_out, max_freqs
+        else:
+            return V_out, u_out
+    else:
+        u = numpy.tile(u,(len(R),1))
+        for i in range(len(R)):
+            u[i,:] += t_offset[i]
+            print(t_offset[i])
+        return V, u, max_freqs
 ############################################################
 
 if __name__ == "__main__":
@@ -578,7 +958,7 @@ if __name__ == "__main__":
     #phi_0 = reader['phi_0'][event]
     #fig = plotGeometry(origin,neutrino_loc,phi_0,sub_info)
     
-    
+    '''
     angles = numpy.linspace(cherenkov_angle_deg-2,cherenkov_angle_deg+2,10)
     angles = numpy.append( angles,cherenkov_angle_deg)
     
@@ -611,9 +991,7 @@ if __name__ == "__main__":
     
     
     #V,u,f_dom = electricFieldTimeDomainSignal(numpy.deg2rad(50),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=True,out_dom_freq = True,return_pos = True,mode='v2')
-    #'''
 
-    #'''
     #######################
     
     test_angle = cherenkov_angle_deg-0.3
@@ -750,21 +1128,21 @@ if __name__ == "__main__":
     pylab.xlabel('u (ns)',fontsize=16)
     pylab.subplot(212)
     pylab.xlabel('f(MHz)',fontsize=16)
-    pylab.ylabel('fourier_fp',fontsize=16)
+    pylab.ylabel('fp_fft',fontsize=16)
     for upsample in upsamples:
         V1,u1,f_dom1 = electricFieldTimeDomainSignal(numpy.deg2rad(test_angle),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = True,return_pos = False,mode='v2',up_sample_factor = upsample)    
         fp = F_p(energy_neutrino,u1,n,1)
         pylab.subplot(211)
         pylab.plot(u1,fp,label='n_points = %i'%(len(u1)))
-        fourier_fp = numpy.fft.rfft(fp)
-        fourier_fp = fourier_fp/len(fourier_fp)
+        fp_fft = numpy.fft.rfft(fp)
+        fp_fft = fp_fft/len(fp_fft)
         
         time_step = (u1[1]-u1[0]) #ns
         freq_step = 1/(len(u1)*(time_step*1e-9))
         max_freq = 1/(2*(time_step*1e-9))
-        freqs = numpy.arange(len(fourier_fp))*freq_step #might be off by 1 step somewhere
+        freqs = numpy.arange(len(fp_fft))*freq_step #might be off by 1 step somewhere
         pylab.subplot(212)
-        pylab.plot(freqs/1e6,numpy.absolute(fourier_fp),label='n_points = %i'%(len(freqs)))
+        pylab.plot(freqs/1e6,numpy.absolute(fp_fft),label='n_points = %i'%(len(freqs)))
     pylab.subplot(211)
     pylab.xlim(-1.5,1.5)
     pylab.legend()
@@ -781,44 +1159,71 @@ if __name__ == "__main__":
     pylab.scatter(u,V,label='V_signal')
     pylab.scatter(u,V_envelope,label='V_envelope')
     pylab.legend(fontsize=16)
+    '''   
     ''' 
-    if abs(theta_deg-theta_cherenkov_deg) < 0.5:
-        up_sample_factor = 30
-    elif abs(theta_deg-theta_cherenkov_deg) < 10:
-        up_sample_factor = 20
-    else:
-        up_sample_factor = 10
+    for upsample in [5,10,20]:#numpy.arange(0,20):
+        quickSignalSingle(numpy.deg2rad(cherenkov_angle_deg-0.3),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = False,return_pos = False,mode='v2',up_sample_factor=upsample)
     '''
-    #reduce_by = 2**7
-    #lenu = len(sys)*reduce_by
-    #u = numpy.arange(-(lenu*t_step/reduce_by)/2,(lenu*t_step/reduce_by)/2,t_step/reduce_by)
-    #freqs_sig = numpy.fft.rfftfreq(len(u),d=(numpy.diff(u)[0])*1e-9)
-    #print(freqs)
-    #print(freqs_sig)
-    #E_sig, u = electricFieldTimeDomainRaw(numpy.deg2rad(50),R,energy_neutrino,n,plot=True,u_step = t_step/reduce_by)
-    #freqs_sig = numpy.fft.rfftfreq(len(u),d=(t_step/2**7)*1e-9)
-    #E_fft = numpy.fft.rfft(E_sig)
-    #V_fft = numpy.multiply(E_fft,response_fft)
-    #V = numpy.fft.irfft(V_fft)
-    #t = numpy.arange(len(u))*t_step
-    #sys = numpy.append(sys,numpy.zeros(len(u)-len(sys)))
-    #h = numpy.append(h,numpy.zeros(len(u)-len(h)))
-    #h_fft = numpy.fft.rfft(h)
-    #sys_fft = numpy.fft.rfft(sys)
-    #freqs_sig = numpy.fft.rfftfreq(len(t),d=(t_step)*1e-9)
-    #pylab.figure()
-    #pylab.subplot(211)
-    #pylab.plot(t,sys)
-    #pylab.xlim(-10,200)
-    
-    #pylab.subplot(212)
-    #pylab.plot(t,h)
-    #pylab.xlim(-10,100)
+    '''
+    angles = numpy.linspace(cherenkov_angle_deg-2,cherenkov_angle_deg+2,10)
+    angles = numpy.append( angles,cherenkov_angle_deg)
     
     
+    #angles = [numpy.rad2deg(cherenkov_angle)+0.01,numpy.rad2deg(cherenkov_angle)]
+    pylab.figure()
+    pylab.title('Electric Field With Response for Various Angles ($\\theta_{Cherenkov}$ = %f, R = %0.2f, n = %0.2f)'%(numpy.rad2deg(cherenkov_angle),R,n),fontsize=16)
+    pylab.ylabel('E (V)',fontsize=16)
+    pylab.xlabel('t (ns)',fontsize=16)
+    for angle in angles:
+        V, u = quickSignalSingle(numpy.deg2rad(angle),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = False,return_pos = False,mode='v2',up_sample_factor=upsample)
+        pylab.plot(u,V,label='$\\theta$ = %.2f deg'%(angle))
+    pylab.legend() 
+    pylab.xlim([0,100])
+    '''
+    h_fft,sys_fft,freqs = loadSignalResponse()
+    
+    upsample = 40
+    #V, u = quickSignalSingle(numpy.deg2rad(cherenkov_angle_deg),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=True,out_dom_freq = False,return_pos = False,mode='v2',up_sample_factor=upsample)
+    
+    #V,u = electricFieldTimeDomainSignal(numpy.deg2rad(cherenkov_angle_deg-0.3),R,energy_neutrino,n,h_fft=h_fft,sys_fft=sys_fft,freqs=freqs,plot=False,out_dom_freq = False,return_pos = False,mode='v2',up_sample_factor = upsample)
+    #V, u = quickSignalSingle(numpy.deg2rad(cherenkov_angle_deg-0.3),R,energy_neutrino,n,h_fft=h_fft,sys_fft=sys_fft,freqs=freqs,plot=False,out_dom_freq = False,return_pos = False,mode='v2',up_sample_factor=upsample)
+    
+    Rs = numpy.array([1000,1000,1000,1000,1000])
+    thetas = numpy.array([cherenkov_angle_deg-30,cherenkov_angle_deg-15,cherenkov_angle_deg-0.5,cherenkov_angle_deg+20,cherenkov_angle_deg])
+    t_offset = numpy.array([1200,1300,1350,1500,1600])
+    attenuation = numpy.array([0.8,0.9,.5,0.7,1.])
+    
+    V, u,f = quickSignalMulti(numpy.deg2rad(thetas),Rs,energy_neutrino,n,t_offset,attenuation,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = True,mode='v2',up_sample_factor=upsample,add_signals=False)
+    print(f/1e6)
+    V, u,f = quickSignalMulti(numpy.deg2rad(thetas),Rs,energy_neutrino,n,t_offset,attenuation,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = True,mode='v2',up_sample_factor=upsample,add_signals=True)
+    print(f/1e6)
+    #u = numpy.tile(u,(numpy.shape(V)[0],1))
+    #u[0,:] += 1200
+    #u[1,:] += 1300
+    #u[2,:] += 1350
+    #u[3,:] += 1500
+    #u[4,:] += 1600
+    
+    #V_out, u_out = addSignals(u,V,plot=False)
+    #V, u = quickSignalMulti(numpy.deg2rad(thetas),Rs,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=True,out_dom_freq = False,return_pos = False,mode='v2',up_sample_factor=upsample)
+    
+    '''
     
     
-    
+    n_trials = 1000
+    start_time = time.time()
+    for trial in range(n_trials):
+        V, u = quickSignal(numpy.deg2rad(cherenkov_angle_deg-0.3),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = False,return_pos = False,mode='v2',up_sample_factor=15)
+    new_time = (time.time() - start_time)/n_trials
+    print('len(V) = ', len(V))
+    start_time = time.time()
+    for trial in range(n_trials):
+        V, u = electricFieldTimeDomainSignal(numpy.deg2rad(cherenkov_angle_deg-0.3),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = False,return_pos = False,mode='v2',up_sample_factor = 15,deriv_mode = 'freq')
+    old_time = (time.time() - start_time)/n_trials
+    print('len(V) = ', len(V))
+    print('New time:', new_time)
+    print('Old time:', old_time)
+    '''
     
     
 ############################################################
