@@ -376,20 +376,20 @@ def plotGeometry(origin,neutrino_loc,phi_0,info):
     neutrino_loc_r = numpy.sqrt(neutrino_loc[0]**2 + neutrino_loc[1]**2)
     if len(numpy.unique(info['eventid'])) == 1:
         eventid = numpy.unique(info['eventid'])
-        fig = pylab.figure()
+        fig = pylab.figure(figsize=(16.,11.2)) #my screensize
         pylab.title('Event %i'%(eventid))
-        pylab.scatter(neutrino_loc_r,neutrino_loc[2],label='Neutrino Loc')
+        pylab.scatter(neutrino_loc_r,neutrino_loc[2],label='Neutrino Loc',marker = '*',color = 'k')
         sub_info = numpy.unique(info[info['eventid'] == eventid])
-        for counter,antenna in enumerate(sub_info['antenna']):
+        for counter,antenna in enumerate(sub_info['antenna']): #might need to put a unique here to solve problem 
             origin_r = numpy.sqrt(origin[counter][0]**2 + origin[counter][1]**2)
             pylab.scatter(origin_r,origin[counter][2],label='Antenna %i'%(antenna))
             ssub_info = sub_info[sub_info['antenna'] == antenna]
             
             for solution in ssub_info['solution']:
-                x, y, z, t, d, phi, theta, a_v, a_h, index_reflect_air, index_reflect_water = gnosim.trace.refraction_library_beta.rayTrace(origin[counter], phi_0, ssub_info['theta_ant'][ssub_info['solution'] == solution])
+                x, y, z, t, d, phi, theta, a_v, a_h, index_reflect_air, index_reflect_water = gnosim.trace.refraction_library_beta.rayTrace(origin[counter], phi_0, ssub_info['theta_ant'][ssub_info['solution'] == solution], r_limit = 1.01*neutrino_loc_r)
                 r = numpy.sqrt(x**2 + y**2)
                 label = 'A%i %s'%(antenna,solution)
-                print(label)
+                #print(label)
                 pylab.plot(r,z,label=label)
         pylab.legend()
     else:

@@ -11,34 +11,42 @@
  'antenna_definitions': {'simple0': {'lib': '/home/dsouthall/Projects/GNOSim/library_-200_polar_120_rays/*.h5',
                                     'frequency_low': 0.1, # GHz
                                     'frequency_high': 0.8, # GHz
-                                    'temp': 300.} ,# K
+                                    'temp': 300.,#K
+                                    'resistance':50},
                         'simple1': {'lib': '/home/dsouthall/Projects/GNOSim/library_-201_polar_120_rays/*.h5',
                                     'frequency_low': 0.1, # GHz
                                     'frequency_high': 0.8, # GHz
-                                    'temp': 300.},
+                                    'temp': 300.,#K
+                                    'resistance':50},
                         'simple2': {'lib': '/home/dsouthall/Projects/GNOSim/library_-202_polar_120_rays/*.h5',
                                     'frequency_low': 0.1, # GHz
                                     'frequency_high': 0.8, # GHz
-                                    'temp': 300.},
+                                    'temp': 300.,#K
+                                    'resistance':50},
                         'simple3': {'lib': '/home/dsouthall/Projects/GNOSim/library_-203_polar_120_rays/*.h5',
                                     'frequency_low': 0.1, # GHz
                                     'frequency_high': 0.8, # GHz
-                                    'temp': 300.},
+                                    'temp': 300.,#K
+                                    'resistance':50},
                         'simple4': {'lib': '/home/dsouthall/Projects/GNOSim/library_-204_polar_120_rays/*.h5',
                                     'frequency_low': 0.1, # GHz
                                     'frequency_high': 0.8, # GHz
-                                    'temp': 300.},
+                                    'temp': 300.,#K
+                                    'resistance':50},
                         'simple5': {'lib': '/home/dsouthall/Projects/GNOSim/library_-205_polar_120_rays/*.h5',
                                     'frequency_low': 0.1, # GHz
                                     'frequency_high': 0.8, # GHz
-                                    'temp': 300.},
+                                    'temp': 300.,#K
+                                    'resistance':50},
                         'simple6': {'lib': '/home/dsouthall/Projects/GNOSim/library_-206_polar_120_rays/*.h5',
                                     'frequency_low': 0.1, # GHz
                                     'frequency_high': 0.8, # GHz
-                                    'temp': 300.},
+                                    'temp': 300.,#K
+                                    'resistance':50},
                         'simple7': {'lib': '/home/dsouthall/Projects/GNOSim/library_-207_polar_120_rays/*.h5',
                                     'frequency_low': 0.1, # GHz
                                     'frequency_high': 0.8, # GHz
-                                    'temp': 300.}}
+                                    'temp': 300.,#K
+                                    'resistance':50}}
 }
 

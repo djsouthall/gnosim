@@ -14,6 +14,7 @@ info: Calculates E in the time domain for eventual phasing
 
 import numpy
 import pylab
+import math
 import scipy.signal
 import gnosim.utils.constants
 import gnosim.interaction.inelasticity
@@ -336,54 +337,299 @@ def electricFieldTimeDomainSignal(theta_obs_rad,R,Energy_GeV,n,h_fft=None,sys_ff
     else:
         return V, u
 
-def addSignals(u_in,E_in,plot=False):
+def addSignals(u_in,V_in,plot=False):
     '''
     u_in should be an array of times with dimensions (n_signal , n_timestep )
-    E_in should be an array of electric fields with dimensions (n_signal , n_timestep )
+    u is assumed to be in order, i.e. u[0] is the min of each row and u[-1] is the max.
+    Each row of u is also assumed to have the same time step.  
+    V_in should be an array of electric fields with dimensions (n_signal , n_timestep )
     Not that the timing of signals may be shifted by up to a u-step here to align 
     descretized timing values.  There may be a more elegant want do this if this
     added wiggle becomes a problem. 
     '''
-    u_out = numpy.concatenate(u_in)
-    u_step = abs(u_out[1]-u_out[0])
-    u_out = numpy.arange(min(u_out),max(u_out)+u_step,u_step)
-    E_out = numpy.zeros_like(u_out)
-    if plot == True:
-        pylab.figure()    
-        ax = pylab.subplot(numpy.shape(E_in)[0]+1,1,numpy.shape(E_in)[0]+1)
-        pylab.xlim((min(u_out),max(u_out)))
-    for i in range(numpy.shape(E_in)[0]):
-        E = E_in[i]
-        u = u_in[i]
-        
-        if len(u) == 0:
-            u = u_out
-            E = numpy.zeros_like(u_out)   
-        #print('Lengths:')
-        #print(len(E))
-        #print(len(u))
-        #print('%i:%i ->%i'%(numpy.argmin(abs(u_out - min(u))),numpy.argmin(abs(u_out - min(u)))+len(u),len(E_out[numpy.argmin(abs(u_out - min(u))):numpy.argmin(abs(u_out - min(u)))+len(u)])))
-        left_index = numpy.argmin(abs(u_out - min(u)))
-        right_index = left_index + len(E)
-        #print('left_index',left_index)
-        #print('right_index',right_index)
-        cut = numpy.arange(left_index,right_index)
-        #print(len(cut))
-        E_out[cut] += E
+    if numpy.shape(u_in)[0] <= 1:
+        return V_in.flatten(),u_in.flatten()
+    else:
+        #print(u_in)
+        #print(numpy.shape(u_in))
+        u_step = u_in[0,1]-u_in[0,0]
+        u_out_min = min(u_in[:,0])
+        u_out_max = max(u_in[:,-1])
+        u_out = numpy.arange(u_out_min,u_out_max+u_step,u_step)
+        V_out = numpy.zeros_like(u_out)
         if plot == True:
-            pylab.subplot(numpy.shape(E_in)[0]+1,1,i+1,sharex=ax)
-            pylab.plot(u,E,label='Signal %i'%(i))
-            pylab.ylabel('E (V/m)',fontsize=16)
+            pylab.figure()    
+            ax = pylab.subplot(numpy.shape(V_in)[0]+1,1,numpy.shape(V_in)[0]+1)
+            pylab.xlim((u_out_min,u_out_max))
+        for i in range(numpy.shape(V_in)[0]):
+            V = V_in[i]
+            u = u_in[i]
+            
+            if len(u) == 0:
+                u = u_out
+                V = numpy.zeros_like(u_out)   
+            #print('Lengths:')
+            #print(len(V))
+            #print(len(u))
+            #print('%i:%i ->%i'%(numpy.argmin(abs(u_out - min(u))),numpy.argmin(abs(u_out - min(u)))+len(u),len(V_out[numpy.argmin(abs(u_out - min(u))):numpy.argmin(abs(u_out - min(u)))+len(u)])))
+            left_index = numpy.argmin(abs(u_out - u[0]))
+            right_index = left_index + len(V)
+            #print('left_index',left_index)
+            #print('right_index',right_index)
+            cut = numpy.arange(left_index,right_index)
+            #print(len(cut))
+            V_out[cut] += V
+            if plot == True:
+                pylab.subplot(numpy.shape(V_in)[0]+1,1,i+1,sharex=ax)
+                pylab.plot(u,V,label='Signal %i'%(i))
+                pylab.ylabel('V (V)',fontsize=16)
+                pylab.xlabel('t-t_emit (ns)',fontsize=16)
+                pylab.legend(fontsize=14)
+        if plot == True:
+            pylab.subplot(numpy.shape(V_in)[0]+1,1,numpy.shape(V_in)[0]+1)
+            pylab.plot(u_out,V_out,label='Total Signal')
+            pylab.ylabel('V (V)',fontsize=16)
             pylab.xlabel('t-t_emit (ns)',fontsize=16)
+            pylab.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=0.4)
             pylab.legend(fontsize=14)
-    if plot == True:
-        pylab.subplot(numpy.shape(E_in)[0]+1,1,numpy.shape(E_in)[0]+1)
-        pylab.plot(u_out,E_out,label='Total Signal')
-        pylab.ylabel('E (V/m)',fontsize=16)
-        pylab.xlabel('t-t_emit (ns)',fontsize=16)
-        pylab.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=0.4)
-        pylab.legend(fontsize=14)
-    return E_out,u_out
+        return V_out,u_out
+
+def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode='v2'):
+    '''
+    Calculates the times used for signal calculations based on the response functions
+    (assumed to have the same frequency step).  up_sample_factor is not exact, as the
+    number of points is rounded to a factor of 2 to ensure future ifft's are as fast
+    as possible.
+    
+    This also returns the newly padded responses and freqs.
+    '''
+    #Loading in response function and setting frequency / time steps
+    if any([numpy.size(h_fft) ==1,numpy.size(sys_fft)==1,numpy.size(freqs)==1]):
+        h_fft,sys_fft,freqs = loadSignalResponse(mode=mode)
+
+    if up_sample_factor <= 0:
+        up_sample_factor = 1
+
+    freqs = numpy.absolute(freqs)
+    freq_step = freqs[1]-freqs[0] #1/(n_points*t_step*1e-9) #Hz
+    possible_lengths = 2**numpy.arange(0,25)
+    n_points_freq = possible_lengths[possible_lengths >= up_sample_factor*len(h_fft)][0] + 1 #Want 2^n events in time domain, so 2^n  #upsamples to the closest power of two to upsample*original_length
+    freqs = numpy.arange(n_points_freq)*freq_step
+    
+    h_fft = numpy.append(h_fft,numpy.zeros(n_points_freq - len(h_fft)))
+    sys_fft = numpy.append(sys_fft,numpy.zeros(n_points_freq - len(sys_fft)))
+    response_fft = numpy.multiply(h_fft,sys_fft)
+    
+    t_step = 1/(2*max(freqs))*1e9 #ns
+    u = numpy.arange(-(n_points_freq-1),(n_points_freq-1))*t_step #To increase time duration of signal I should just need to upsample?
+    return u, h_fft, sys_fft, freqs
+
+def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential = False,out_dom_freq = False,include_noise = False, resistance = 50, temperature = 320):  
+    '''
+    This should do the entire calculation, mostly in the frequency domain. 
+    Expects u, h_fft, sys_fft, freqs to all come straight from calculateTimes.
+    These are the same for a given up_sample and response so don't need to be calculated
+    every signal. 
+    
+    
+    Return pattern:
+    if include_noise == True:
+        return V_noiseless, u, dominant_freq, V_noise,  SNR
+    else:
+        return V_noiseless, u, dominant_freq
+        
+    SNR is calculated as the ratio of the peak to peak/2 over rms(noise), squared 
+    (ratio of powers)
+    '''
+    t_step = u[1]-u[0] #ns
+    
+    #Calculating the vector potential
+    #cherenkov_angle = numpy.arccos(1./n)
+    LQ = 1#excessProjectedTrackLength(Q,int_min=min(u),int_max=max(u),n_steps = len(u)) #can probably set to 1 for now as this Q is normalized?
+    alpha = (1. - n*numpy.cos(theta_obs_rad))/gnosim.utils.constants.speed_light #scaling factor of u substitution units of ns/m
+
+    #calling the below was slow, so I put it just calculate it in this function
+    #fp = F_p(Energy_GeV,u,n,LQ)
+    #fp = numpy.multiply(scipy.signal.tukey(len(fp),alpha=0.05),fp)
+    ra = RA(Energy_GeV,u)  
+    fp = (4. * numpy.pi /(LQ * gnosim.utils.constants.mu_0 * math.sqrt(1-1/n**2))) * ra #note that math.sqrt(1-1/1.78**2) is a faster form of numpy.sin(cherenkov_angle) = numpy.sin(numpy.arccos(1/n))
+    fp = numpy.multiply(scipy.signal.tukey(len(fp),alpha=0.05),fp)
+    fp_fft = numpy.fft.rfft(fp)
+    
+    if abs(alpha) < 0.001:
+        #print('alpha < 0.001')
+        A_fft = fp_fft * ( gnosim.utils.constants.mu_0 * numpy.sin(theta_obs_rad) * LQ / (4. * numpy.pi * R) ) 
+        
+    else:
+        #For calculation Q(u/alpha) below here is my explaination:
+        #The scale factor is added to modify this function by scaling the z' input
+        #such that the convolution described in Eq17 of arXiv:1106.6283.
+        #Essentially in trying to understand how to implement the convolution described
+        #by that equation I decided a u substitution had to be done where 
+        #u = z' * alpha where alpha = (1-n*cos(theta))/c.  
+        #The convolution is then 1/alpha INT du Q(u/alpha)*Fp(dt - u).  The scale
+        #factor is meant to account for the scaling in Q to make it appear more
+        #like a convolution: 1/alpha INT du Q'(u)*Fp(dt - u), where Q' scales u. 
+        #The scaling factor not being one implies the input x is some value of ns
+        #that was converted from meters using the scale factor.
+        
+        
+        #calling the below was slow, so I put it just as a line of code with force a/b parameters.  
+        #q = Q(u/alpha)
+        #q = numpy.multiply(scipy.signal.tukey(len(q),alpha=0.05),q)
+        
+        q = 0.60 * scipy.stats.gamma.pdf( 0.60 * u/alpha , a = 4.85 ) #This seems to be rate limiting.  If you think of faster way to calculate you can save some time.
+        q = numpy.multiply(scipy.signal.tukey(len(q),alpha=0.05),q)
+        q_fft = numpy.fft.rfft(q)
+        A_fft = numpy.multiply(fp_fft,q_fft) * ( gnosim.utils.constants.mu_0 * numpy.sin(theta_obs_rad) / (4. * numpy.pi * R ) ) * ( t_step/abs(alpha) ) #the t_step already accounts for scaling required with irffting.  Might not want here?  unsure
+        
+        A = numpy.fft.irfft(A_fft,n=len(u))
+        A = numpy.fft.fftshift(A)
+        if plot_potential == True:
+            pylab.figure()
+            pylab.subplot(311)
+            pylab.title('alpha = %0.3f, $\\theta$ = %0.2f deg'%(alpha,numpy.rad2deg(theta_obs_rad)),fontsize=20)
+            pylab.plot(u,fp,label='fp')
+            pylab.ylabel('$F_p$ ($Amps$)',fontsize=16)
+            #pylab.xlim(-10,50)
+            pylab.subplot(312)
+            pylab.plot(u,q,label='q')
+            pylab.ylabel('$Q (arb)$ ',fontsize=16)
+            #pylab.xlim(-10,50)
+            pylab.subplot(313)
+            pylab.semilogy(u,numpy.fabs(R*numpy.absolute(A)),label='RA')
+            pylab.ylabel('$R|A|$ ',fontsize=16)
+            pylab.xlabel('$\Delta t$',fontsize=16)
+            #pylab.xlim(-10,50)
+    #calculating E_raw_fft    
+    E_raw_fft = -1j*2*numpy.pi*numpy.multiply(A_fft , freqs) #negitive sign because E = -dA/dt
+    
+    #Accounting for attenuation
+    E_raw_fft *= attenuation #Want to do before noise is added.  Noise is not attenuated by 
+    #Adding antenna response
+    E_antenna_fft = numpy.multiply(E_raw_fft, h_fft) 
+    V_fft_noiseless = numpy.multiply(E_antenna_fft,sys_fft)
+    
+    V_noiseless = numpy.fft.irfft(V_fft_noiseless,n=len(u))
+    
+    if include_noise == True:
+        #The state is reset after this is called to avoid the random queue being shifted when using noise v.s. when not using noise
+        #rand_state = numpy.random.get_state()
+        
+        #SNR Peak to Peak calculation and noiseless signal calculation
+        
+        V_noiseless_sorted = numpy.sort(V_noiseless)
+        p2p_half = (V_noiseless_sorted[-1] - V_noiseless_sorted[0]) / 2
+        
+        #calculating noise
+        bandwidth = freqs[-1]/1e9 #Calculating full band noise, response cuts out stuff we don't see
+        V_rms = numpy.sqrt(gnosim.utils.constants.boltzmann * temperature * resistance * bandwidth * gnosim.utils.constants.GHz_to_Hz)
+        sigma = V_rms 
+        
+        #Noise in Polar
+        #noise_phase = numpy.random.uniform(-numpy.pi,numpy.pi,size = len(freqs))
+        #noise_amp = numpy.random.normal(loc = 0.0, scale = sigma , size = len(freqs)) #these might need the normalization factor of *numpy.sqrt(len(u)/2) if used at some point for some reason
+        
+        #Noise in Cartesian
+        noise_cartesian = numpy.sqrt(len(u)/2)*(numpy.random.normal(loc = 0.0, scale = sigma , size = len(freqs)) + 1j*numpy.random.normal(loc = 0.0, scale = sigma , size = len(freqs))) # the *numpy.sqrt(len(u)/2) factor is to handle some normalization issues
+        V_fft_just_noise = numpy.multiply(noise_cartesian,sys_fft)
+        #Multiplying in system noise to get V_fft
+        V_fft_noise = numpy.add(V_fft_noiseless,V_fft_just_noise)
+        V_noise = numpy.fft.irfft(V_fft_noise,n=len(u))
+        #numpy.random.set_state(rand_state)
+    
+    
+    if abs(alpha) >= 0.001:
+        V_noiseless = numpy.fft.fftshift(V_noiseless) #This centres V so it occurs at t=0. and ensures it is located temporaly in the same place for if the calculation was done using the exception or on cone or not
+        if include_noise == True:
+            V_noise = numpy.fft.fftshift(V_noise)
+    
+    if include_noise == True:
+        V_rms_measured = numpy.sqrt(numpy.mean(V_noise[u < 0]**2)) #This is the 'measured' V_rms, rather than the set.  This is after system response
+        SNR = (p2p_half/V_rms_measured)**2
+        #SNR_dB = 10*numpy.log10( SNR )#dB, using 10log10 because input is power ratio 
+        #print('SNR', SNR)
+    else:
+        SNR = 0
+        #print('No noise included.  Cannot perform SNR calculation.')
+
+    if plot_signals==True:
+        E_raw = numpy.fft.irfft(E_raw_fft,n=len(u)) #should just be the signal, as A_fft already divided by scaling factor of t_step?
+        A = numpy.fft.irfft(A_fft,n=len(u))
+        if abs(alpha) >= 0.001:
+            E_raw = numpy.fft.fftshift(E_raw) #This centres E so it occurs at t=0. and ensures it is located temporaly in the same place for if the calculation was done using the exception or on cone or not
+            A = numpy.fft.fftshift(A) #This centres A so it occurs at t=0. and ensures it is located temporaly in the same place for if the calculation was done using the exception or on cone or not
+            
+        pylab.figure()
+        if include_noise == True:
+            pylab.subplot(411)
+            pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f\tt_step = %g ns'%(energy_neutrino,numpy.rad2deg(theta_obs_rad),n,t_step),fontsize=20)
+            pylab.ylabel('R*|A| (V s)')
+            pylab.xlabel('t (ns)')
+            #pylab.scatter(u,R*numpy.absolute(A),s=1)
+            pylab.plot(u,R*numpy.absolute(A))
+            
+            pylab.subplot(412)
+            pylab.ylabel('$R \cdot E_{raw}$ (V)')
+            pylab.xlabel('t (ns)')
+            #pylab.scatter(u,R*E_raw,s=1)
+            pylab.plot(u,R*E_raw)
+            
+            pylab.subplot(413)
+            pylab.ylabel('Noiseless Signal Voltage (V)')
+            pylab.xlabel('t (ns)')
+            #pylab.scatter(u,V,s=1)
+            pylab.plot(u,V_noiseless)
+            
+            pylab.subplot(414)
+            pylab.ylabel('Signal Voltage (V)')
+            pylab.xlabel('t (ns)')
+            #pylab.scatter(u,V,s=1)
+            pylab.plot(u,V_noise)
+        else:
+            pylab.subplot(311)
+            pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f\tt_step = %g ns'%(energy_neutrino,numpy.rad2deg(theta_obs_rad),n,t_step),fontsize=20)
+            pylab.ylabel('R*|A| (V s)')
+            pylab.xlabel('t (ns)')
+            #pylab.scatter(u,R*numpy.absolute(A),s=1)
+            pylab.plot(u,R*numpy.absolute(A))
+            
+            pylab.subplot(312)
+            pylab.ylabel('$R \cdot E_{raw}$ (V)')
+            pylab.xlabel('t (ns)')
+            #pylab.scatter(u,R*E_raw,s=1)
+            pylab.plot(u,R*E_raw)
+            
+            pylab.subplot(313)
+            pylab.ylabel('Noiseless Signal Voltage (V)')
+            pylab.xlabel('t (ns)')
+            #pylab.scatter(u,V,s=1)
+            pylab.plot(u,V_noiseless)
+    if plot_spectrum == True:
+        pylab.figure()
+        pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n))
+        pylab.plot(freqs/1e6,20.0 * numpy.log10(numpy.absolute(E_raw_fft)),label='Raw Signal (fft)')
+        pylab.plot(freqs/1e6,20.0 * numpy.log10(numpy.absolute(sys_fft)),label='System Response')
+        pylab.plot(freqs/1e6,20.0 * numpy.log10(numpy.absolute(h_fft)),label='Antenna Response')
+        if include_noise == True:
+            pylab.plot(freqs/1e6,20.0 * numpy.log10(numpy.absolute(V_fft_noise)),label='Processed Signal (fft)')
+        else:
+            pylab.plot(freqs/1e6,20.0 * numpy.log10(numpy.absolute(V_fft_noiseless)),label='Processed Signal (fft)')
+        
+        pylab.xlabel('Freq. [MHz]',fontsize=16)
+        pylab.ylabel('dB',fontsize=16)
+        #pylab.ylim(-50,100)
+        pylab.xlim(0,1500)
+        pylab.legend()
+    
+    if include_noise == True:
+        dominant_freq = freqs[numpy.argmax(numpy.absolute(V_fft_noise))]
+        return V_noiseless, u + t_offset, dominant_freq, V_noise,  SNR
+    else:
+        dominant_freq = freqs[numpy.argmax(numpy.absolute(V_fft_noiseless))]
+        return V_noiseless, u + t_offset, dominant_freq
+
+
 
 ############################################################
 
@@ -435,6 +681,6 @@ if __name__ == "__main__":
     pylab.ylim([numpy.min(angle_mesh), numpy.max(angle_mesh)])
     
     u,V,f_dom = electricFieldTimeDomainSignal(numpy.deg2rad(50),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=True,out_dom_freq = True,return_pos = True,mode='v2')
-    u,V,f_dom = electricFieldTimeDomainSignal(numpy.deg2rad(60),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=True,out_dom_freq = True,return_pos = True,mode='v2')    
+    u,V,f_dom = electricFieldTimeDomainSignal(numpy.deg2rad(50),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=True,out_dom_freq = True,return_pos = True,mode='v2')    
     
 ############################################################

@@ -15,6 +15,7 @@ import os.path
 import glob
 import scipy
 import scipy.signal
+import math
 
 sys.path.append("/home/dsouthall/Projects/GNOSim/")
 import gnosim.utils.quat
@@ -29,6 +30,36 @@ pylab.ion()
 
 ############################################################
 
+import cProfile, pstats, io
+
+def profile(fnc):
+    """
+    A decorator that uses cProfile to profile a function
+    This is lifted from https://osf.io/upav8/
+    
+    Required imports:
+    import cProfile, pstats, io
+    
+    To use, decorate function of interest by putting @profile above
+    its definition.
+    """
+    
+    def inner(*args, **kwargs):
+        
+        pr = cProfile.Profile()
+        pr.enable()
+        retval = fnc(*args, **kwargs)
+        pr.disable()
+        s = io.StringIO()
+        sortby = 'cumulative'
+        ps = pstats.Stats(pr, stream=s)
+        ps.strip_dirs().sort_stats(sortby)
+        ps.print_stats()
+        print(s.getvalue())
+        return retval
+
+    return inner
+
 
 class Sim:
 
@@ -40,7 +71,7 @@ class Sim:
         #self.config = eval(''.join(open(config_file).readlines()))
         self.config = yaml.load(open(config_file))
         self.detector()     
-        self.info_dtype = numpy.dtype([('eventid','i'),('station','i'),('antenna','i'),('has_solution','i'),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('observation_angle','f'),('electric_field','f'),('weighted_freq','f'),('a_h','f'),('a_v','f')])
+        self.info_dtype = numpy.dtype([('eventid','i'),('station','i'),('antenna','i'),('has_solution','i'),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('observation_angle','f'),('electric_field','f'),('dominant_freq','f'),('a_h','f'),('a_v','f')])
         # List attributes of interest
         self.keys = ['t', 'd', 'theta', 'theta_0', 'a_v', 'a_h']
         self.n_antenna = sum([len(self.stations[s].antennas) for s in range(len(self.stations))])
@@ -65,20 +96,34 @@ class Sim:
                                                       self.config)
                 self.stations[ii].antennas.append(antenna)
 
-    def event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, anti=False,electricFieldDomain = 'freq',plot=False,summed_signals=False,save_fig=False):
+    def event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, anti=False,
+        electricFieldDomain = 'freq',include_noise = False,plot_signals=False,plot_geometry=False,summed_signals=False,
+        plot_threshold = 0,plot_filetype_extension = 'svg',image_path = './'):
+        '''
+        Note that the freq domain option is outdated and does not just do the same thing differently.  It does 
+        what older version of the code attempted did.  Does not have a lot of the newer additions such as noise.  
+        '''
+        plot_threshold_passed = False
         p_interact = gnosim.earth.earth.probInteract(energy_neutrino, z_0, anti=anti)
     
         # Probability for neutrino to make it through the Earth
         p_earth = gnosim.earth.earth.probSurvival(energy_neutrino, theta_0, elevation=z_0, anti=anti)
 
         # Placeholders
-        inelasticity = -999.
+        #inelasticity = gnosim.interaction.inelasticity.inelasticity(energy_neutrino, mode='cc') # GENERALIZE THIS LATER  This has some randomness so is calculated upfront sucht that it can be seeded without noise messing up ordering. 
         #electric_field_max = 0. Now per antenna, not event
+        event_electric_field_max = 0.
         dic_max = {}
         observation_angle_max = -999.
         solution_max = -999.
         index_station_max = -999.
         index_antenna_max = -999.
+        event_observation_angle_max = -999.
+        event_solution_max = -999.
+        event_index_station_max = 0
+        event_index_antenna_max = 0
+        
+        
         
         info = numpy.zeros(  self.n_antenna  , dtype = self.info_dtype) #was using numpy.empy, switch to 0s
         #Old indexing -> (len(self.stations)*len(self.stations[0].antennas))
@@ -101,7 +146,7 @@ class Sim:
                     for solution in self.stations[index_station].antennas[index_antenna].lib.solutions:
                         u_signals[station_label][antenna_label][solution] = []
                         E_signals[station_label][antenna_label][solution] = []
-                electric_field_max = 0. #This clearly makes no sense.  Reset every antenna??  Why?  So bizarre.  My info object outputs more info. 
+                electric_field_max = 0. 
                 x_antenna = self.stations[index_station].antennas[index_antenna].x
                 y_antenna = self.stations[index_station].antennas[index_antenna].y
                 z_antenna = self.stations[index_station].antennas[index_antenna].z
@@ -123,7 +168,6 @@ class Sim:
                     #p_detect = 1.  #This essentially flags if any detector sees any solution type.
                     #temporary_info['has_solution'] = 1
                     #want an antenna specific p_detect that flags if a particular detector sees any solution type.  
-                    inelasticity = gnosim.interaction.inelasticity.inelasticity(energy_neutrino, mode='cc') # GENERALIZE THIS LATER #DS not sure why this is in the loop.  Does not depend on any loop variables, only need to calculate once.  Maybe because it was going to be 'generalized'?
                     frequency = numpy.linspace(self.stations[index_station].antennas[index_antenna].frequency_low,
                                                self.stations[index_station].antennas[index_antenna].frequency_high,
                                                100) # GHz
@@ -150,20 +194,42 @@ class Sim:
                                 #the time resolution required for an accurent vector potential calculation varies,
                                 #but likely less than 0.05ns is preferred.  If up_sample_factor = 0 then the 
                                 #time step is closer to 0.32ns.  Near cone the required timing resolution increases. 
-                                cherenkov_angle_deg = numpy.rad2deg(numpy.arccos(1./index_of_refraction))
-                                if abs(observation_angle-cherenkov_angle_deg) < 0.5:
-                                    up_sample_factor = 30 #it might be fine to do this at 20
-                                elif abs(observation_angle-cherenkov_angle_deg) < 10:
-                                    up_sample_factor = 20
+                                #As far as I can tell from profiling, the time of execution of quickSignalSingle is linear
+                                #in upsample.  
+                                
+                                '''
+                                quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,u, h_fft, sys_fft, 
+                                            freqs,plot_signals=False,plot_spectrum=False,plot_potential = False,
+                                            out_dom_freq = False,include_noise = False, resistance = 50, temperature = 320)
+                                if include_noise == True:
+                                    dominant_freq = freqs[numpy.argmax(numpy.absolute(V_fft_noise))]
+                                    return V_noiseless, u + t_offset, dominant_freq, V_noise,  SNR
                                 else:
-                                    up_sample_factor = 10 #maybe could reduce for reaaally far off cone.  
-                                electric_array, u, weighted_freq = gnosim.interaction.askaryan.electricFieldTimeDomainSignal(numpy.deg2rad(observation_angle),self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],energy_neutrino*inelasticity,index_of_refraction,h_fft=self.h_fft,sys_fft=self.sys_fft,freqs=self.freqs_response,return_pos = True,out_dom_freq=True,plot=False,up_sample_factor=up_sample_factor,deriv_mode = 'time')
-                                #note that electric_array here should be measured voltage if the response function is correct (ignoring attenuation done below). 
-                                u = u + self.in_dic_array[station_label][antenna_label][solution]['t'][eventid]
-                                electric_array *= self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid]
-                                electric_field = max(numpy.abs(scipy.signal.hilbert(electric_array))) #Right now this takes the max value of the hilbert envelope
+                                    dominant_freq = freqs[numpy.argmax(numpy.absolute(V_fft_noiseless))]
+                                    return V_noiseless, u + t_offset, dominant_freq
+                                '''
+                                if include_noise == True:
+                                    V_noiseless, u , dominant_freq, V_noise, SNR = gnosim.interaction.askaryan.quickSignalSingle( numpy.deg2rad(observation_angle),\
+                                      self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],energy_neutrino*inelasticity,index_of_refraction,\
+                                      self.in_dic_array[station_label][antenna_label][solution]['t'][eventid],self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid],\
+                                      self.signal_times,self.h_fft,self.sys_fft,self.freqs_response,plot_signals=False,plot_spectrum=False,plot_potential = False,out_dom_freq = True,\
+                                      include_noise = True, resistance = 50, temperature = 320)  #expects ovbservation_angle to be in radians (hence the deg2rad on input)
+                                
+                                    electric_array = V_noise
+                                else:
+                                    V_noiseless, u , dominant_freq = gnosim.interaction.askaryan.quickSignalSingle( numpy.deg2rad(observation_angle),\
+                                      self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],energy_neutrino*inelasticity,index_of_refraction,\
+                                      self.in_dic_array[station_label][antenna_label][solution]['t'][eventid],self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid],\
+                                      self.signal_times,self.h_fft,self.sys_fft,self.freqs_response,plot_signals=False,plot_spectrum=False,plot_potential = False,out_dom_freq = True,\
+                                      include_noise = False, resistance = 50, temperature = 320)  #expects ovbservation_angle to be in radians (hence the deg2rad on input)
+                                    
+                                    electric_array = V_noiseless
+                                
+                                electric_field = max(numpy.abs(electric_array))
                                 E_signals[station_label][antenna_label][solution] = electric_array
                                 u_signals[station_label][antenna_label][solution] = u
+                                if electric_field > plot_threshold:
+                                    plot_threshold_passed = True
                             else:
                                 if electricFieldDomain != 'freq':
                                     print('Electric field domain selection did not fit one of the\ntwo expected values.  Defaulting to freq.')
@@ -171,21 +237,29 @@ class Sim:
                                 electric_field \
                                     = gnosim.interaction.askaryan.electricFieldFrequencyDomainRaw(frequency, d, observation_angle,
                                                                                 energy_neutrino, inelasticity, 
-                                                                                'cc', index_of_refraction) # V m^-1 GHz^-1, dimensionless
+                                                                                'cc', index_of_refraction) # V m^-1 GHz^-1, dimensionless, expects observation_angle to be in degrees
                                 electric_field *= self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid] # COME BACK TO GENERALIZE THIS
-                                electric_array, electric_field, weighted_freq = self.stations[index_station].antennas[index_antenna].totalElectricField(frequency, electric_field, self.in_dic_array[station_label][antenna_label][solution]['theta_ant'][eventid]) # V m^-1 #THIS WAS CHANGED THETA WAS ADDED
+                                electric_array, electric_field, dominant_freq = self.stations[index_station].antennas[index_antenna].totalElectricField(frequency, electric_field, self.in_dic_array[station_label][antenna_label][solution]['theta_ant'][eventid]) # V m^-1 #THIS WAS CHANGED THETA WAS ADDED
                             
-                            temporary_info[ii] = numpy.array([(eventid,index_station,index_antenna,has_solution,solution,self.in_dic_array[station_label][antenna_label][solution]['t'][eventid],self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],self.in_dic_array[station_label][antenna_label][solution]['theta_ant'][eventid],observation_angle,electric_field,weighted_freq,self.in_dic_array[station_label][antenna_label][solution]['a_h'][eventid],self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid])],dtype = self.info_dtype)
+                            temporary_info[ii] = numpy.array([(eventid,index_station,index_antenna,has_solution,solution,self.in_dic_array[station_label][antenna_label][solution]['t'][eventid],self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],self.in_dic_array[station_label][antenna_label][solution]['theta_ant'][eventid],observation_angle,electric_field,dominant_freq,self.in_dic_array[station_label][antenna_label][solution]['a_h'][eventid],self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid])],dtype = self.info_dtype)
                             if electric_field >= electric_field_max:
                                 electric_field_max = electric_field
                                 observation_angle_max = observation_angle
                                 solution_max = ii
                                 solution_type_max = solution
-                                max_eventid = eventid
                                 index_station_max = index_station
                                 index_antenna_max = index_antenna
-                    
-                    if plot == True:
+                                
+                    if electric_field_max >= event_electric_field_max:
+                        event_electric_field_max = electric_field_max
+                        event_electric_field_max = electric_field_max
+                        event_observation_angle_max = observation_angle_max
+                        event_solution_max = solution_max
+                        event_index_station_max = index_station_max
+                        event_index_antenna_max = index_antenna_max
+                        
+                        
+                    if numpy.logical_and(plot_threshold_passed,plot_geometry == True):
                         origin = []
                         for index_antenna in temporary_info[temporary_info['has_solution'] == 1]['antenna']:
                             origin.append([self.stations[index_station].antennas[index_antenna].x,self.stations[index_station].antennas[index_antenna].y,self.stations[index_station].antennas[index_antenna].z])
@@ -194,30 +268,28 @@ class Sim:
                         neutrino_loc = [x_0, y_0, z_0]
                         if len(temporary_info[temporary_info['has_solution'] == 1]) > 0:
                             fig = plotGeometry(origin,neutrino_loc,phi_0,temporary_info[temporary_info['has_solution'] == 1])
-                            if save_fig == True:
-                                try:
-                                    fig.savefig('./%s_antenna%i_all_solutions-event%i.pdf'%(self.outfile.split('/')[-1].replace('.h5',''),index_antenna,eventid),bbox_inches='tight')
-                                    pylab.close(fig)
-                                except:
-                                    print('Failed to save image ./%s_antenna%i_all_solutions-event%i.pdf'%(self.outfile.split('/')[-1].replace('.h5',''),index_antenna,eventid))
-                            else:
-                                print('Attempted to plot, but no signals for this event are present')
+                            try:
+                                fig.savefig('%s%s_antenna%i_all_solutions-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),index_antenna,eventid,plot_filetype_extension),bbox_inches='tight')
+                                pylab.close(fig)
+                            except:
+                                print('Failed to save image %s%s_antenna%i_all_solutions-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),index_antenna,eventid,plot_filetype_extension))
                     #NEED WAY TO HANDLE SCENARIO WHERE NONE!!! ARE A SOLUTION.  PICK UP ON THIS.
-                    dic_max['d'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['d'][max_eventid]
-                    dic_max['r'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['r'][max_eventid]
-                    dic_max['t'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['t'][max_eventid]
-                    dic_max['theta'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['theta'][max_eventid]
-                    dic_max['theta_ant'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['theta_ant'][max_eventid]
-                    dic_max['a_h'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['a_h'][max_eventid]
-                    dic_max['a_v'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['a_v'][max_eventid]
-                    dic_max['z'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['z'][max_eventid]
-                    info[ sum([len(self.stations[s].antennas) for s in range(0,index_station)]) + index_antenna] = temporary_info[numpy.argmax(temporary_info['electric_field'])]
+                    dic_max['d'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['d'][eventid]
+                    dic_max['r'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['r'][eventid]
+                    dic_max['t'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['t'][eventid]
+                    dic_max['theta'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['theta'][eventid]
+                    dic_max['theta_ant'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['theta_ant'][eventid]
+                    dic_max['a_h'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['a_h'][eventid]
+                    dic_max['a_v'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['a_v'][eventid]
+                    dic_max['z'] = self.in_dic_array[station_label][antenna_label][solution_type_max]['z'][eventid]
+                    
+                    info[ sum([len(self.stations[s].antennas) for s in range(0,index_station)]) + index_antenna] = temporary_info[numpy.logical_and(temporary_info['station'] == index_station,temporary_info['antenna'] == index_antenna)]
                 #self.in_flag_array[station_label][antenna_label][solution] #Want a way to include this in info.  I.e. a binary has_solution flag for each antenna for each event
                 else:
                     #This event has no solution for this antenna
                     has_solution = 0
                     info[ sum([len(self.stations[s].antennas) for s in range(0,index_station)]) + index_antenna] = numpy.array([(eventid,index_station,index_antenna,has_solution,'',-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0)],dtype = self.info_dtype)
-            if plot == True:
+            if numpy.logical_and(plot_threshold_passed,plot_geometry == True):
                 origin = []
                 for index_antenna in info[info['has_solution'] == 1]['antenna']:
                     origin.append([self.stations[index_station].antennas[index_antenna].x,self.stations[index_station].antennas[index_antenna].y,self.stations[index_station].antennas[index_antenna].z])
@@ -226,35 +298,34 @@ class Sim:
                 neutrino_loc = [x_0, y_0, z_0]
                 if len(info[info['has_solution'] == 1]) > 0:
                     fig = plotGeometry(origin,neutrino_loc,phi_0,info[info['has_solution'] == 1])
-                    if save_fig == True:
-                        try:
-                            fig.savefig('./%s_all_antennas-event%i.pdf'%(self.outfile.split('/')[-1].replace('.h5',''),eventid),bbox_inches='tight')
-                            pylab.close(fig)
-                        except:
-                            print('Failed to save image ./%s_antenna%i_all_solutions-event%i.pdf'%(self.outfile.split('/')[-1].replace('.h5',''),index_antenna,eventid))
-                    else:
-                        print('Attempted to plot, but no signals for this event are present')        
+                    try:
+                        fig.savefig('%s%s_all_antennas-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
+                        pylab.close(fig)
+                    except:
+                        print('Failed to save image %s%s_antenna%i_all_solutions-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),index_antenna,eventid,plot_filetype_extension))
+        
         p_detect = numpy.any(info['has_solution'])
         
         if electricFieldDomain == 'time':
-            summed_signals = False
             for index_station in range(0, len(self.stations)):
                 station_label = 'station'+str(index_station)
                 for index_antenna in range(0, len(self.stations[index_station].antennas)):
-                    antenna_label = self.config['antennas']['types'][index_antenna]                    
+                    antenna_label = self.config['antennas']['types'][index_antenna]
                     u_in = []
                     E_in = []
                     if summed_signals == False:
                         max_E_in_val = 0
                         max_E_val_solution_type = ''
                     for solution in self.stations[index_station].antennas[index_antenna].lib.solutions:
-                        u_in.append(u_signals[station_label][antenna_label][solution])
-                        E_in.append(E_signals[station_label][antenna_label][solution])
-                        if summed_signals == False:
-                            if self.in_flag_array[station_label][antenna_label][solution][eventid]:
+                        if self.in_flag_array[station_label][antenna_label][solution][eventid]:
+                            u_in.append(u_signals[station_label][antenna_label][solution])
+                            E_in.append(E_signals[station_label][antenna_label][solution])
+                            if summed_signals == False:
                                 if max(numpy.fabs(E_signals[station_label][antenna_label][solution])) >= max_E_in_val:
-                                    max_E_in_val = max(abs(E_signals[station_label][antenna_label][solution]))
+                                    max_E_in_val = max(numpy.abs(E_signals[station_label][antenna_label][solution]))
                                     max_E_val_solution_type = solution
+                    u_in = numpy.array(u_in)
+                    E_in = numpy.array(E_in)
                     #u_in/E_in should be an array of times with dimensions (n_signal , n_timestep )
                     if numpy.size(u_in) != 0:
                         #print(numpy.size(u_in))
@@ -274,46 +345,54 @@ class Sim:
                             u_signals[station_label][antenna_label] = u_signals[station_label][antenna_label][max_E_val_solution_type]
                             E_signals[station_label][antenna_label] = E_signals[station_label][antenna_label][max_E_val_solution_type]
                     else:
-                        u_signals[station_label][antenna_label] = []
-                        E_signals[station_label][antenna_label] = []
-                if plot == True:
+                        u_signals[station_label][antenna_label] = numpy.array([])
+                        E_signals[station_label][antenna_label] = numpy.array([])
+                if numpy.logical_and(plot_threshold_passed,plot_signals == True):
                     #might need to account for when signals are not present in certain detectors
-                    if len(self.stations[index_station].antennas) > 4:
-                        ax = pylab.subplot((len(self.stations[index_station].antennas)+1)//2,2,1)
-                    else:
-                        ax = pylab.subplot(len(self.stations[index_station].antennas),1,1)
-                    pylab.title('Event %i'%(eventid))
+                    fig = pylab.figure(figsize=(16.,11.2)) #my screensize
+                    ax = pylab.subplot(len(self.stations[index_station].antennas),1,1)
+                    
                     u_min = 1e20
                     u_max = -1e20
                     E_min = 1e20
                     E_max = -1e20
                     for index_antenna in range(0, len(self.stations[index_station].antennas)):
+                        antenna_label = self.config['antennas']['types'][index_antenna]
                         if numpy.size(u_signals[station_label][antenna_label]) != 0:
-                            u_min = numpy.min([u_min,min(u_signals[station_label][antenna_label])])
-                            u_max = numpy.max([u_max,max(u_signals[station_label][antenna_label])])
-                            E_min = numpy.min([E_min,min(E_signals[station_label][antenna_label])])
-                            E_max = numpy.max([E_max,max(E_signals[station_label][antenna_label])])
+                            #print(u_signals[station_label][antenna_label])
+                            #print(numpy.shape(u_signals[station_label][antenna_label]))
+                            #print(min(u_signals[station_label][antenna_label]))
+                            #print([u_min,min(u_signals[station_label][antenna_label])])
+                            u_min = min(u_min,min(u_signals[station_label][antenna_label]))
+                            u_max = max(u_max,max(u_signals[station_label][antenna_label]))
+                            E_min = min(E_min,min(E_signals[station_label][antenna_label]))
+                            E_max = max(E_max,max(E_signals[station_label][antenna_label]))
                     if numpy.logical_and(u_min != 1e20, u_max != -1e20) == True:
-                        pylab.xlim(u_min,u_max)
+                        #pylab.xlim(u_min,u_max)
+                        pylab.xlim(min(u_min*0.9,u_min*1.1),max(u_max*0.9,u_max*1.1))
                         pylab.ylim(min(E_min*0.99,E_min*1.01),max(E_max*0.99,E_max*1.01))
                         for index_antenna in range(0, len(self.stations[index_station].antennas)):
+                            antenna_label = self.config['antennas']['types'][index_antenna]
                             pylab.subplot(len(self.stations[index_station].antennas),1,index_antenna+1,sharex=ax,sharey=ax)
-                            pylab.plot(u_signals[station_label][antenna_label],E_signals[station_label][antenna_label],label='s%ia%i'%(index_station,index_antenna),linewidth=0.1)
-                            pylab.ylabel('E$_{%i}$ (V/m)'%(eventid),fontsize=12)
-                            pylab.legend(fontsize=8)
+                            if index_antenna == 0:
+                                boolstring = ['False','True']
+                                pylab.title('Event %i, summed_signals = %s'%(eventid,boolstring[int(summed_signals)])) 
+                            pylab.plot(u_signals[station_label][antenna_label],E_signals[station_label][antenna_label],label='s%ia%i'%(index_station,index_antenna),linewidth=0.5)
+                            if ( len(self.stations[index_station].antennas) // 2 == index_antenna):
+                                pylab.ylabel('V$_{%i}$ (V)'%(eventid),fontsize=12)
+                            pylab.legend(fontsize=8,framealpha=0.0)
                         pylab.xlabel('t-t_emit (ns)',fontsize=12)
                         #pylab.show(block=True)
-                        if save_fig == True:
-                            try:
-                                pylab.savefig('./%s-event%i.pdf'%(self.outfile.split('/')[-1].replace('.h5',''),eventid),bbox_inches='tight')
-                            except:
-                                print('Failed to save image ./%s-event%i.pdf'%(self.outfile,eventid))
-                        else:
-                            print('Attempted to plot, but no signals for this event are present')
+                        try:
+                            pylab.savefig('%s%s-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
+                            pylab.close(fig)
+                        except:
+                            print('Failed to save image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
+                    
             #By this point the signals for each antenna should be selected.  Here is where they could be plotted
             #or where phasing could take place. 
         
-        return p_interact, p_earth, p_detect, inelasticity, electric_field_max, dic_max, observation_angle_max, solution_max, index_station_max, index_antenna_max, info
+        return p_interact, p_earth, p_detect, event_electric_field_max, dic_max, event_observation_angle_max, event_solution_max, event_index_station_max, event_index_antenna_max, info
         #return p_interact, p_earth, p_detect, electric_field_direct, electric_field_crossover, electric_field_reflect,  dic_direct, dic_crossover, dic_reflect
     
     def griddata_Event(self, x_query, y_query , z_query, method = 'cubic'):
@@ -335,6 +414,96 @@ class Sim:
             self.in_dic_array[station_label] = {}
             self.in_flag_array[station_label] = {}
             for index_antenna, antenna_label in enumerate(self.lib.keys()):
+                #I might be able to multithread of multiprocess each antenna through griddata.
+                #They are each checking independant grids/libraries and saving to dictionary seperately
+                
+                #antenna_label = self.lib.keys()[index_antenna]
+                print('Running Events Through Griddata Interpolation for:', antenna_label)
+                x_antenna = self.stations[index_station].antennas[index_antenna].x
+                y_antenna = self.stations[index_station].antennas[index_antenna].y
+                #z_antenna = self.stations[index_station].antennas[index_antenna].z
+                r_query = numpy.sqrt((x_query - x_antenna)**2 + (y_query - y_antenna)**2)
+                
+                if ((type(r_query) != numpy.ndarray) or (type(z_query) != numpy.ndarray)):
+                    if ((type(r_query) != list) or (type(z_query) != list)):
+                        r_query = numpy.array([r_query])
+                        z_query = numpy.array([z_query])
+                    else:
+                        r_query = numpy.array(r_query)
+                        z_query = numpy.array(z_query)
+                
+                self.in_dic_array[station_label][antenna_label] = {}
+                self.in_flag_array[station_label][antenna_label] = {}
+                for solution in self.stations[index_station].antennas[index_antenna].lib.solutions:
+                    print('\tSolution Type:', solution)
+                    self.in_dic_array[station_label][antenna_label][solution] = {}
+
+                    
+
+                    in_bound = numpy.logical_and((z_query >= self.concave_hull[antenna_label][solution]['z_min']),z_query <= self.concave_hull[antenna_label][solution]['z_max'])
+                    r_in_hull = numpy.logical_and((r_query >= self.concave_hull[antenna_label][solution]['f_inner_r_bound'](z_query)),(r_query <= self.concave_hull[antenna_label][solution]['f_outer_r_bound'](z_query)))
+                    has_solution = numpy.logical_and(in_bound,r_in_hull)
+                    
+                    if numpy.all( has_solution == False ):
+                        print('No solutions found for', antenna_label, solution)
+                        self.in_flag_array[station_label][antenna_label][solution] = numpy.array([False]*len(r_query))
+                        for key in self.lib[antenna_label].data[solution].keys():
+                            self.in_dic_array[station_label][antenna_label][solution][key] = []
+                        continue
+
+                    zm_query = numpy.ma.masked_array( z_query, mask = ~has_solution)
+                    rm_query = numpy.ma.masked_array( r_query, mask = ~has_solution)
+                    no_solution_index = numpy.where(~has_solution)
+                    #no_solution_index = numpy.where(simplices_index == -1) #make sure this is as I want.  
+                    self.in_flag_array[station_label][antenna_label][solution] = has_solution
+                    
+                    
+                    events_per_calc = 100000
+                    left_event = 0
+                    
+                    for key in self.lib[antenna_label].data[solution].keys():
+                        self.in_dic_array[station_label][antenna_label][solution][key] = numpy.zeros_like(z_query)
+                    
+                    while left_event < len(z_query):
+                        cut = numpy.arange(left_event,min(left_event+events_per_calc,len(z_query)))
+                        for key in self.lib[antenna_label].data[solution].keys():
+                            self.in_dic_array[station_label][antenna_label][solution][key][cut] = numpy.ma.filled(numpy.ma.masked_array(scipy.interpolate.griddata((self.lib[antenna_label].data[solution]['r'],self.lib[antenna_label].data[solution]['z']),self.lib[antenna_label].data[solution][key],(rm_query[cut], zm_query[cut]),method=method,fill_value=-999.0),mask = ~has_solution[cut],fill_value = -999.0))
+                        print('\t\t%s : %i/%i'%(solution,min(left_event+events_per_calc,len(z_query)),len(z_query)))
+                        left_event += events_per_calc
+                    
+                        #Currently can poduce nan values if griddata thinks it is extrapolating but hull says it is in region 
+                    
+                    
+                    '''
+                    for key in self.lib[antenna_label].data[solution].keys():
+                        self.in_dic_array[station_label][antenna_label][solution][key] = numpy.ma.filled(numpy.ma.masked_array(scipy.interpolate.griddata((self.lib[antenna_label].data[solution]['r'],self.lib[antenna_label].data[solution]['z']),self.lib[antenna_label].data[solution][key],(rm_query, zm_query),method=method,fill_value=-999.0),mask = ~has_solution,fill_value = -999.0))
+                        #Currently can poduce nan values if griddata thinks it is extrapolating but hull says it is in region 
+                    '''
+        print('Finished griddata_Event')
+        #return self.in_dic_array[station_label], self.in_flag_array
+
+    def threaddedGridDataEvent(self, x_query, y_query , z_query, method = 'cubic'):
+        '''
+        This function takes a set of x,y,z coordinates and determines whether each set
+        is within the set of solutions.  First it checks the points against the
+        self.concave_hull bounding functions, and the locates which triangle each
+        point is within referencing the self.delaunay grid created elsewhere.  
+        Using barycentric weighting of the 3 corners of the triangle, an average
+        value is calculated to estimate the coresponding information about the pair.
+        
+        Right now this expects r_query,z_query to be centered coordinates
+        '''
+        
+        self.in_dic_array = {}
+        self.in_flag_array = {}
+        for index_station in range(0, len(self.stations)):
+            station_label = 'station'+str(index_station)
+            self.in_dic_array[station_label] = {}
+            self.in_flag_array[station_label] = {}
+            for index_antenna, antenna_label in enumerate(self.lib.keys()):
+                #I might be able to multithread of multiprocess each antenna through griddata.
+                #They are each checking independant grids/libraries and saving to dictionary seperately
+                
                 #antenna_label = self.lib.keys()[index_antenna]
                 print('Running Events Through Griddata Interpolation for:', antenna_label)
                 x_antenna = self.stations[index_station].antennas[index_antenna].x
@@ -403,11 +572,13 @@ class Sim:
     def throw(self, energy_neutrino=1.e9, 
               theta_0=None, phi_0=None, x_0=None, y_0=None, z_0=None, 
               anti=False, n_events=10000, detector_volume_radius=6000., detector_volume_depth=3000., 
-              outfile=None,seed = None,method = 'cubic',electricFieldDomain = 'freq'):
+              outfile=None,seed = None,method = 'cubic',electricFieldDomain = 'freq',include_noise = False,summed_signals = False,
+              plot_geometry = False, plot_signals = False, plot_threshold = 0,plot_filetype_extension = 'svg',image_path = './'):
         '''
         electricFieldDomain should be either freq or time.  The freq domain uses
         the older electric field calculation, while the 'time' uses the new one.
         '''
+
         self.outfile = outfile
         #seed for testing purposes (if want replicated data)
         if (seed != None):
@@ -466,7 +637,8 @@ class Sim:
         p_interact = numpy.zeros(n_events)
         p_earth = numpy.zeros(n_events)
         p_detect = numpy.zeros(n_events)
-        inelasticity = numpy.zeros(n_events)
+        #inelasticity = numpy.zeros(n_events)
+        inelasticity = gnosim.interaction.inelasticity.inelasticityArray(energy_neutrino, mode='cc') ## GENERALIZE THIS LATER for anti neutrino, etc. 
         electric_field_max = numpy.zeros(n_events)
         observation_angle_max = numpy.zeros(n_events)
         solution_max = numpy.zeros(n_events)
@@ -491,24 +663,22 @@ class Sim:
         print('Succesfully ran griddata_Event:')
         if electricFieldDomain == 'time':
             print('Loading Response Functions')
-            self.h_fft,self.sys_fft,self.freqs_response = gnosim.interaction.askaryan.loadSignalResponse()
-            
+            self.signal_times, self.h_fft,self.sys_fft,self.freqs_response = gnosim.interaction.askaryan.calculateTimes(up_sample_factor = 20)
+            apply_hard_cut = False
+            hard_low = 130e6
+            hard_high = 750e6
+            if apply_hard_cut == True:
+                freqs_cut = numpy.logical_and(self.freqs_response > hard_low, self.freqs_response < hard_high)
+                self.sys_fft = numpy.multiply(self.sys_fft,freqs_cut) #This forces a strong bandwidth cut which makes signals that are dominant in low frequency below the band width not be dominated by the noise in that region over the response.  
         ############################################################################
         #Using interpolated values for further calculations on an event/event basis:
         ############################################################################
         for ii in range(0, n_events):
-            if(ii%(n_events/100) == 0):
+            if(ii%(n_events//100) == 0):
                 print ('Event (%i/%i)'%(ii, n_events)) #might want to comment out these print statements to run faster and spew less
-            if (ii%(n_events/20) == 0):
-                plot = True  
-                #right now this is a quick way to check some events.  In the future 
-                #might want to save triggered events only?  Will need to figure out 
-                #a better trigger method to do that.  For large simulations would 
-                #risk saving crazy amounts of figures.
-            else:
-                plot = False
-            p_interact[ii], p_earth[ii], p_detect[ii], inelasticity[ii], electric_field_max[ii], dic_max, observation_angle_max[ii], solution_max[ii], index_station_max[ii], index_antenna_max[ii], info[(ii * self.n_antenna ):((ii+1) * self.n_antenna )] \
-                = self.event(energy_neutrino[ii], phi_0[ii], theta_0[ii], x_0[ii], y_0[ii], z_0[ii], ii, anti=anti,electricFieldDomain = electricFieldDomain,plot=plot,save_fig=plot)
+
+            p_interact[ii], p_earth[ii], p_detect[ii], electric_field_max[ii], dic_max, observation_angle_max[ii], solution_max[ii], index_station_max[ii], index_antenna_max[ii], info[(ii * self.n_antenna ):((ii+1) * self.n_antenna )] \
+                = self.event(energy_neutrino[ii], phi_0[ii], theta_0[ii], x_0[ii], y_0[ii], z_0[ii], ii,inelasticity[ii], anti=anti,electricFieldDomain = electricFieldDomain,include_noise = include_noise,plot_signals=plot_signals,plot_geometry=plot_geometry,summed_signals = summed_signals,plot_threshold = plot_threshold,plot_filetype_extension=plot_filetype_extension, image_path = image_path)
 
             if p_detect[ii] == 1.:
                 t_max[ii] = dic_max['t']
@@ -593,6 +763,85 @@ class Sim:
 
             file.close()
 
+def makeIndexHTML(path = './',filetype = 'svg'):
+    '''
+    Makes a crude html image browser of the created images.
+    filytpe should not have the .
+    Path should have / at the end
+    '''
+    header = os.path.realpath(path).split('/')[-1]
+    infiles = glob.glob('%s*%s'%(path,filetype))
+    
+    infiles_num = []
+    for infile in infiles:
+        infiles_num.append(int(infile.split('-event')[-1].replace('.' + filetype,'')))
+    infiles = numpy.array(infiles)[numpy.argsort(infiles_num)]
+        
+    #I want to sort by event number here!
+    image_list = ''
+    for infile in infiles:
+        image_list = image_list + '\t<img class="mySlides" src="' + infile.split('/')[-1] + '" style="width:100%">\n'
+    
+    #print(image_list)
+    
+    
+    template = """<!DOCTYPE html>
+    <html>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+    <style>
+    .mySlides {display:none;}
+    </style>
+    <body>
+    
+    <head>
+    <title> RCC KICP | Dan Southall </title>
+    </head>
+    <p><strong> Dan Southall </strong> | <a href="https://kicp.uchicago.edu/people/profile/daniel_southall.html"> KICP Profile </a> | <a href="../../index.html"> Home </a></p>
+    
+    <h2 class="w3-center"><strong> """ + header + """</strong></h2>
+
+    <div class="w3-content w3-display-container"> 
+    """ + image_list + """
+        <button class="w3-button w3-black w3-display-left" onclick="plusDivs(-1)">&#10094;</button>
+        <button class="w3-button w3-black w3-display-right" onclick="plusDivs(1)">&#10095;</button>
+    </div>
+
+    <script>
+    var slideIndex = 1;
+    showDivs(slideIndex);
+
+    function plusDivs(n) {
+      showDivs(slideIndex += n);
+    }
+
+    function showDivs(n) {
+      var i;
+      var x = document.getElementsByClassName("mySlides");
+      if (n > x.length) {slideIndex = 1}    
+      if (n < 1) {slideIndex = x.length}
+      for (i = 0; i < x.length; i++) {
+         x[i].style.display = "none";  
+      }
+      x[slideIndex-1].style.display = "block";  
+    }
+    </script>
+
+    </body>
+    </html>
+    """
+    print(template)
+    outfile_name = path + 'index'
+    if os.path.isfile(outfile_name +'.html'):
+        print('Outfile Name %s is taken, saving in current directory and appending \'_new\' if necessary'%(outfile_name))
+        outfile_name = outfile_name + '_new'
+        while os.path.isfile(outfile_name+'.html'):
+            outfile_name = outfile_name + '_new'
+    outfile = open(outfile_name + '.html','w')
+    outfile.write(template)
+    outfile.close()
+
+
 ############################################################
 
 if __name__ == "__main__":
@@ -607,19 +856,19 @@ if __name__ == "__main__":
     #detector_volume_depth = float(sys.argv[6]) # m, 500 for Ross and Minna, 3000 for subterranean
 
     #SEED FOR TESTNG:
-    seed = None
+    seed = 0#None
     config_file_fix = config_file.replace('/home/dsouthall/Projects/GNOSim/','')
     config_file_fix = config_file_fix.replace('gnosim/sim/ConfigFiles/Config_dsouthall/','')
     config_file_fix = config_file_fix.replace('./','')
     if (seed != None):
-        outfile = '/home/dsouthall/Projects/GNOSim/Output/results_2018_Oct_%s_%.2e_GeV_%i_events_%i_seed_%i.h5'%(config_file_fix.replace('.py', ''),
+        outfile = '/home/dsouthall/Projects/GNOSim/Output/results_2018_Nov_%s_%.2e_GeV_%i_events_%i_seed_%i.h5'%(config_file_fix.replace('.py', ''),
                                                                     energy_neutrino,
                                                                     n_events,
                                                                     seed,
                                                                     index)
         print('!!!Using Seed!!! Seed: ', seed, '\nOutfile Name: \n', outfile)
     else:
-        outfile = '/home/dsouthall/Projects/GNOSim/Output/results_2018_Oct_%s_%.2e_GeV_%i_events_%i.h5'%(config_file_fix.replace('.py', ''),
+        outfile = '/home/dsouthall/Projects/GNOSim/Output/results_2018_Nov_%s_%.2e_GeV_%i_events_%i.h5'%(config_file_fix.replace('.py', ''),
                                                                 energy_neutrino,
                                                                 n_events,
                                                                 index)
@@ -629,15 +878,38 @@ if __name__ == "__main__":
         outfile = './' + outfile.split('/')[-1]
         while os.path.isfile(outfile):
             outfile = outfile.replace('.h5','_new.h5')
-            
-    #f = h5py.File(outfile, 'w')
-   
+    
+    #making image directory
+    image_extension = 'svg'
+    image_path = '/home/dsouthall/public_html/images/' + outfile.replace('.h5','').split('/')[-1] #should end with a / before inputting into throw
+    if os.path.exists(image_path):
+        print('Image Directory Name %s is taken, saving in current directory and appending \'_new\' if necessary'%(image_path))
+        image_path = image_path + '_new'
+        while os.path.exists(image_path):
+            image_path = image_path + '_new'
+    
+    os.makedirs(image_path) 
+    image_path = image_path + '/'
+    print('Images will be saved to ', image_path)
+    
+    
+    #Creating Sim and throwing events
     my_sim = Sim(config_file, solutions=solutions,pre_split = True)
     my_sim.throw(energy_neutrino, n_events=n_events, 
                  detector_volume_radius=my_sim.config['detector_volume']['radius'],
                  detector_volume_depth=my_sim.config['detector_volume']['depth'],
-                 outfile=outfile,seed=seed,electricFieldDomain = 'time')
-
+                 outfile=outfile,seed=seed,electricFieldDomain = 'time',include_noise = True,summed_signals = True, 
+                 plot_geometry = False, plot_signals = True, plot_threshold = 0.5,
+                 plot_filetype_extension = image_extension,image_path = image_path)
+    
+    #current plot_threshold is on the signal amplitude and is not great.  probably want to make this
+    #depend on the SNR of a signal.  However that makes more sense for when noise is present
+    #and no sense if noise is turned off.  
+    print('Trying to create index.html file for new images')
+    try:
+        makeIndexHTML(path = image_path ,filetype = image_extension)
+    except:
+        print('Something went wrong in making index.html')
     #python /home/dsouthall/Projects/GNOSim/sim/antarcticsim.py config energy n_events index 
     #python /home/dsouthall/Projects/GNOSim/gnosim/sim/antarcticsim.py /home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_octo_-200_polar_120_rays.py 1.0e8 50000 1 
     #f.close()
