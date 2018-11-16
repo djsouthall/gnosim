@@ -400,7 +400,6 @@ def addSignals(u_in,V_in,plot=False):
             pylab.legend(fontsize=14)
         return V_out,u_out
 
-@profile
 def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode='v2'):
     '''
     Calculates the times used for signal calculations based on the response functions
@@ -431,8 +430,7 @@ def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode='
     u = numpy.arange(-(n_points_freq-1),(n_points_freq-1))*t_step #To increase time duration of signal I should just need to upsample?
     return u, h_fft, sys_fft, freqs
 
-@profile
-def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential = False,out_dom_freq = False,include_noise = False, resistance = 50, temperature = 320):  
+def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential = False,include_noise = False, resistance = 50, temperature = 320):  
     '''
     This should do the entire calculation, mostly in the frequency domain. 
     Expects u, h_fft, sys_fft, freqs to all come straight from calculateTimes.
@@ -558,6 +556,7 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,u, h_fft
         SNR_dB = 10*numpy.log10( SNR )#dB, using 10log10 because input is power ratio 
         print('SNR', SNR)
     else:
+        SNR = 0
         print('No noise included.  Cannot perform SNR calculation.')
 
     if plot_signals==True:
@@ -885,7 +884,7 @@ if __name__ == "__main__":
     cherenkov_angle = numpy.arccos(1./n)
     cherenkov_angle_deg = numpy.rad2deg(numpy.arccos(1./n))
     h_fft,sys_fft,freqs = loadSignalResponse()
-    input_u, h_fft, sys_fft, freqs = calculateTimes(up_sample_factor=20)
+    input_u, h_fft, sys_fft, freqs = calculateTimes(up_sample_factor=0)
     #########################################
 
     #inelasticity = gnosim.interaction.inelasticity.inelasticity(energy_neutrino, mode='cc')
@@ -901,10 +900,11 @@ if __name__ == "__main__":
     
     #Testing making a table for an event
     from gnosim.trace.refraction_library_beta import *
-    reader = h5py.File('./Output/results_2018_Oct_config_octo_-200_polar_120_rays_1.00e+09_GeV_10000_events_1.h5' , 'r')
+    reader = h5py.File('./Output/results_2018_Nov_config_octo_-200_polar_120_rays_3.00e+09_GeV_10021_events_0_seed_2.h5' , 'r')
     info = reader['info'][...]
+    
     #'''
-    for eventid in [0,102,7848,7969]:
+    for eventid in [122]:
         #Note noise is kind of jank and will always be the same
         df = signalsFromInfo(eventid,reader,input_u,h_fft,sys_fft,freqs,include_noise = True,resistance = 50, temperature = 320)
         sub_info = info[info['eventid'] == eventid]
