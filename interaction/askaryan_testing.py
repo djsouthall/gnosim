@@ -277,7 +277,7 @@ def electricFieldTimeDomainRaw(theta_obs_rad,R,Energy_GeV,n,u,plot = False,deriv
             pylab.plot(u,R*E,label = '$R|\\vec{E}_{raw}|$ ')
     return  E , u
 
-def electricFieldTimeDomainSignal(theta_obs_rad,R,Energy_GeV,n,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = False,return_pos = False,mode='v2',up_sample_factor=10,deriv_mode = 'time'):  
+def electricFieldTimeDomainSignal(theta_obs_rad,R,Energy_GeV,n,h_fft=None,sys_fft=None,freqs=None,plot=False,return_pos = False,mode='v2',up_sample_factor=10,deriv_mode = 'time'):  
     '''
     Calculates the full electric field, including response function calculations.
     '''
@@ -339,11 +339,9 @@ def electricFieldTimeDomainSignal(theta_obs_rad,R,Energy_GeV,n,h_fft=None,sys_ff
     if return_pos == True:
         V = V[u>=0]
         u = u[u>=0]
-    if out_dom_freq == True:
-        dominant_freq = f[numpy.argmax(numpy.absolute(V_fft))]
-        return V, u, dominant_freq
-    else:
-        return V, u
+    dominant_freq = f[numpy.argmax(numpy.absolute(V_fft))]
+    return V, u, dominant_freq
+
 
 def addSignals(u_in,V_in,plot=False):
     '''
@@ -729,10 +727,10 @@ def signalsFromInfo(eventid,reader,u_signal,h_fft,sys_fft,freqs,include_noise = 
         
         for index in range(len(Rs)):
             if include_noise == True:
-                _Vi, ui, fi,Vi,SNRi = quickSignalSingle(numpy.deg2rad(thetas[index]),Rs[index],inelasticity*energy_neutrino,n,t_offset[index],av[index],u_signal, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential = False,include_noise = include_noise,out_dom_freq = True,resistance = resistance, temperature = temperature)  
+                _Vi, ui, fi,Vi,SNRi = quickSignalSingle(numpy.deg2rad(thetas[index]),Rs[index],inelasticity*energy_neutrino,n,t_offset[index],av[index],u_signal, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential = False,include_noise = include_noise,resistance = resistance, temperature = temperature)  
                 #in this case I would want Vi to be the noisy signal, not _Vi which is the clean signal.
             else:
-                Vi, ui, fi = quickSignalSingle(numpy.deg2rad(thetas[index]),Rs[index],inelasticity*energy_neutrino,n,t_offset[index],av[index],u_signal, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential = False,out_dom_freq = True,include_noise = include_noise,resistance = resistance, temperature = temperature)   
+                Vi, ui, fi = quickSignalSingle(numpy.deg2rad(thetas[index]),Rs[index],inelasticity*energy_neutrino,n,t_offset[index],av[index],u_signal, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential = False,include_noise = include_noise,resistance = resistance, temperature = temperature)   
             
             if index == 0:
                 V = Vi
@@ -900,7 +898,7 @@ if __name__ == "__main__":
     
     #Testing making a table for an event
     from gnosim.trace.refraction_library_beta import *
-    reader = h5py.File('./Output/results_2018_Nov_config_octo_-200_polar_120_rays_3.00e+09_GeV_10021_events_0_seed_2.h5' , 'r')
+    reader = h5py.File('./Output/results_2018_Nov_config_duo_-200_polar_120_rays_3.00e+09_GeV_1000_events_1_seed_1.h5' , 'r')
     info = reader['info'][...]
     
     #'''

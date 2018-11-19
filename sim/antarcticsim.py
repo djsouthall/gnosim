@@ -18,6 +18,9 @@ import scipy.signal
 import math
 from matplotlib import gridspec
 import pandas
+import time
+from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import cpu_count
 
 sys.path.append("/home/dsouthall/Projects/GNOSim/")
 import gnosim.utils.quat
@@ -516,7 +519,7 @@ class Sim:
         
         Right now this expects r_query,z_query to be centered coordinates
         '''
-        
+        griddata_initate_time = time.time()
         self.in_dic_array = {}
         self.in_flag_array = {}
         for index_station in range(0, len(self.stations)):
@@ -589,10 +592,77 @@ class Sim:
                         self.in_dic_array[station_label][antenna_label][solution][key] = numpy.ma.filled(numpy.ma.masked_array(scipy.interpolate.griddata((self.lib[antenna_label].data[solution]['r'],self.lib[antenna_label].data[solution]['z']),self.lib[antenna_label].data[solution][key],(rm_query, zm_query),method=method,fill_value=-999.0),mask = ~has_solution,fill_value = -999.0))
                         #Currently can poduce nan values if griddata thinks it is extrapolating but hull says it is in region 
                     '''
-        print('Finished griddata_Event')
+        print('Finished griddata_Event in ', time.time() - griddata_initate_time, 's')
         #return self.in_dic_array[station_label], self.in_flag_array
+    
+    def singleAntennaGridDataEvent(self, r_query , z_query, index_station, station_label, index_antenna, antenna_label, method = 'cubic'):
+            '''
+            This function takes a set of x,y,z coordinates and determines whether each set
+            is within the set of solutions.  First it checks the points against the
+            self.concave_hull bounding functions, and the locates which triangle each
+            point is within referencing the self.delaunay grid created elsewhere.  
+            Using barycentric weighting of the 3 corners of the triangle, an average
+            value is calculated to estimate the coresponding information about the pair.
+            
+            Right now this expects r_query,z_query to be centered coordinates
+            
+            This will do what griddata_Event does but for a single antenna at time. 
+            This is intended to be used during multiprocessing. 
+            '''
+            print('Running Events Through Griddata Interpolation for:', antenna_label)
+            if ((type(r_query) != numpy.ndarray) or (type(z_query) != numpy.ndarray)):
+                if ((type(r_query) != list) or (type(z_query) != list)):
+                    r_query = numpy.array([r_query])
+                    z_query = numpy.array([z_query])
+                else:
+                    r_query = numpy.array(r_query)
+                    z_query = numpy.array(z_query)
 
-    def threaddedGridDataEvent(self, x_query, y_query , z_query, method = 'cubic'):
+            out_dic_array = {}
+            out_flag_array = {}
+            #self.in_dic_array[station_label][antenna_label] = {}
+            #self.in_flag_array[station_label][antenna_label] = {}
+            #for solution in self.stations[index_station].antennas[index_antenna].lib.solutions:
+            for solution in self.stations[index_station].antennas[index_antenna].lib.solutions:
+                #print('\tSolution Type:', solution)
+                out_dic_array[solution] = {}
+                out_flag_array[solution] = {}
+                
+
+                in_bound = numpy.logical_and((z_query >= self.concave_hull[antenna_label][solution]['z_min']),z_query <= self.concave_hull[antenna_label][solution]['z_max'])
+                r_in_hull = numpy.logical_and((r_query >= self.concave_hull[antenna_label][solution]['f_inner_r_bound'](z_query)),(r_query <= self.concave_hull[antenna_label][solution]['f_outer_r_bound'](z_query)))
+                has_solution = numpy.logical_and(in_bound,r_in_hull)
+                
+                if numpy.all( has_solution == False ):
+                    print('No solutions found for', antenna_label, solution)
+                    out_flag_array[solution] = numpy.array([False]*len(r_query))
+                    for key in self.lib[antenna_label].data[solution].keys():
+                        out_dic_array[solution][key] = []
+                    continue
+
+                zm_query = numpy.ma.masked_array( z_query, mask = ~has_solution)
+                rm_query = numpy.ma.masked_array( r_query, mask = ~has_solution)
+                no_solution_index = numpy.where(~has_solution)
+                #no_solution_index = numpy.where(simplices_index == -1) #make sure this is as I want.  
+                out_flag_array[solution] = has_solution
+                
+                
+                events_per_calc = 100000
+                left_event = 0
+                
+                for key in self.lib[antenna_label].data[solution].keys():
+                    out_dic_array[solution][key] = numpy.zeros_like(z_query)
+                
+                while left_event < len(z_query):
+                    cut = numpy.arange(left_event,min(left_event+events_per_calc,len(z_query)))
+                    for key in self.lib[antenna_label].data[solution].keys():
+                        out_dic_array[solution][key][cut] = numpy.ma.filled(numpy.ma.masked_array(scipy.interpolate.griddata((self.lib[antenna_label].data[solution]['r'],self.lib[antenna_label].data[solution]['z']),self.lib[antenna_label].data[solution][key],(rm_query[cut], zm_query[cut]),method=method,fill_value=-999.0),mask = ~has_solution[cut],fill_value = -999.0))
+                    print('\t\t%s : %i/%i'%(solution,min(left_event+events_per_calc,len(z_query)),len(z_query)))
+                    left_event += events_per_calc
+            print('Done Interpolation for:', antenna_label)
+            return out_dic_array, out_flag_array
+    
+    def multiThreadGridDataEvent(self, x_query, y_query , z_query, method = 'cubic',n_cores = 4):
         '''
         This function takes a set of x,y,z coordinates and determines whether each set
         is within the set of solutions.  First it checks the points against the
@@ -603,7 +673,26 @@ class Sim:
         
         Right now this expects r_query,z_query to be centered coordinates
         '''
+        griddata_initate_time = time.time()
+        from concurrent.futures import ThreadPoolExecutor
         
+        #initiate threads
+        print('Submitting threads')
+        thread_results = {}
+        with ThreadPoolExecutor(max_workers = n_cores) as executor:
+            for index_station in range(0, len(self.stations)):
+                station_label = 'station'+str(index_station)
+                thread_results[station_label] = {}
+                #self.in_dic_array[station_label] = {}
+                #self.in_flag_array[station_label] = {}
+                for index_antenna, antenna_label in enumerate(self.lib.keys()):
+                    x_antenna = self.stations[index_station].antennas[index_antenna].x
+                    y_antenna = self.stations[index_station].antennas[index_antenna].y
+                    r_query = numpy.sqrt((x_query - x_antenna)**2 + (y_query - y_antenna)**2)
+                    #_singleAntennaGridDataEvent(self, r_query , z_query, index_antenna, antenna_label, method = 'cubic')
+                    thread_results[station_label][antenna_label] = executor.submit(self.singleAntennaGridDataEvent, r_query , z_query, index_station, station_label, index_antenna, antenna_label, method = 'cubic')
+        print('Weaving threads')
+        #write outputs of threads
         self.in_dic_array = {}
         self.in_flag_array = {}
         for index_station in range(0, len(self.stations)):
@@ -611,79 +700,15 @@ class Sim:
             self.in_dic_array[station_label] = {}
             self.in_flag_array[station_label] = {}
             for index_antenna, antenna_label in enumerate(self.lib.keys()):
-                #I might be able to multithread of multiprocess each antenna through griddata.
-                #They are each checking independant grids/libraries and saving to dictionary seperately
-                
-                #antenna_label = self.lib.keys()[index_antenna]
-                print('Running Events Through Griddata Interpolation for:', antenna_label)
-                x_antenna = self.stations[index_station].antennas[index_antenna].x
-                y_antenna = self.stations[index_station].antennas[index_antenna].y
-                #z_antenna = self.stations[index_station].antennas[index_antenna].z
-                r_query = numpy.sqrt((x_query - x_antenna)**2 + (y_query - y_antenna)**2)
-                
-                if ((type(r_query) != numpy.ndarray) or (type(z_query) != numpy.ndarray)):
-                    if ((type(r_query) != list) or (type(z_query) != list)):
-                        r_query = numpy.array([r_query])
-                        z_query = numpy.array([z_query])
-                    else:
-                        r_query = numpy.array(r_query)
-                        z_query = numpy.array(z_query)
-                
-                self.in_dic_array[station_label][antenna_label] = {}
-                self.in_flag_array[station_label][antenna_label] = {}
-                for solution in self.stations[index_station].antennas[index_antenna].lib.solutions:
-                    print('\tSolution Type:', solution)
-                    self.in_dic_array[station_label][antenna_label][solution] = {}
-
-                    
-
-                    in_bound = numpy.logical_and((z_query >= self.concave_hull[antenna_label][solution]['z_min']),z_query <= self.concave_hull[antenna_label][solution]['z_max'])
-                    r_in_hull = numpy.logical_and((r_query >= self.concave_hull[antenna_label][solution]['f_inner_r_bound'](z_query)),(r_query <= self.concave_hull[antenna_label][solution]['f_outer_r_bound'](z_query)))
-                    has_solution = numpy.logical_and(in_bound,r_in_hull)
-                    
-                    if numpy.all( has_solution == False ):
-                        print('No solutions found for', antenna_label, solution)
-                        self.in_flag_array[station_label][antenna_label][solution] = numpy.array([False]*len(r_query))
-                        for key in self.lib[antenna_label].data[solution].keys():
-                            self.in_dic_array[station_label][antenna_label][solution][key] = []
-                        continue
-
-                    zm_query = numpy.ma.masked_array( z_query, mask = ~has_solution)
-                    rm_query = numpy.ma.masked_array( r_query, mask = ~has_solution)
-                    no_solution_index = numpy.where(~has_solution)
-                    #no_solution_index = numpy.where(simplices_index == -1) #make sure this is as I want.  
-                    self.in_flag_array[station_label][antenna_label][solution] = has_solution
-                    
-                    
-                    events_per_calc = 100000
-                    left_event = 0
-                    
-                    for key in self.lib[antenna_label].data[solution].keys():
-                        self.in_dic_array[station_label][antenna_label][solution][key] = numpy.zeros_like(z_query)
-                    
-                    while left_event < len(z_query):
-                        cut = numpy.arange(left_event,min(left_event+events_per_calc,len(z_query)))
-                        for key in self.lib[antenna_label].data[solution].keys():
-                            self.in_dic_array[station_label][antenna_label][solution][key][cut] = numpy.ma.filled(numpy.ma.masked_array(scipy.interpolate.griddata((self.lib[antenna_label].data[solution]['r'],self.lib[antenna_label].data[solution]['z']),self.lib[antenna_label].data[solution][key],(rm_query[cut], zm_query[cut]),method=method,fill_value=-999.0),mask = ~has_solution[cut],fill_value = -999.0))
-                        print('\t\t%s : %i/%i'%(solution,min(left_event+events_per_calc,len(z_query)),len(z_query)))
-                        left_event += events_per_calc
-                    
-                        #Currently can poduce nan values if griddata thinks it is extrapolating but hull says it is in region 
-                    
-                    
-                    '''
-                    for key in self.lib[antenna_label].data[solution].keys():
-                        self.in_dic_array[station_label][antenna_label][solution][key] = numpy.ma.filled(numpy.ma.masked_array(scipy.interpolate.griddata((self.lib[antenna_label].data[solution]['r'],self.lib[antenna_label].data[solution]['z']),self.lib[antenna_label].data[solution][key],(rm_query, zm_query),method=method,fill_value=-999.0),mask = ~has_solution,fill_value = -999.0))
-                        #Currently can poduce nan values if griddata thinks it is extrapolating but hull says it is in region 
-                    '''
-        print('Finished griddata_Event')
-        #return self.in_dic_array[station_label], self.in_flag_array
+                self.in_dic_array[station_label][antenna_label] , self.in_flag_array[station_label][antenna_label]  = thread_results[station_label][antenna_label] .result()
+            
+        print('Finished griddata_Event in ', time.time() - griddata_initate_time, 's')
 
     def throw(self, energy_neutrino=1.e9, 
               theta_0=None, phi_0=None, x_0=None, y_0=None, z_0=None, 
               anti=False, n_events=10000, detector_volume_radius=6000., detector_volume_depth=3000., 
               outfile=None,seed = None,method = 'cubic',electricFieldDomain = 'freq',include_noise = False,summed_signals = False,
-              plot_geometry = False, plot_signals = False, plot_threshold = 0,plot_filetype_extension = 'svg',image_path = './'):
+              plot_geometry = False, plot_signals = False, plot_threshold = 0,plot_filetype_extension = 'svg',image_path = './',use_threading = False):
         '''
         electricFieldDomain should be either freq or time.  The freq domain uses
         the older electric field calculation, while the 'time' uses the new one.
@@ -769,7 +794,11 @@ class Sim:
         ############################################################################
         
         #If memory becomes an issue this might need to be adapted to run for chunks of events 
-        self.griddata_Event(x_0, y_0, z_0, method = method)   
+        if use_threading == True:
+            n_cores = cpu_count()
+            self.multiThreadGridDataEvent(x_0, y_0, z_0, method = method,n_cores = n_cores)
+        else:
+            self.griddata_Event(x_0, y_0, z_0, method = method)   
         print('Succesfully ran griddata_Event:')
         if electricFieldDomain == 'time':
             print('Loading Response Functions')
@@ -784,9 +813,11 @@ class Sim:
         #Using interpolated values for further calculations on an event/event basis:
         ############################################################################
         for ii in range(0, n_events):
-            if(ii%(n_events//100) == 0):
-                print ('Event (%i/%i)'%(ii, n_events)) #might want to comment out these print statements to run faster and spew less
-
+            if (n_events//100 != 0):
+                if(ii%(n_events//100) == 0):
+                    print ('Event (%i/%i)'%(ii, n_events)) #might want to comment out these print statements to run faster and spew less
+            else:
+                print ('Event (%i/%i)'%(ii, n_events))
             p_interact[ii], p_earth[ii], p_detect[ii], electric_field_max[ii], dic_max, observation_angle_max[ii], solution_max[ii], index_station_max[ii], index_antenna_max[ii], info[(ii * self.n_antenna ):((ii+1) * self.n_antenna )] \
                 = self.event(energy_neutrino[ii], phi_0[ii], theta_0[ii], x_0[ii], y_0[ii], z_0[ii], ii,inelasticity[ii], anti=anti,electricFieldDomain = electricFieldDomain,include_noise = include_noise,plot_signals=plot_signals,plot_geometry=plot_geometry,summed_signals = summed_signals,plot_threshold = plot_threshold,plot_filetype_extension=plot_filetype_extension, image_path = image_path)
 
@@ -980,11 +1011,12 @@ if __name__ == "__main__":
     index = int(sys.argv[4])
     #solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2'])
     solutions = numpy.array(['direct', 'cross', 'reflect'])
+    #solutions = numpy.array(['cross'])
     #detector_volume_radius = float(sys.argv[5]) # m, 1200 for Ross surface, 51000 for Minna bluff, >6000 for subterranean
     #detector_volume_depth = float(sys.argv[6]) # m, 500 for Ross and Minna, 3000 for subterranean
 
     #SEED FOR TESTNG:
-    seed = None
+    seed = 1#None
     config_file_fix = config_file.replace('/home/dsouthall/Projects/GNOSim/','')
     config_file_fix = config_file_fix.replace('gnosim/sim/ConfigFiles/Config_dsouthall/','')
     config_file_fix = config_file_fix.replace('./','')
@@ -994,7 +1026,7 @@ if __name__ == "__main__":
                                                                     n_events,
                                                                     seed,
                                                                     index)
-        print('!!!Using Seed!!! Seed: ', seed, '\nOutfile Name: \n', outfile)
+        print('\n\n!!!Using Seed!!! \n\n Seed: ', seed, '\nOutfile Name: \n', outfile)
     else:
         outfile = '/home/dsouthall/Projects/GNOSim/Output/results_2018_Nov_%s_%.2e_GeV_%i_events_%i.h5'%(config_file_fix.replace('.py', ''),
                                                                 energy_neutrino,
@@ -1027,8 +1059,8 @@ if __name__ == "__main__":
                  detector_volume_radius=my_sim.config['detector_volume']['radius'],
                  detector_volume_depth=my_sim.config['detector_volume']['depth'],
                  outfile=outfile,seed=seed,electricFieldDomain = 'time',include_noise = True,summed_signals = True, 
-                 plot_geometry = False, plot_signals = True, plot_threshold = 0.5,
-                 plot_filetype_extension = image_extension,image_path = image_path)
+                 plot_geometry = True, plot_signals = True, plot_threshold = 0.5,
+                 plot_filetype_extension = image_extension,image_path = image_path,use_threading = True)
     
     #current plot_threshold is on the signal amplitude and is not great.  probably want to make this
     #depend on the SNR of a signal.  However that makes more sense for when noise is present
