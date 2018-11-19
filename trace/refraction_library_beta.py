@@ -825,47 +825,6 @@ class RefractionLibrary:
         """
         return dic_direct, dic_cross
 
-    
-    def plot(self, field, solution, cmap='summer'):
-        """
-        field (t, d, theta, theta_ant, a_v, a_h)
-        mode (direct, crossover, reflect)
-        """
-
-        colorbar_dict = {'t': 'Time (ns)',
-                         'd': 'Distance (m)',
-                         'theta': 'Zenith Angle (deg)',
-                         'theta_ant': 'Zenith Angle at Antenna (deg)',
-                         'a_v': 'VPOL Attenuation (dB)',
-                         'a_h': 'HPOL Attenuation (dB)'}
-
-        title = solution
-        #dic = self.data[solution]
-        #dic['a_v'] = gnosim.utils.rf.decibel(dic['a_v'])
-        #dic['a_h'] = gnosim.utils.rf.decibel(dic['a_h'])
-        
-        pylab.figure()
-        if field in ['a_v', 'a_h']:
-            pylab.scatter(self.data[solution]['r'], self.data[solution]['z'], c=gnosim.utils.rf.decibel(self.data[solution][field]), 
-                          edgecolors='none', cmap=cmap) # cmap='autumn'
-        else:
-            pylab.scatter(self.data[solution]['r'], self.data[solution]['z'], c=self.data[solution][field],
-                          edgecolors='none', cmap=cmap) # cmap='autumn'
-        colorbar = pylab.colorbar()
-        colorbar.set_label(colorbar_dict[field])
-
-        r_interp = numpy.arange(numpy.min(self.data[solution]['r']), numpy.max(self.data[solution]['r']), 0.1)
-        pylab.plot(r_interp, self.envelope[solution]['low'](r_interp), color='black', linestyle='--')
-        pylab.plot(r_interp, self.envelope[solution]['high'](r_interp), color='black', linestyle='--')
-        
-        #pylab.plot(hull_r, hull_z, )
-        #pylab.gca().add_patch(pylab.Polygon(zip(hull_r, hull_z), closed=True, fill=False, linestyle='dashed', color='black'))
-
-        #pylab.scatter(self.r_intersect, self.z_intersect, c='red')
-
-        pylab.title(title)
-        pylab.xlabel('Radius (m)')
-        pylab.ylabel('Elevation (m)')
 
     def plotRays(self, s=10):
         r = []
