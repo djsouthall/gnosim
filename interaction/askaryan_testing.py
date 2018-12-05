@@ -16,6 +16,7 @@ import os.path
 import glob
 import scipy
 import scipy.signal
+import scipy.misc
 import time
 import math
 sys.path.append("/home/dsouthall/Projects/GNOSim/")
@@ -428,7 +429,7 @@ def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode='
     u = numpy.arange(-(n_points_freq-1),(n_points_freq-1))*t_step #To increase time duration of signal I should just need to upsample?
     return u, h_fft, sys_fft, freqs
 
-def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential = False,include_noise = False, resistance = 50, temperature = 320):  
+def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pattern_factor,u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential = False,include_noise = False, resistance = 50, temperature = 320):  
     '''
     This should do the entire calculation, mostly in the frequency domain. 
     Expects u, h_fft, sys_fft, freqs to all come straight from calculateTimes.
@@ -507,6 +508,9 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,u, h_fft
             #pylab.xlim(-10,50)
     #calculating E_raw_fft    
     E_raw_fft = -1j*2*numpy.pi*numpy.multiply(A_fft , freqs) #negitive sign because E = -dA/dt
+    
+    #Accouning for beam pattern
+    E_raw_fft *= beam_pattern_factor
     
     #Accounting for attenuation
     E_raw_fft *= attenuation #Want to do before noise is added.  Noise is not attenuated by 
@@ -633,7 +637,45 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,u, h_fft
         dominant_freq = freqs[numpy.argmax(numpy.absolute(V_fft_noiseless))]
         return V_noiseless, u + t_offset, dominant_freq
 
- 
+
+@profile
+def digitizeSignal(u,V,sampling_rate,bytes,scale_noise_from,scale_noise_to, dc_offset = 0, random_time_offset = 0, plot = False):
+    '''
+    This function is meant to act as the ADC for the simulation.  It will sample
+    the signal using the provided sampling rate.  The value of
+    bytes sets the number of voltage bins, those will be distributed from 
+    -2**(bytes-1)+1 to 2**(bytes-1).  The input V will be sampled and scaled linearly
+    using a linear scaling with V_new = (scale_noise_to/scale_noise_from) * V_sampled
+    And then V_sampled is scaled to be one of the byte values using a floor.  Everything
+    outside of the max will be rounded.  
+    '''
+    V = V + dc_offset
+    sampling_period = 1.0 / sampling_rate #ns
+    sample_times = numpy.arange(u[1],u[-1],sampling_period) + random_time_offset
+    sample_times = sample_times[numpy.logical_and(sample_times <= u[-1],sample_times >= u[1])] #otherwise interpolation error for out of bounds. 
+    V_sampled = scipy.interpolate.interp1d(u,V)(sample_times)
+    
+    #byte_vals = numpy.linspace(-2**(bytes-1)+1,2**(bytes-1),2**bytes,dtype=int)
+    byte_vals = numpy.array([-2**(bytes-1)+1,2**(bytes-1)],dtype=int) #only really need endpoints
+    slope = scale_noise_to/scale_noise_from
+    f = scipy.interpolate.interp1d(byte_vals/slope,byte_vals,bounds_error = False,fill_value = (byte_vals[0],byte_vals[-1]) )
+    V_bit = numpy.floor(f(V_sampled)) #not sure if round or floor should be used to best approximate the actual process.
+    
+    if plot == True:
+        pylab.figure()
+        ax = pylab.subplot(2,1,1)
+        pylab.ylabel('V (V)')
+        pylab.xlabel('t (ns)')
+        pylab.scatter(u,V,label='Signal')
+        pylab.stem(sample_times,V_sampled,bottom = dc_offset, linefmt='r-', markerfmt='rs', basefmt='r-',label='Interp Sampled at %0.2f GSPS'%sampling_rate)
+        
+        ax = pylab.subplot(2,1,2,sharex=ax)
+        pylab.ylabel('Voltage (Scaled so VRMS = 3)')
+        pylab.xlabel('t (ns)')
+        pylab.plot(u,V*slope)
+        pylab.stem(sample_times,V_bit,bottom = dc_offset*slope, linefmt='r-', markerfmt='rs', basefmt='r-',label='Interp Sampled at %0.2f GSPS'%sampling_rate)
+    return V_bit, sample_times
+
 '''
 def signalsFromInfo(eventid,reader,h_fft=None,sys_fft=None,freqs=None,mode='v2'):
     if any([numpy.size(h_fft) ==1,numpy.size(sys_fft)==1,numpy.size(freqs)==1]):
@@ -725,12 +767,18 @@ def signalsFromInfo(eventid,reader,u_signal,h_fft,sys_fft,freqs,include_noise = 
         u = []
         f = []
         
+        #if case to handle if info has dtype label of beam_pattern_factor
+        
+        if numpy.isin('beam_pattern_factor',numpy.array(event_info.dtype.names)) == True:
+            beam_pattern_factor = event_info['beam_pattern_factor']
+        else:
+            beam_pattern_factor = 1.0
         for index in range(len(Rs)):
             if include_noise == True:
-                _Vi, ui, fi,Vi,SNRi = quickSignalSingle(numpy.deg2rad(thetas[index]),Rs[index],inelasticity*energy_neutrino,n,t_offset[index],av[index],u_signal, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential = False,include_noise = include_noise,resistance = resistance, temperature = temperature)  
+                _Vi, ui, fi,Vi,SNRi = quickSignalSingle(numpy.deg2rad(thetas[index]),Rs[index],inelasticity*energy_neutrino,n,t_offset[index],av[index],beam_pattern_factor[index],u_signal, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential = False,include_noise = include_noise,resistance = resistance, temperature = temperature)  
                 #in this case I would want Vi to be the noisy signal, not _Vi which is the clean signal.
             else:
-                Vi, ui, fi = quickSignalSingle(numpy.deg2rad(thetas[index]),Rs[index],inelasticity*energy_neutrino,n,t_offset[index],av[index],u_signal, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential = False,include_noise = include_noise,resistance = resistance, temperature = temperature)   
+                Vi, ui, fi = quickSignalSingle(numpy.deg2rad(thetas[index]),Rs[index],inelasticity*energy_neutrino,n,t_offset[index],av[index],beam_pattern_factor,u_signal, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential = False,include_noise = include_noise,resistance = resistance, temperature = temperature)   
             
             if index == 0:
                 V = Vi
@@ -875,6 +923,10 @@ def signalsFromInfo(eventid,reader,u_signal,h_fft,sys_fft,freqs,include_noise = 
 ############################################################
 
 if __name__ == "__main__":
+    old_testing = False
+    interp_testing = False
+    new_testing = True
+    
     pylab.close('all')
     energy_neutrino = 3.e9 # GeV
     n = 1.78
@@ -882,69 +934,106 @@ if __name__ == "__main__":
     cherenkov_angle = numpy.arccos(1./n)
     cherenkov_angle_deg = numpy.rad2deg(numpy.arccos(1./n))
     h_fft,sys_fft,freqs = loadSignalResponse()
-    input_u, h_fft, sys_fft, freqs = calculateTimes(up_sample_factor=0)
-    #########################################
+    input_u, h_fft, sys_fft, freqs = calculateTimes(up_sample_factor=20)
+    
+    if new_testing == True:
+        inelasticity = 0.2#gnosim.interaction.inelasticity.inelasticity(energy_neutrino, mode='cc')
+        #Testing the digitizations of the signal.  
+        V_noiseless, u, dominant_freq, V_noise,  SNR = quickSignalSingle(numpy.deg2rad(50),R,inelasticity*energy_neutrino,n,2500,0.7,0.7,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)
+        noise_rms = numpy.std(quickSignalSingle(0,R,inelasticity*energy_neutrino,n,2500,0,0,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)[3])
+        sampling_rate = 1.5 #GHz
+        bytes = 7
+        scale_noise_from = noise_rms
+        scale_noise_to = 3
+        
+        random_time_offset = numpy.random.uniform(-5.0,5.0) #ns
+        dc_offset = 0.5 #V
+        V_bit, sampled_times = digitizeSignal(u,V_noise,sampling_rate,bytes,scale_noise_from,scale_noise_to, random_time_offset = random_time_offset, dc_offset = dc_offset, plot = True)
+        
+        
+    if interp_testing ==True:
+    
+        inelasticity = 0.2#gnosim.interaction.inelasticity.inelasticity(energy_neutrino, mode='cc')
+        #Testing the digitizations of the signal.  
+        V_noiseless, u, dominant_freq, V_noise,  SNR = quickSignalSingle(numpy.deg2rad(50),R,inelasticity*energy_neutrino,n,2500,0.5,0.5,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)
+        
+        
+        
+        sampling_rate = 1.5 #GHz
+        sampling_period = 1.0 / sampling_rate #ns
+        #sample_number = u / sampling_period
+        sample_times = numpy.arange(u[1],u[-1],sampling_period)
 
-    #inelasticity = gnosim.interaction.inelasticity.inelasticity(energy_neutrino, mode='cc')
-    #reader1 = h5py.File('./Output/results_2018_Nov_config_octo_-200_polar_120_rays_3.00e+09_GeV_20000_events_0_seed_1.h5' , 'r')
-    #info1 = reader1['info'][...]
-    #print(info1[info1['eventid'] == 1339])
-    #reader2 = h5py.File('./Output/results_2018_Nov_config_octo_-200_polar_120_rays_3.00e+09_GeV_20000_events_0_seed_2.h5' , 'r')
-    #info2 = reader2['info'][...]
-    #print(info2[info2['eventid'] == 1339])
-    #V1, u1, f1 = quickSignalSingle(numpy.deg2rad(55.8),R,energy_neutrino,n,1500,0.2,h_fft=h_fft,sys_fft=sys_fft,freqs=freqs,plot=True,out_dom_freq = True,mode='v2',up_sample_factor=20,include_noise = True)
-    #V1, u1, f1 = quickSignalSingle(numpy.deg2rad(50),R,energy_neutrino,n,1500,0.2,h_fft=h_fft,sys_fft=sys_fft,freqs=freqs,plot=True,out_dom_freq = True,mode='v2',up_sample_factor=20,include_noise = False)
-    
-    
-    #Testing making a table for an event
-    from gnosim.trace.refraction_library_beta import *
-    reader = h5py.File('./Output/results_2018_Nov_config_duo_-200_polar_120_rays_3.00e+09_GeV_1000_events_1_seed_1.h5' , 'r')
-    info = reader['info'][...]
-    
-    #'''
-    for eventid in [122]:
-        #Note noise is kind of jank and will always be the same
-        df = signalsFromInfo(eventid,reader,input_u,h_fft,sys_fft,freqs,include_noise = True,resistance = 50, temperature = 320)
-        sub_info = info[info['eventid'] == eventid]
-        origin = [[0,0,-200],[0,0,-201],[0,0,-202],[0,0,-203],[0,0,-204],[0,0,-205],[0,0,-206],[0,0,-207]]
-        neutrino_loc = [reader['x_0'][eventid],reader['y_0'][eventid],reader['z_0'][eventid]]
-        phi_0 = reader['phi_0'][eventid]
-        #fig = plotGeometry(origin,neutrino_loc,phi_0,sub_info)
-    #'''
-    '''
-    angles = numpy.arange(30,35)
-    for a in angles:
-        V_noiseless, u, dominant_freq, V_noise,  SNR = quickSignalSingle(numpy.deg2rad(a),R,energy_neutrino,n,2500,1.0,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)
-    '''
-    '''
-    V2, u2, f2, t_snr, f_snr = quickSignalSingle(numpy.deg2rad(40),R,energy_neutrino,n,2500,0.6,h_fft=h_fft,sys_fft=sys_fft,freqs=freqs,plot=True,mode='v2',up_sample_factor=20,include_noise = True,time_domain_SNR = True, freq_domain_SNR = True)
-    V2, u2, f2, t_snr, f_snr = quickSignalSingle(numpy.deg2rad(50),R,energy_neutrino,n,2500,0.6,h_fft=h_fft,sys_fft=sys_fft,freqs=freqs,plot=True,mode='v2',up_sample_factor=20,include_noise = True,time_domain_SNR = True, freq_domain_SNR = True)
-    V2, u2, f2, t_snr, f_snr = quickSignalSingle(numpy.deg2rad(55),R,energy_neutrino,n,2500,0.6,h_fft=h_fft,sys_fft=sys_fft,freqs=freqs,plot=True,mode='v2',up_sample_factor=20,include_noise = True,time_domain_SNR = True, freq_domain_SNR = True)
-    '''
-    '''
-    V2, u2, f2, f_snr = quickSignalSingle(numpy.deg2rad(55.82),R,energy_neutrino,n,2500,0.6,h_fft=h_fft,sys_fft=sys_fft,freqs=freqs,plot=False,mode='v2',up_sample_factor=20,include_noise = True,time_domain_SNR = False, freq_domain_SNR = True)
-    V2, u2, f2, t_snr = quickSignalSingle(numpy.deg2rad(55.82),R,energy_neutrino,n,2500,0.6,h_fft=h_fft,sys_fft=sys_fft,freqs=freqs,plot=False,mode='v2',up_sample_factor=20,include_noise = True,time_domain_SNR = True, freq_domain_SNR = False)
-    V2, u2, f2, t_snr, f_snr = quickSignalSingle(numpy.deg2rad(55.82),R,energy_neutrino,n,2500,0.1,h_fft=h_fft,sys_fft=sys_fft,freqs=freqs,plot=False,mode='v2',up_sample_factor=20,include_noise = True,time_domain_SNR = True, freq_domain_SNR = True)
-    '''
-    '''
-    
-    
-    u1 -= 1000
-    
-    u_in = numpy.vstack((u1,u2))
-    V_in = numpy.vstack((V1,V2))
-    V_out, u_out = addSignals(u_in,V_in,plot=True)
-    
-    
-    from gnosim.trace.refraction_library_beta import *
-    reader = h5py.File('./Output/results_2018_Oct_config_octo_-200_polar_120_rays_1.00e+09_GeV_10000_events_1.h5' , 'r')
-    info = reader['info'][...]
-    for eventid in [7848,7969]:
-        signalsFromInfo(eventid,reader,h_fft=h_fft,sys_fft=sys_fft,freqs=freqs)
-        sub_info = info[info['eventid'] == eventid]
-        origin = [[0,0,-200],[0,0,-201],[0,0,-202],[0,0,-203],[0,0,-204],[0,0,-205],[0,0,-206],[0,0,-207]]
-        neutrino_loc = [reader['x_0'][eventid],reader['y_0'][eventid],reader['z_0'][eventid]]
-        phi_0 = reader['phi_0'][eventid]
-        fig = plotGeometry(origin,neutrino_loc,phi_0,sub_info)
-    '''
+        @profile
+        def f1(sample_times, u, V_noise):        
+            snap_index = []
+            for i in sample_times:
+                index = numpy.argmin(numpy.fabs(u-i))
+                snap_index.append(index)
+            snap_index = numpy.array(snap_index)
+            V_sampled = V_noise[snap_index]
+            return V_sampled
+            
+        V_sampled = f1(sample_times, u, V_noise)
+        pylab.figure()
+        ax = pylab.subplot(3,1,1)
+        pylab.scatter(u,V_noise,label='Signal')
+        pylab.ylabel('V (V)')
+        pylab.xlabel('t (ns)')
+        pylab.stem(sample_times,V_sampled,linefmt='r-', markerfmt='rs', basefmt='r-',label='Snap Sampled at %0.2f GSPS'%sampling_rate)
+        pylab.legend()
+        
+        #linear interpolation #Can probably use interp1d here
+        @profile
+        def f2(sample_times, u, V_noise): 
+            V_interp = []
+            for i in sample_times:
+                left_cut = numpy.less(u-i , 0)
+                xl = u[left_cut][-1]
+                xr = u[~left_cut][0]
+                yl = V_noise[left_cut][-1]
+                yr = V_noise[~left_cut][0] 
+                V_interp.append( ((yr - yl)/(xr-xl))*(i-xl)+yl )
+            V_interp = numpy.array(V_interp)
+            return V_interp
+        
+        V_interp = f2(sample_times, u, V_noise)
+        pylab.subplot(3,1,2,sharex=ax,sharey=ax)
+        pylab.ylabel('V (V)')
+        pylab.xlabel('t (ns)')
+        pylab.scatter(u,V_noise,label='Signal')
+        pylab.stem(sample_times,V_interp,linefmt='r-', markerfmt='rs', basefmt='r-',label='Interp Sampled at %0.2f GSPS'%sampling_rate)
+        
+        #using scipy interp1d
+        
+        @profile
+        def f3(sample_times, u, V_noise): 
+            #Clearly the fastest from profiling
+            f = scipy.interpolate.interp1d(u,V_noise)
+            return f(sample_times)
+        
+        V_interp2 = f3(sample_times, u, V_noise)
+        pylab.subplot(3,1,3,sharex=ax,sharey=ax)
+        pylab.ylabel('V (V)')
+        pylab.xlabel('t (ns)')
+        pylab.scatter(u,V_noise,label='Signal')
+        pylab.stem(sample_times,V_interp2,linefmt='r-', markerfmt='rs', basefmt='r-',label='Interp Sampled at %0.2f GSPS'%sampling_rate)
+        
+        
+    if old_testing == True:
+        #Testing making a table for an event
+        from gnosim.trace.refraction_library_beta import *
+        reader = h5py.File('./Output/results_2018_Nov_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_10000_events_1_seed_2.h5' , 'r')
+        
+        info = reader['info'][...]
+        
+        for eventid in [2362]:
+            #Note noise is kind of jank and will always be the same
+            df = signalsFromInfo(eventid,reader,input_u,h_fft,sys_fft,freqs,include_noise = True,resistance = 50, temperature = 320)
+            sub_info = info[info['eventid'] == eventid]
+            origin = [[0,0,-200],[0,0,-201],[0,0,-202],[0,0,-203],[0,0,-204],[0,0,-205],[0,0,-206],[0,0,-207]]
+            neutrino_loc = [reader['x_0'][eventid],reader['y_0'][eventid],reader['z_0'][eventid]]
+            phi_0 = reader['phi_0'][eventid]
+            print(sub_info)
+
 ############################################################

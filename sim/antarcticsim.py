@@ -7,7 +7,10 @@ Simulation
 import sys
 import numpy
 import h5py
+import matplotlib
+#matplotlib.use('Agg') #Use so it doesn't popup plots during the running of the sime
 import pylab
+#pylab.ioff() #Use so it doesn't popup plots during the running of the sime
 import json
 import yaml
 import os
@@ -76,7 +79,7 @@ class Sim:
         #self.config = eval(''.join(open(config_file).readlines()))
         self.config = yaml.load(open(config_file))
         self.detector()     
-        self.info_dtype = numpy.dtype([('eventid','i'),('station','i'),('antenna','i'),('has_solution','i'),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('observation_angle','f'),('electric_field','f'),('dominant_freq','f'),('a_h','f'),('a_v','f'),('SNR','f')])
+        self.info_dtype = numpy.dtype([('eventid','i'),('station','i'),('antenna','i'),('has_solution','i'),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('observation_angle','f'),('electric_field','f'),('dominant_freq','f'),('a_h','f'),('a_v','f'),('SNR','f'),('beam_pattern_factor','f')])
         # List attributes of interest
         self.keys = ['t', 'd', 'theta', 'theta_0', 'a_v', 'a_h']
         self.n_antenna = sum([len(self.stations[s].antennas) for s in range(len(self.stations))])
@@ -99,8 +102,14 @@ class Sim:
                                                       self.config['antenna_definitions'][antenna_type]['frequency_low'],
                                                       self.config['antenna_definitions'][antenna_type]['frequency_high'],
                                                       self.config)
+                if numpy.isin('orientations',list(self.config['antennas'].keys())) == True:                                   
+                    antenna.alpha_deg, antenna.beta_deg, antenna.gamma_deg =  self.config['antennas']['orientations'][jj]
+                else:
+                    antenna.alpha_deg, antenna.beta_deg, antenna.gamma_deg = [0.0,0.0,0.0]
+                antenna.R = gnosim.sim.detector.eulerRotationMatrix(numpy.deg2rad(antenna.alpha_deg), numpy.deg2rad(antenna.beta_deg), numpy.deg2rad(antenna.gamma_deg))
+                antenna.R_inv = numpy.linalg.inv(antenna.R)
                 self.stations[ii].antennas.append(antenna)
-
+        
     def event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, anti=False,
         electricFieldDomain = 'freq',include_noise = False,plot_signals=False,plot_geometry=False,summed_signals=False,
         plot_threshold = 0,plot_filetype_extension = 'svg',image_path = './'):
@@ -167,7 +176,7 @@ class Sim:
                 temporary_info = numpy.zeros(  numpy.size(self.stations[index_station].antennas[index_antenna].lib.solutions)  , dtype = self.info_dtype)
                 #print('len(temporary_info)',len(temporary_info))
                 for i in range(len(temporary_info)):
-                    temporary_info[i] = numpy.array([(eventid,index_station,index_antenna,0,'',-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0)],dtype = self.info_dtype)
+                    temporary_info[i] = numpy.array([(eventid,index_station,index_antenna,0,'',-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0)],dtype = self.info_dtype)
                 #temporary_info['has_solution'] = 0
                 if numpy.any(flag_array):
                     has_solution = 1
@@ -187,9 +196,27 @@ class Sim:
                             # Direction of outgoing ray from antenna to interaction vertex
                             
                             #vector_ray = gnosim.utils.quat.angToVec(phi_ray, dic_array[ii]['theta'])
-                            vector_ray = gnosim.utils.quat.angToVec(phi_ray, self.in_dic_array[station_label][antenna_label][solution]['theta'][eventid])
+                            vector_ray = gnosim.utils.quat.angToVec(phi_ray, self.in_dic_array[station_label][antenna_label][solution]['theta'][eventid]) #at neutrino event
                             observation_angle = gnosim.utils.quat.angTwoVec(vector_neutrino, vector_ray) # deg
                             d = self.in_dic_array[station_label][antenna_label][solution]['d'][eventid] # m
+                            theta_ant_deg = self.in_dic_array[station_label][antenna_label][solution]['theta_ant'][eventid]
+                            
+                            if self.config['antenna_type']['antenna_type'] == 'dipole': #this is dumb but that's how it is currently set up
+                                #The below must be normalized such that r = 1 (cylindrical coordinates r, not polar)
+                                ray_x = numpy.sin(numpy.deg2rad(theta_ant_deg)) * numpy.cos(numpy.deg2rad(phi_ray))
+                                ray_y = numpy.sin(numpy.deg2rad(theta_ant_deg)) * numpy.sin(numpy.deg2rad(phi_ray))
+                                ray_z = numpy.cos(numpy.deg2rad(theta_ant_deg))
+                                ray_vector_cartesian_ice_frame = numpy.array([ray_x,ray_y,ray_z]) #returns xyz, but r should be 1
+                                antenna_frame_coefficients = gnosim.sim.detector.antennaFrameCoefficients(self.stations[index_station].antennas[index_antenna].R_inv, ray_vector_cartesian_ice_frame, pre_inv = True) 
+                                
+                                #Calculating beam pattern from theta
+                                #below is the standard explicit way to do this
+                                #antenna_frame_theta_rad = numpy.arccos(antenna_frame_coefficients[2])# Typically it is arccos(z/r) but r is 1 for unit vector
+                                #beam_pattern_factor = numpy.sin(antenna_frame_theta_rad)**2
+                                #Below is a slightly faster way to do this using more geometry
+                                beam_pattern_factor = 1.0 - antenna_frame_coefficients[2]**2 #where r is assumed to be 1 because working with unit vectors
+                            else:
+                                beam_pattern_factor = 1.0
                             
                             if electricFieldDomain == 'time':
                                 #this must output a single value for the electric field in the same way old does
@@ -218,7 +245,7 @@ class Sim:
                                     V_noiseless, u , dominant_freq, V_noise, SNR = gnosim.interaction.askaryan.quickSignalSingle( numpy.deg2rad(observation_angle),\
                                       self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],energy_neutrino*inelasticity,index_of_refraction,\
                                       self.in_dic_array[station_label][antenna_label][solution]['t'][eventid],self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid],\
-                                      self.signal_times,self.h_fft,self.sys_fft,self.freqs_response,plot_signals=False,plot_spectrum=False,plot_potential = False,\
+                                      beam_pattern_factor,self.signal_times,self.h_fft,self.sys_fft,self.freqs_response,plot_signals=False,plot_spectrum=False,plot_potential = False,\
                                       include_noise = True, resistance = 50, temperature = 320)  #expects ovbservation_angle to be in radians (hence the deg2rad on input)
                                 
                                     electric_array = V_noise
@@ -226,12 +253,11 @@ class Sim:
                                     V_noiseless, u , dominant_freq = gnosim.interaction.askaryan.quickSignalSingle( numpy.deg2rad(observation_angle),\
                                       self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],energy_neutrino*inelasticity,index_of_refraction,\
                                       self.in_dic_array[station_label][antenna_label][solution]['t'][eventid],self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid],\
-                                      self.signal_times,self.h_fft,self.sys_fft,self.freqs_response,plot_signals=False,plot_spectrum=False,plot_potential = False,\
+                                      beam_pattern_factor,self.signal_times,self.h_fft,self.sys_fft,self.freqs_response,plot_signals=False,plot_spectrum=False,plot_potential = False,\
                                       include_noise = False, resistance = 50, temperature = 320)  #expects ovbservation_angle to be in radians (hence the deg2rad on input)
                                     
                                     SNR = -999.
                                     electric_array = V_noiseless
-                                
                                 electric_field = max(numpy.abs(electric_array))
                                 E_signals[station_label][antenna_label][solution] = electric_array
                                 u_signals[station_label][antenna_label][solution] = u
@@ -246,9 +272,9 @@ class Sim:
                                                                                 energy_neutrino, inelasticity, 
                                                                                 'cc', index_of_refraction) # V m^-1 GHz^-1, dimensionless, expects observation_angle to be in degrees
                                 electric_field *= self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid] # COME BACK TO GENERALIZE THIS
-                                electric_array, electric_field, dominant_freq = self.stations[index_station].antennas[index_antenna].totalElectricField(frequency, electric_field, self.in_dic_array[station_label][antenna_label][solution]['theta_ant'][eventid]) # V m^-1 #THIS WAS CHANGED THETA WAS ADDED
+                                electric_array, electric_field, dominant_freq = self.stations[index_station].antennas[index_antenna].totalElectricField(frequency, electric_field, theta_ant_deg) # V m^-1 #THIS WAS CHANGED THETA WAS ADDED
                                 SNR = -999.
-                            temporary_info[ii] = numpy.array([(eventid,index_station,index_antenna,has_solution,solution,self.in_dic_array[station_label][antenna_label][solution]['t'][eventid],self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],self.in_dic_array[station_label][antenna_label][solution]['theta_ant'][eventid],observation_angle,electric_field,dominant_freq,self.in_dic_array[station_label][antenna_label][solution]['a_h'][eventid],self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid],SNR)],dtype = self.info_dtype)
+                            temporary_info[ii] = numpy.array([(eventid,index_station,index_antenna,has_solution,solution,self.in_dic_array[station_label][antenna_label][solution]['t'][eventid],self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],theta_ant_deg,observation_angle,electric_field,dominant_freq,self.in_dic_array[station_label][antenna_label][solution]['a_h'][eventid],self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid],SNR,beam_pattern_factor)],dtype = self.info_dtype)
                             if electric_field >= electric_field_max:
                                 electric_field_max = electric_field
                                 observation_angle_max = observation_angle
@@ -296,7 +322,7 @@ class Sim:
                 else:
                     #This event has no solution for this antenna
                     has_solution = 0
-                    info[ sum([len(self.stations[s].antennas) for s in range(0,index_station)]) + index_antenna] = numpy.array([(eventid,index_station,index_antenna,has_solution,'',-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0)],dtype = self.info_dtype)
+                    info[ sum([len(self.stations[s].antennas) for s in range(0,index_station)]) + index_antenna] = numpy.array([(eventid,index_station,index_antenna,has_solution,'',-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0)],dtype = self.info_dtype)
             if numpy.logical_and(plot_threshold_passed,plot_geometry == True):
                 origin = []
                 for index_antenna in info[info['has_solution'] == 1]['antenna']:
@@ -363,7 +389,7 @@ class Sim:
                     n_rows = len(self.stations[index_station].antennas)
                     ntables = 4
                     gs_left = gridspec.GridSpec(n_rows, 2, width_ratios=[3, 2]) #should only call left plots.  pylab.subplot(gs_left[0]),pylab.subplot(gs_left[2]),...
-                    gs_right = gridspec.GridSpec(ntables, 2, width_ratios=[3, 2]) #should only call odd tables pylab.subplot(gs_right[1])
+                    gs_right = gridspec.GridSpec(ntables, 2, width_ratios=[3, 2], height_ratios=[2,2,n_rows+1,n_rows+1]) #should only call odd tables pylab.subplot(gs_right[1])
                     
                     ax = pylab.subplot(gs_left[0])
                     
@@ -453,13 +479,13 @@ class Sim:
                         table_fig.patch.set_visible(False)
                         table_ax.axis('off')
                         table_ax.axis('tight')
-                        antenna = info['antenna'].astype(int)
-                        observation_angle = info['observation_angle'].astype(float)
-                        theta_ant = info['theta_ant'].astype(float)
-                        distance = info['distance'].astype(float)
-                        df = pandas.DataFrame({'antenna':antenna , '$\\theta_\mathrm{ant}$ (deg)':theta_ant , '$\\theta_\mathrm{emit}$ (deg)':observation_angle,'d$_\mathrm{path}$ (m)':distance})
-                        decimals = pandas.Series([0,3,3,3],index = df.columns)
-                        table = pylab.table(cellText = df.round(decimals).values, colLabels = df.columns, loc = 'center')
+                        antenna =           ['%i'%i for i in info['antenna'].astype(int)]
+                        observation_angle = ['%0.3g'%i for i in info['observation_angle'].astype(float)]
+                        theta_ant =         ['%0.3g'%i for i in info['theta_ant'].astype(float)]
+                        distance =          ['%0.3g'%i for i in info['distance'].astype(float)]
+                        beam_factor =       ['%0.3g'%i for i in info['beam_pattern_factor']]
+                        df = pandas.DataFrame({'antenna':antenna , '$\\theta_\mathrm{ant}$ (deg)':theta_ant , '$\\theta_\mathrm{emit}$ (deg)':observation_angle,'d$_\mathrm{path}$ (m)':distance, 'Beam Factor':beam_factor})
+                        table = pylab.table(cellText = df.values, colLabels = df.columns, loc = 'center')
                         table.auto_set_font_size(False)
                         table.set_fontsize(10)
                         
@@ -482,13 +508,12 @@ class Sim:
                         table_fig.patch.set_visible(False)
                         table_ax.axis('off')
                         table_ax.axis('tight')
-                        antenna = info['antenna'].astype(int)
-                        electric_field = info['electric_field'].astype(float)
-                        dom_freqs = (info['dominant_freq']/1e6).astype(float)
-                        SNRs = info['SNR'].astype(float)
+                        antenna =           ['%i'%i for i in info['antenna'].astype(int)]
+                        electric_field =    ['%0.3g'%i for i in info['electric_field'].astype(float)]
+                        dom_freqs =         ['%0.3g'%i for i in (info['dominant_freq']/1e6).astype(float)]
+                        SNRs =              ['%0.3g'%i for i in info['SNR'].astype(float)]
                         df = pandas.DataFrame({'antenna':antenna , '$V_\mathrm{max}$ (V)':electric_field , 'SNR':SNRs, '$f_\mathrm{max}$ (MHz)':dom_freqs})
-                        decimals = pandas.Series([0,3,3,3],index = df.columns)
-                        table = pylab.table(cellText = df.round(decimals).values , colLabels = df.columns, loc = 'center')
+                        table = pylab.table(cellText = df.values , colLabels = df.columns, loc = 'center')
                         table.auto_set_font_size(False)
                         table.set_fontsize(10)
                         
@@ -1059,17 +1084,29 @@ if __name__ == "__main__":
                  detector_volume_radius=my_sim.config['detector_volume']['radius'],
                  detector_volume_depth=my_sim.config['detector_volume']['depth'],
                  outfile=outfile,seed=seed,electricFieldDomain = 'time',include_noise = True,summed_signals = True, 
-                 plot_geometry = True, plot_signals = True, plot_threshold = 0.5,
+                 plot_geometry = False, plot_signals = True, plot_threshold = 0.5,
                  plot_filetype_extension = image_extension,image_path = image_path,use_threading = True)
     
     #current plot_threshold is on the signal amplitude and is not great.  probably want to make this
     #depend on the SNR of a signal.  However that makes more sense for when noise is present
     #and no sense if noise is turned off.  
+    
+    print('Trying to print station geometry and antenna orientations')
+    try:
+        fig = gnosim.sim.detector.plotArrayFromConfig(my_sim.config,only_station = 'all',verbose = False)
+        fig.savefig('%s%s_array_geometry.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),image_extension),bbox_inches='tight')
+        pylab.close(fig)
+    except:
+        print('Failed to save image %s%s_array_geometry.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),image_extension))
+
+    
     print('Trying to create index.html file for new images')
     try:
         makeIndexHTML(path = image_path ,filetype = image_extension)
     except:
         print('Something went wrong in making index.html')
+        
+    
     #python /home/dsouthall/Projects/GNOSim/sim/antarcticsim.py config energy n_events index 
     #python /home/dsouthall/Projects/GNOSim/gnosim/sim/antarcticsim.py /home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_octo_-200_polar_120_rays.py 1.0e8 50000 1 
     #f.close()

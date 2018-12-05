@@ -117,12 +117,16 @@ def eulerRotationMatrix(alpha_rad, beta_rad, gamma_rad):
     Rz2 = zRotationMatrix(alpha_rad)
     R = numpy.dot(Rz2,numpy.dot(Rx1,Rz1))
     return R
-    
-def antennaFrameCoefficients(R, in_vector):
+
+@profile
+def antennaFrameCoefficients(R, in_vector, pre_inv = False):
     '''
     R should be calculated in advance using R = eulerRotationMatrix(alpha_rad, beta_rad, gamma_rad)
     and passed to this function.  Not internally calculated because it is the same for a given antenna
-    for each in_vector and does not need to be redundently calculated. 
+    for each in_vector and does not need to be redundently calculated.  The inversion of the matrix
+    also only needs to be done once, so there is an option to pass this function the previously 
+    inverted R.  
+    
     This is intended to perform the extrinsic rotation of a vector
     using the Euler angles alpha, beta, gamma.  I intend for the output vector
     to be in the frame in the basis frame defined by the given Euler angles.
@@ -132,7 +136,10 @@ def antennaFrameCoefficients(R, in_vector):
     is represented in the ice frame, this returns the coefficients A,B,C of the
     antenna frame basis (X,Y,Z), such that u = A X + B Y + C Z = a x + b y + c z  
     '''
-    out_vector = numpy.dot(numpy.linalg.inv(R),in_vector)
+    if pre_inv == True:
+        out_vector = numpy.dot(R,in_vector)
+    else:
+        out_vector = numpy.dot(numpy.linalg.inv(R),in_vector)
     
     return out_vector   
     
@@ -200,6 +207,26 @@ if __name__ == "__main__":
     
     plot_test1 = True
     plot_test2 = True
+    speed_test1 = True
+    
+    if speed_test1 == True:
+        alpha_deg = 20.0
+        beta_deg = 40.0
+        gamma_deg = 15.0
+        
+        ray_phi_deg = 35.0
+        ray_theta_deg = 90.0 #horizontal at 90
+        
+        ray_x = numpy.sin(numpy.deg2rad(ray_theta_deg)) * numpy.cos(numpy.deg2rad(ray_phi_deg))
+        ray_y = numpy.sin(numpy.deg2rad(ray_theta_deg)) * numpy.sin(numpy.deg2rad(ray_phi_deg))
+        ray_z = numpy.cos(numpy.deg2rad(ray_theta_deg))
+        
+        ray_vector = numpy.array([ray_x,ray_y,ray_z])
+        
+        R = eulerRotationMatrix(numpy.deg2rad(alpha_deg), numpy.deg2rad(beta_deg), numpy.deg2rad(gamma_deg)) 
+        antennaFrameCoefficients(R, ray_vector, pre_inv = False)
+        R_inv = numpy.linalg.inv(R)
+        antennaFrameCoefficients(R_inv, ray_vector, pre_inv = True)
     
     
     if plot_test1 == True:
@@ -247,7 +274,9 @@ if __name__ == "__main__":
         ax.set_xlim([-1,1])
         ax.set_ylim([-1,1])
         ax.set_zlim([-1,1])
-        
+        ax.set_xlabel('Ice x',fontsize=16)
+        ax.set_ylabel('Ice y',fontsize=16)
+        ax.set_zlabel('Ice z',fontsize=16)
         #Antenna Frame
         ax = fig.add_subplot(gs_upper[1],projection='3d')
         ax.quiver(0,0,0,1,0,0,label='X',color='r',linestyle='--')
@@ -259,7 +288,9 @@ if __name__ == "__main__":
         ax.set_xlim([-1,1])
         ax.set_ylim([-1,1])
         ax.set_zlim([-1,1])
-        
+        ax.set_xlabel('Antenna x',fontsize=16)
+        ax.set_ylabel('Antenna y',fontsize=16)
+        ax.set_zlabel('Antenna z',fontsize=16)
         #Overlap (Ice Frame)
         ax = fig.add_subplot(gs_lower[4],projection='3d')
         ax.quiver(0,0,0,1,0,0,label='x',color='r')
@@ -277,7 +308,9 @@ if __name__ == "__main__":
         ax.set_xlim([-1,1])
         ax.set_ylim([-1,1])
         ax.set_zlim([-1,1])
-        
+        ax.set_xlabel('Ice x',fontsize=16)
+        ax.set_ylabel('Ice y',fontsize=16)
+        ax.set_zlabel('Ice z',fontsize=16)
         fig.suptitle('Euler Angles: $\\alpha = $%0.2g$^\circ$, $\\beta = $%0.2g$^\circ$, $\gamma = $%0.2g$^\circ$'%(alpha_deg,beta_deg,gamma_deg))
         pylab.subplots_adjust(left = 0.00, bottom = 0.05, right = 0.97, top = 0.95, wspace = 0.00, hspace = 0.06)
         

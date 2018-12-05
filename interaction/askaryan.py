@@ -424,7 +424,7 @@ def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode='
     u = numpy.arange(-(n_points_freq-1),(n_points_freq-1))*t_step #To increase time duration of signal I should just need to upsample?
     return u, h_fft, sys_fft, freqs
 
-def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential = False,include_noise = False, resistance = 50, temperature = 320):  
+def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pattern_factor,u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential = False,include_noise = False, resistance = 50, temperature = 320):  
     '''
     This should do the entire calculation, mostly in the frequency domain. 
     Expects u, h_fft, sys_fft, freqs to all come straight from calculateTimes.
@@ -503,6 +503,9 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,u, h_fft
             #pylab.xlim(-10,50)
     #calculating E_raw_fft    
     E_raw_fft = -1j*2*numpy.pi*numpy.multiply(A_fft , freqs) #negitive sign because E = -dA/dt
+    
+    #Accouning for beam pattern
+    E_raw_fft *= beam_pattern_factor
     
     #Accounting for attenuation
     E_raw_fft *= attenuation #Want to do before noise is added.  Noise is not attenuated by 
@@ -630,7 +633,42 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,u, h_fft
         dominant_freq = freqs[numpy.argmax(numpy.absolute(V_fft_noiseless))]
         return V_noiseless, u + t_offset, dominant_freq
 
-
+def digitizeSignal(u,V,sampling_rate,bytes,scale_noise_from,scale_noise_to, dc_offset = 0, random_time_offset = 0, plot = False):
+    '''
+    This function is meant to act as the ADC for the simulation.  It will sample
+    the signal using the provided sampling rate.  The value of
+    bytes sets the number of voltage bins, those will be distributed from 
+    -2**(bytes-1)+1 to 2**(bytes-1).  The input V will be sampled and scaled linearly
+    using a linear scaling with V_new = (scale_noise_to/scale_noise_from) * V_sampled
+    And then V_sampled is scaled to be one of the byte values using a floor.  Everything
+    outside of the max will be rounded.  
+    '''
+    V = V + dc_offset
+    sampling_period = 1.0 / sampling_rate #ns
+    sample_times = numpy.arange(u[1],u[-1],sampling_period) + random_time_offset
+    sample_times = sample_times[numpy.logical_and(sample_times <= u[-1],sample_times >= u[1])] #otherwise interpolation error for out of bounds. 
+    V_sampled = scipy.interpolate.interp1d(u,V)(sample_times)
+    
+    #byte_vals = numpy.linspace(-2**(bytes-1)+1,2**(bytes-1),2**bytes,dtype=int)
+    byte_vals = numpy.array([-2**(bytes-1)+1,2**(bytes-1)],dtype=int) #only really need endpoints
+    slope = scale_noise_to/scale_noise_from
+    f = scipy.interpolate.interp1d(byte_vals/slope,byte_vals,bounds_error = False,fill_value = (byte_vals[0],byte_vals[-1]) )
+    V_bit = numpy.floor(f(V_sampled)) #not sure if round or floor should be used to best approximate the actual process.
+    
+    if plot == True:
+        pylab.figure()
+        ax = pylab.subplot(2,1,1)
+        pylab.ylabel('V (V)')
+        pylab.xlabel('t (ns)')
+        pylab.scatter(u,V,label='Signal')
+        pylab.stem(sample_times,V_sampled,bottom = dc_offset, linefmt='r-', markerfmt='rs', basefmt='r-',label='Interp Sampled at %0.2f GSPS'%sampling_rate)
+        
+        ax = pylab.subplot(2,1,2,sharex=ax)
+        pylab.ylabel('Voltage (Scaled so VRMS = 3)')
+        pylab.xlabel('t (ns)')
+        pylab.plot(u,V*slope)
+        pylab.stem(sample_times,V_bit,bottom = dc_offset*slope, linefmt='r-', markerfmt='rs', basefmt='r-',label='Interp Sampled at %0.2f GSPS'%sampling_rate)
+    return V_bit, sample_times
 
 ############################################################
 
