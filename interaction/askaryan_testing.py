@@ -663,17 +663,25 @@ def digitizeSignal(u,V,sampling_rate,bytes,scale_noise_from,scale_noise_to, dc_o
     
     if plot == True:
         pylab.figure()
-        ax = pylab.subplot(2,1,1)
+        ax = pylab.subplot(3,1,1)
         pylab.ylabel('V (V)')
         pylab.xlabel('t (ns)')
         pylab.scatter(u,V,label='Signal')
         pylab.stem(sample_times,V_sampled,bottom = dc_offset, linefmt='r-', markerfmt='rs', basefmt='r-',label='Interp Sampled at %0.2f GSPS'%sampling_rate)
+        pylab.legend()
         
-        ax = pylab.subplot(2,1,2,sharex=ax)
-        pylab.ylabel('Voltage (Scaled so VRMS = 3)')
+        ax = pylab.subplot(3,1,2,sharex=ax)
+        pylab.ylabel('adu')
         pylab.xlabel('t (ns)')
         pylab.plot(u,V*slope)
         pylab.stem(sample_times,V_bit,bottom = dc_offset*slope, linefmt='r-', markerfmt='rs', basefmt='r-',label='Interp Sampled at %0.2f GSPS'%sampling_rate)
+        pylab.legend()
+        
+        ax = pylab.subplot(3,1,3,sharex=ax)
+        pylab.ylabel('adu')
+        pylab.xlabel('t (ns)')
+        pylab.plot(sample_times,V_bit,label='Interp Sampled at %0.2f GSPS'%sampling_rate)
+        pylab.legend()   
     return V_bit, sample_times
 
 '''
@@ -923,11 +931,11 @@ def signalsFromInfo(eventid,reader,u_signal,h_fft,sys_fft,freqs,include_noise = 
 ############################################################
 
 if __name__ == "__main__":
-    old_testing = False
+    old_testing = True
     interp_testing = False
-    new_testing = True
+    new_testing = False
     
-    pylab.close('all')
+    #pylab.close('all')
     energy_neutrino = 3.e9 # GeV
     n = 1.78
     R = 1000. #m
@@ -940,15 +948,15 @@ if __name__ == "__main__":
         inelasticity = 0.2#gnosim.interaction.inelasticity.inelasticity(energy_neutrino, mode='cc')
         #Testing the digitizations of the signal.  
         V_noiseless, u, dominant_freq, V_noise,  SNR = quickSignalSingle(numpy.deg2rad(50),R,inelasticity*energy_neutrino,n,2500,0.7,0.7,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)
-        noise_rms = numpy.std(quickSignalSingle(0,R,inelasticity*energy_neutrino,n,2500,0,0,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)[3])
+        noise_rms = numpy.std(quickSignalSingle(0,R,inelasticity*energy_neutrino,1.8,2500,0,0,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)[3])
         sampling_rate = 1.5 #GHz
         bytes = 7
         scale_noise_from = noise_rms
         scale_noise_to = 3
         
         random_time_offset = numpy.random.uniform(-5.0,5.0) #ns
-        dc_offset = 0.5 #V
-        V_bit, sampled_times = digitizeSignal(u,V_noise,sampling_rate,bytes,scale_noise_from,scale_noise_to, random_time_offset = random_time_offset, dc_offset = dc_offset, plot = True)
+        dc_offset = 0.0 #V
+        V_bit, sampled_times = digitizeSignal(u,V_noise,sampling_rate,bytes,scale_noise_from,scale_noise_to, random_time_offset = random_time_offset, dc_offset = dc_offset, plot = False)
         
         
     if interp_testing ==True:
@@ -1023,11 +1031,11 @@ if __name__ == "__main__":
     if old_testing == True:
         #Testing making a table for an event
         from gnosim.trace.refraction_library_beta import *
-        reader = h5py.File('./Output/results_2018_Nov_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_10000_events_1_seed_2.h5' , 'r')
+        reader = h5py.File('./Output/results_2018_Dec_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_100_events_1_seed_1.h5' , 'r')
         
         info = reader['info'][...]
         
-        for eventid in [2362]:
+        for eventid in [15]:
             #Note noise is kind of jank and will always be the same
             df = signalsFromInfo(eventid,reader,input_u,h_fft,sys_fft,freqs,include_noise = True,resistance = 50, temperature = 320)
             sub_info = info[info['eventid'] == eventid]

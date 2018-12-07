@@ -8,7 +8,9 @@
  'antennas': {'n': 8,
               'positions': [[0., 0., 0.], [0., 0., -1.], [0., 0., -2.], [0., 0., -3.], [0., 0., -4.], [0., 0., -5.], [0., 0., -6.], [0., 0., -7.]],
               'types': ['dipole0','dipole1','dipole2','dipole3','dipole4','dipole5','dipole6','dipole7'],
-              'orientations': [[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0]]}, #alpha, beta, gamma Euler angles in degrees for zxz rotation, all zeros to match ice frame
+              'orientations': [[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0]],#alpha, beta, gamma Euler angles in degrees for zxz rotation, all zeros to match ice frame
+              'sampling_rate_GHz':[1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5],
+              'sampling_bits':[7,7,7,7,7,7,7,7]}, 
  'antenna_definitions': {'dipole0': {'lib': '/home/dsouthall/Projects/GNOSim/library_-200_polar_120_rays/*.h5',
                                     'frequency_low': 0.1, # GHz
                                     'frequency_high': 0.8, # GHz

@@ -95,6 +95,10 @@ def RA(Energy_GeV,t_ns):
             return (-4.5e-14) * Energy_TeV * ( numpy.exp(- numpy.fabs(t_ns)/0.030) + (1. + 3.05*numpy.fabs(t_ns))**(-3.5)) 
     else:
         ra = numpy.zeros_like(t_ns)
+        #ra_gt = (-4.5e-14) * Energy_TeV * ( numpy.exp(- numpy.fabs(t_ns[t_ns > 0])/0.057) + (1. + 2.87*numpy.fabs(t_ns[t_ns > 0]))**(-3.0))
+        #ra[t_ns > 0] = ra_gt
+        #ra_lt = (-4.5e-14) * Energy_TeV * ( numpy.exp(- numpy.fabs(t_ns[t_ns <= 0])/0.030) + (1. + 3.05*numpy.fabs(t_ns[t_ns <= 0]))**(-3.5)) 
+        #ra[t_ns <= 0] = ra_lt
         ra[t_ns > 0] = (-4.5e-14) * Energy_TeV * ( numpy.exp(- numpy.fabs(t_ns[t_ns > 0])/0.057) + (1. + 2.87*numpy.fabs(t_ns[t_ns > 0]))**(-3.0))
         ra[t_ns <= 0] = (-4.5e-14) * Energy_TeV * ( numpy.exp(- numpy.fabs(t_ns[t_ns <= 0])/0.030) + (1. + 3.05*numpy.fabs(t_ns[t_ns <= 0]))**(-3.5)) 
         return ra
@@ -642,6 +646,8 @@ def digitizeSignal(u,V,sampling_rate,bytes,scale_noise_from,scale_noise_to, dc_o
     using a linear scaling with V_new = (scale_noise_to/scale_noise_from) * V_sampled
     And then V_sampled is scaled to be one of the byte values using a floor.  Everything
     outside of the max will be rounded.  
+    
+    Sampleing rate should be in GHz
     '''
     V = V + dc_offset
     sampling_period = 1.0 / sampling_rate #ns
