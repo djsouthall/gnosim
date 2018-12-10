@@ -153,22 +153,30 @@ class Sim:
         
         # Loop over stations
         if electricFieldDomain == 'time':
-            u_signals = {}
-            E_signals = {}
+            time_analog = {}
+            V_analog = {}
+            time_digital = {}
+            V_digital = {}
         for index_station in range(0, len(self.stations)):
             # Loop over station antennas
             station_label = 'station'+str(index_station)
             if electricFieldDomain == 'time':
-                u_signals[station_label] = {}
-                E_signals[station_label] = {}
+                time_analog[station_label] = {}
+                V_analog[station_label] = {}
+                time_digital[station_label] = {}
+                V_digital[station_label] = {}
             for index_antenna in range(0, len(self.stations[index_station].antennas)):
                 antenna_label = self.config['antennas']['types'][index_antenna]
                 if electricFieldDomain == 'time':
-                    u_signals[station_label][antenna_label] = {}
-                    E_signals[station_label][antenna_label] = {}
+                    time_analog[station_label][antenna_label] = {}
+                    V_analog[station_label][antenna_label] = {}
+                    time_digital[station_label][antenna_label] = {}
+                    V_digital[station_label][antenna_label] = {}
                     for solution in self.stations[index_station].antennas[index_antenna].lib.solutions:
-                        u_signals[station_label][antenna_label][solution] = []
-                        E_signals[station_label][antenna_label][solution] = []
+                        time_analog[station_label][antenna_label][solution] = []
+                        V_analog[station_label][antenna_label][solution] = []
+                        time_digital[station_label][antenna_label][solution] = []
+                        V_digital[station_label][antenna_label][solution] = []
                 electric_field_max = 0. 
                 x_antenna = self.stations[index_station].antennas[index_antenna].x
                 y_antenna = self.stations[index_station].antennas[index_antenna].y
@@ -257,7 +265,7 @@ class Sim:
                                       include_noise = True, resistance = 50, temperature = 320)  #expects ovbservation_angle to be in radians (hence the deg2rad on input)
                                     
                                     electric_array = V_noise
-                                    electric_array_digitized, u_digitized = gnosim.interaction.askaryan.digitizeSignal(u,V_noise,self.stations[index_station].antennas[index_antenna].sampling_rate,self.stations[index_station].antennas[index_antenna].sampling_bits,self.noise_rms,3, dc_offset = dc_offset, random_time_offset = random_time_offset, plot = False)
+                                    electric_array_digitized, u_digitized = gnosim.interaction.askaryan.digitizeSignal(u,V_noise,self.stations[index_station].antennas[index_antenna].sampling_rate,self.stations[index_station].antennas[index_antenna].sampling_bits,self.noise_rms,self.scale_noise_to, dc_offset = dc_offset, random_time_offset = random_time_offset, plot = False)
                                     
                                 else:
                                     V_noiseless, u , dominant_freq = gnosim.interaction.askaryan.quickSignalSingle( numpy.deg2rad(observation_angle),\
@@ -268,7 +276,7 @@ class Sim:
                                     
                                     SNR = -999.
                                     electric_array = V_noiseless
-                                    electric_array_digitized, u_digitized = gnosim.interaction.askaryan.digitizeSignal(u,V_noiseless,self.stations[index_station].antennas[index_antenna].sampling_rate,self.stations[index_station].antennas[index_antenna].sampling_bits,self.noise_rms,3, dc_offset = dc_offset, random_time_offset = random_time_offset, plot = False)
+                                    electric_array_digitized, u_digitized = gnosim.interaction.askaryan.digitizeSignal(u,V_noiseless,self.stations[index_station].antennas[index_antenna].sampling_rate,self.stations[index_station].antennas[index_antenna].sampling_bits,self.noise_rms,self.scale_noise_to, dc_offset = dc_offset, random_time_offset = random_time_offset, plot = False)
                                 
                                 max_analog = numpy.argmax(numpy.abs(electric_array))
                                 electric_field = numpy.abs(electric_array[max_analog]) #maybe shouldn't be abs.  Need to change some lines that comapre to this if made not abs here.  
@@ -278,8 +286,12 @@ class Sim:
                                 electric_field_digitized = numpy.abs(electric_array_digitized[max_sample])
                                 trigger_time_digitized = u_digitized[max_sample]
                                 
-                                E_signals[station_label][antenna_label][solution] = electric_array
-                                u_signals[station_label][antenna_label][solution] = u
+                                V_analog[station_label][antenna_label][solution] = electric_array
+                                time_analog[station_label][antenna_label][solution] = u
+                                
+                                V_digital[station_label][antenna_label][solution] = electric_array_digitized
+                                time_digital[station_label][antenna_label][solution] = u_digitized
+                                
                                 if plot_threshold_units == 'adu':
                                     if electric_field_digitized > plot_threshold:
                                         plot_threshold_passed = True
@@ -373,41 +385,56 @@ class Sim:
                 for index_antenna in range(0, len(self.stations[index_station].antennas)):
                     antenna_label = self.config['antennas']['types'][index_antenna]
                     u_in = []
-                    E_in = []
+                    V_in = []
+                    ud_in = []
+                    Vd_in = []
                     if summed_signals == False:
-                        max_E_in_val = 0
+                        max_V_in_val = 0
                         max_E_val_solution_type = ''
                     for solution in self.stations[index_station].antennas[index_antenna].lib.solutions:
                         if self.in_flag_array[station_label][antenna_label][solution][eventid]:
-                            u_in.append(u_signals[station_label][antenna_label][solution])
-                            E_in.append(E_signals[station_label][antenna_label][solution])
+                            u_in.append(time_analog[station_label][antenna_label][solution])
+                            V_in.append(V_analog[station_label][antenna_label][solution])
+                            ud_in.append(time_digital[station_label][antenna_label][solution])
+                            Vd_in.append(V_digital[station_label][antenna_label][solution])
                             if summed_signals == False:
-                                if max(numpy.fabs(E_signals[station_label][antenna_label][solution])) >= max_E_in_val:
-                                    max_E_in_val = max(numpy.abs(E_signals[station_label][antenna_label][solution]))
+                                if max(numpy.fabs(V_analog[station_label][antenna_label][solution])) >= max_V_in_val:
+                                    max_V_in_val = max(numpy.abs(V_analog[station_label][antenna_label][solution]))
                                     max_E_val_solution_type = solution
                     u_in = numpy.array(u_in)
-                    E_in = numpy.array(E_in)
-                    #u_in/E_in should be an array of times with dimensions (n_signal , n_timestep )
+                    V_in = numpy.array(V_in)
+                    ud_in = numpy.array(ud_in)
+                    Vd_in = numpy.array(Vd_in)
+                    #u_in/V_in should be an array of times with dimensions (n_signal , n_timestep )
                     if numpy.size(u_in) != 0:
                         #print(numpy.size(u_in))
                         #print(numpy.shape(u_in))
                         #print(u_in)
-                        #print(numpy.size(E_in))
-                        #print(numpy.shape(E_in))
-                        #print(E_in)
+                        #print(numpy.size(V_in))
+                        #print(numpy.shape(V_in))
+                        #print(V_in)
                         if summed_signals == True:
-                            E_out, u_out = gnosim.interaction.askaryan.addSignals(u_in,E_in,plot=False)
-                            u_signals[station_label][antenna_label] = u_out
-                            E_signals[station_label][antenna_label] = E_out
+                            V_out, u_out = gnosim.interaction.askaryan.addSignals(u_in,V_in,plot=False)
+                            Vd_out, ud_out = gnosim.interaction.askaryan.addSignals(ud_in,Vd_in,plot=False)
+                            time_analog[station_label][antenna_label] = u_out
+                            V_analog[station_label][antenna_label] = V_out
+                            time_digital[station_label][antenna_label] = ud_out
+                            V_digital[station_label][antenna_label] = Vd_out
                         else:
-                            E_in = numpy.array(E_in)
-                            u_in = numpy.array(u_in)
+                            #V_in = numpy.array(V_in)
+                            #u_in = numpy.array(u_in)
+                            #Vd_in = numpy.array(Vd_in)
+                            #ud_in = numpy.array(ud_in)
                             
-                            u_signals[station_label][antenna_label] = u_signals[station_label][antenna_label][max_E_val_solution_type]
-                            E_signals[station_label][antenna_label] = E_signals[station_label][antenna_label][max_E_val_solution_type]
+                            time_analog[station_label][antenna_label] = time_analog[station_label][antenna_label][max_E_val_solution_type]
+                            V_analog[station_label][antenna_label] = V_analog[station_label][antenna_label][max_E_val_solution_type]
+                            time_digital[station_label][antenna_label] = time_digital[station_label][antenna_label][max_E_val_solution_type]
+                            V_digital[station_label][antenna_label] = V_digital[station_label][antenna_label][max_E_val_solution_type]
                     else:
-                        u_signals[station_label][antenna_label] = numpy.array([])
-                        E_signals[station_label][antenna_label] = numpy.array([])
+                        time_analog[station_label][antenna_label] = numpy.array([])
+                        V_analog[station_label][antenna_label] = numpy.array([])
+                        time_digital[station_label][antenna_label] = numpy.array([])
+                        V_digital[station_label][antenna_label] = numpy.array([])
                 if numpy.logical_and(plot_threshold_passed,plot_signals == True):
                     #might need to account for when signals are not present in certain detectors
                     #print('Attempting to plot', eventid)
@@ -418,141 +445,150 @@ class Sim:
                     gs_left = gridspec.GridSpec(n_rows, 2, width_ratios=[3, 2]) #should only call left plots.  pylab.subplot(gs_left[0]),pylab.subplot(gs_left[2]),...
                     gs_right = gridspec.GridSpec(ntables, 2, width_ratios=[3, 2], height_ratios=[2,2,n_rows+1,n_rows+1]) #should only call odd tables pylab.subplot(gs_right[1])
                     
-                    ax = pylab.subplot(gs_left[0])
+                    #ax = pylab.subplot(gs_left[0])
                     
-                    u_min = 1e20
-                    u_max = -1e20
-                    E_min = 1e20
-                    E_max = -1e20
-                    
+                    first_in_loop = True
+                    axis2 = []
+                    max_ax1_range = numpy.array([1e20,-1e20])
                     for index_antenna in range(0, n_rows):
                         antenna_label = self.config['antennas']['types'][index_antenna]
-                        if numpy.size(u_signals[station_label][antenna_label]) != 0:
-                            #print(u_signals[station_label][antenna_label])
-                            #print(numpy.shape(u_signals[station_label][antenna_label]))
-                            #print(min(u_signals[station_label][antenna_label]))
-                            #print([u_min,min(u_signals[station_label][antenna_label])])
-                            u_min = min(u_min,min(u_signals[station_label][antenna_label]))
-                            u_max = max(u_max,max(u_signals[station_label][antenna_label]))
-                            E_min = min(E_min,min(E_signals[station_label][antenna_label]))
-                            E_max = max(E_max,max(E_signals[station_label][antenna_label]))
-                    if numpy.logical_and(u_min != 1e20, u_max != -1e20) == True:
-                        #pylab.xlim(u_min,u_max)
-                        pylab.xlim(min(u_min*0.9,u_min*1.1),max(u_max*0.9,u_max*1.1))
-                        pylab.ylim(min(E_min*0.99,E_min*1.01),max(E_max*0.99,E_max*1.01))
-                        for index_antenna in range(0, n_rows):
-                            pylab.subplot(gs_left[2*index_antenna],sharex=ax,sharey=ax)
-                            antenna_label = self.config['antennas']['types'][index_antenna]
-                            #pylab.subplot(n_rows,1,index_antenna+1,sharex=ax,sharey=ax)
-                            if index_antenna == 0:
-                                boolstring = ['False','True']
-                                pylab.title('Event %i, summed_signals = %s'%(eventid,boolstring[int(summed_signals)])) 
-                            pylab.plot(u_signals[station_label][antenna_label],E_signals[station_label][antenna_label],label='s%ia%i'%(index_station,index_antenna),linewidth=0.5)
-                            if ( n_rows // 2 == index_antenna):
-                                pylab.ylabel('V$_{%i}$ (V)'%(eventid),fontsize=12)
-                            pylab.legend(fontsize=8,framealpha=0.0)
-                        pylab.xlabel('t-t_emit (ns)',fontsize=12)
+                        if first_in_loop == True:
+                            first_in_loop = False
+                            ax = pylab.subplot(gs_left[2*index_antenna])
                         
-                        #Making Tables
-                        #TABLE 1: Making position table
-                        table_fig = pylab.subplot(gs_right[1])
+                        ax1 = pylab.subplot(gs_left[2*index_antenna],sharex = ax,sharey = ax)
+                        ax2 = ax1.twinx() #this is not perfect and can be janky with zooming.   
+                        axis2.append(ax2)   
+                        c1 = 'b'
+                        c2 = 'r'
+                        #pylab.subplot(n_rows,1,index_antenna+1,sharex=ax,sharey=ax)
+                        if index_antenna == 0:
+                            boolstring = ['False','True']
+                            pylab.title('Event %i, summed_signals = %s'%(eventid,boolstring[int(summed_signals)])) 
+                        ax1.plot(time_analog[station_label][antenna_label],V_analog[station_label][antenna_label],label='s%ia%i'%(index_station,index_antenna),linewidth=0.6,c = c1)
+                        ax2.plot(time_digital[station_label][antenna_label],V_digital[station_label][antenna_label],label='s%ia%i'%(index_station,index_antenna),linewidth=0.4,c = c2)
                         
-                        table_ax = pylab.gca()
-                        table_fig.patch.set_visible(False)
-                        table_ax.axis('off')
-                        table_ax.axis('tight')
-                        x_neutrino = x_0
-                        y_neutrino = y_0
-                        z_neutrino = z_0
-                        r_neutrino = numpy.sqrt(x_neutrino**2 + y_neutrino**2)
-                        phi_neutrino = phi_0
-                        df = pandas.DataFrame({'x(m)':[ x_neutrino ] , 'y(m)':[ y_neutrino ] , 'z(m)':[ z_neutrino ] , 'r(m)':[ r_neutrino ] , '$\phi_0$(deg)':[ phi_neutrino ] })
-                        table = pylab.table(cellText = df.values.round(2), colLabels = df.columns, loc = 'center')
-                        table.auto_set_font_size(False)
-                        table.set_fontsize(10)
-                        pylab.title('Event Info')
+                        if ( n_rows // 2 == index_antenna):
+                            ax1.set_ylabel('V$_{%i}$ (V)'%(eventid),fontsize=12, color=c1)
+                            ax2.set_ylabel('adu',fontsize=12, color=c2)
+                            
+                        ax1.legend(fontsize=8,framealpha=0.0,loc='upper left')
+                        ax1.tick_params('y', colors=c1)
                         
-                        #TABLE 2: Making Neutrino Energetics table 
-                        '''
-                        >>> list(reader.keys())
-                        ['a_h', 'a_v', 'd', 'electric_field', 'energy_neutrino', 'index_antenna', 
-                        'index_station', 'inelasticity', 'info', 'observation_angle', 'p_detect', 
-                        'p_earth', 'p_interact', 'phi_0', 'solution', 't', 'theta_0', 'theta_ant', 
-                        'theta_ray', 'x_0', 'y_0', 'z_0']
+                        ax2.legend(fontsize=8,framealpha=0.0,loc='upper right')
+                        ax2.tick_params('y', colors=c2)
+                        ax1_ylim = numpy.array(ax1.get_ylim())
                         
-                        event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, anti=False,
-                        electricFieldDomain = 'freq',include_noise = False,plot_signals=False,plot_geometry=False,summed_signals=False,
-                        plot_threshold = 0,plot_filetype_extension = 'svg',image_path = './'):
-                        '''
-                        table_fig = pylab.subplot(gs_right[3])
+                        if ax1_ylim[0] < max_ax1_range[0]:
+                            max_ax1_range[0] = ax1_ylim[0]
+                        if ax1_ylim[1] > max_ax1_range[1]:
+                            max_ax1_range[1] = ax1_ylim[1]
+                            
+                    for ax2 in axis2:
+                        ax2.set_ylim(max_ax1_range * self.scale_noise_to / self.noise_rms)
                         
-                        table_ax = pylab.gca()
-                        table_fig.patch.set_visible(False)
-                        table_ax.axis('off')
-                        table_ax.axis('tight')
-                        
-                        df = pandas.DataFrame({'E$_\\nu$ (GeV)':'%0.4g'%(energy_neutrino) , 'Inelasticity':'%0.4g'%inelasticity , 'p_interact':'%0.4g'%p_interact, 'p_earth':'%0.4g'%p_earth},index=[0])
-                        #decimals = pandas.Series([3,3,3,3],index = df.columns)
-                        table = pylab.table(cellText = df.values , colLabels = df.columns, loc = 'center')
-                        table.auto_set_font_size(False)
-                        table.set_fontsize(10)
-                        
-                        
-                        
-                        #TABLE 3: Making observed angles and attenuations table
-                        table_fig = pylab.subplot(gs_right[5])
-                        
-                        table_ax = pylab.gca()
-                        table_fig.patch.set_visible(False)
-                        table_ax.axis('off')
-                        table_ax.axis('tight')
-                        antenna =           ['%i'%i for i in info['antenna'].astype(int)]
-                        observation_angle = ['%0.3g'%i for i in info['observation_angle'].astype(float)]
-                        theta_ant =         ['%0.3g'%i for i in info['theta_ant'].astype(float)]
-                        distance =          ['%0.3g'%i for i in info['distance'].astype(float)]
-                        beam_factor =       ['%0.3g'%i for i in info['beam_pattern_factor']]
-                        df = pandas.DataFrame({'antenna':antenna , '$\\theta_\mathrm{ant}$ (deg)':theta_ant , '$\\theta_\mathrm{emit}$ (deg)':observation_angle,'d$_\mathrm{path}$ (m)':distance, 'Beam Factor':beam_factor})
-                        table = pylab.table(cellText = df.values, colLabels = df.columns, loc = 'center')
-                        table.auto_set_font_size(False)
-                        table.set_fontsize(10)
-                        
-                        
-                        #TABLE 4: Max Voltage and SNR per Antenna
-                        '''
-                        >>> list(reader.keys())
-                        ['a_h', 'a_v', 'd', 'electric_field', 'energy_neutrino', 'index_antenna', 
-                        'index_station', 'inelasticity', 'info', 'observation_angle', 'p_detect', 
-                        'p_earth', 'p_interact', 'phi_0', 'solution', 't', 'theta_0', 'theta_ant', 
-                        'theta_ray', 'x_0', 'y_0', 'z_0']
-                        
-                        event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, anti=False,
-                        electricFieldDomain = 'freq',include_noise = False,plot_signals=False,plot_geometry=False,summed_signals=False,
-                        plot_threshold = 0,plot_filetype_extension = 'svg',image_path = './'):
-                        '''
-                        table_fig = pylab.subplot(gs_right[7])
-                        
-                        table_ax = pylab.gca()
-                        table_fig.patch.set_visible(False)
-                        table_ax.axis('off')
-                        table_ax.axis('tight')
-                        antenna =           ['%i'%i for i in info['antenna'].astype(int)]
-                        electric_field =    ['%0.3g'%i for i in info['electric_field'].astype(float)]
-                        dom_freqs =         ['%0.3g'%i for i in (info['dominant_freq']/1e6).astype(float)]
-                        SNRs =              ['%0.3g'%i for i in info['SNR'].astype(float)]
-                        df = pandas.DataFrame({'antenna':antenna , '$V_\mathrm{max}$ (V)':electric_field , 'SNR':SNRs, '$f_\mathrm{max}$ (MHz)':dom_freqs})
-                        table = pylab.table(cellText = df.values , colLabels = df.columns, loc = 'center')
-                        table.auto_set_font_size(False)
-                        table.set_fontsize(10)
-                        
-                        
-                        pylab.subplots_adjust(left = 0.06, bottom = 0.05, right = 0.99, top = 0.97, wspace = 0.04, hspace = 0.28)
-                        #pylab.show(block=True)
-                        try:
-                            pylab.savefig('%s%s-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
-                            pylab.close(fig)
-                            #print('Saved image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
-                        except:
-                            print('Failed to save image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
+                    pylab.xlabel('t-t_emit (ns)',fontsize=12)
+                    
+                    #Making Tables
+                    #TABLE 1: Making position table
+                    table_fig = pylab.subplot(gs_right[1])
+                    
+                    table_ax = pylab.gca()
+                    table_fig.patch.set_visible(False)
+                    table_ax.axis('off')
+                    table_ax.axis('tight')
+                    x_neutrino = x_0
+                    y_neutrino = y_0
+                    z_neutrino = z_0
+                    r_neutrino = numpy.sqrt(x_neutrino**2 + y_neutrino**2)
+                    phi_neutrino = phi_0
+                    df = pandas.DataFrame({'x(m)':[ x_neutrino ] , 'y(m)':[ y_neutrino ] , 'z(m)':[ z_neutrino ] , 'r(m)':[ r_neutrino ] , '$\phi_0$(deg)':[ phi_neutrino ] })
+                    table = pylab.table(cellText = df.values.round(2), colLabels = df.columns, loc = 'center')
+                    table.auto_set_font_size(False)
+                    table.set_fontsize(10)
+                    pylab.title('Event Info')
+                    
+                    #TABLE 2: Making Neutrino Energetics table 
+                    '''
+                    >>> list(reader.keys())
+                    ['a_h', 'a_v', 'd', 'electric_field', 'energy_neutrino', 'index_antenna', 
+                    'index_station', 'inelasticity', 'info', 'observation_angle', 'p_detect', 
+                    'p_earth', 'p_interact', 'phi_0', 'solution', 't', 'theta_0', 'theta_ant', 
+                    'theta_ray', 'x_0', 'y_0', 'z_0']
+                    
+                    event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, anti=False,
+                    electricFieldDomain = 'freq',include_noise = False,plot_signals=False,plot_geometry=False,summed_signals=False,
+                    plot_threshold = 0,plot_filetype_extension = 'svg',image_path = './'):
+                    '''
+                    table_fig = pylab.subplot(gs_right[3])
+                    
+                    table_ax = pylab.gca()
+                    table_fig.patch.set_visible(False)
+                    table_ax.axis('off')
+                    table_ax.axis('tight')
+                    
+                    df = pandas.DataFrame({'E$_\\nu$ (GeV)':'%0.4g'%(energy_neutrino) , 'Inelasticity':'%0.4g'%inelasticity , 'p_interact':'%0.4g'%p_interact, 'p_earth':'%0.4g'%p_earth},index=[0])
+                    #decimals = pandas.Series([3,3,3,3],index = df.columns)
+                    table = pylab.table(cellText = df.values , colLabels = df.columns, loc = 'center')
+                    table.auto_set_font_size(False)
+                    table.set_fontsize(10)
+                    
+                    
+                    
+                    #TABLE 3: Making observed angles and attenuations table
+                    table_fig = pylab.subplot(gs_right[5])
+                    
+                    table_ax = pylab.gca()
+                    table_fig.patch.set_visible(False)
+                    table_ax.axis('off')
+                    table_ax.axis('tight')
+                    antenna =           ['%i'%i for i in info['antenna'].astype(int)]
+                    observation_angle = ['%0.3g'%i for i in info['observation_angle'].astype(float)]
+                    theta_ant =         ['%0.3g'%i for i in info['theta_ant'].astype(float)]
+                    distance =          ['%0.3g'%i for i in info['distance'].astype(float)]
+                    beam_factor =       ['%0.3g'%i for i in info['beam_pattern_factor']]
+                    df = pandas.DataFrame({'antenna':antenna , '$\\theta_\mathrm{ant}$ (deg)':theta_ant , '$\\theta_\mathrm{emit}$ (deg)':observation_angle,'d$_\mathrm{path}$ (m)':distance, 'Beam Factor':beam_factor})
+                    table = pylab.table(cellText = df.values, colLabels = df.columns, loc = 'center')
+                    table.auto_set_font_size(False)
+                    table.set_fontsize(10)
+                    
+                    
+                    #TABLE 4: Max Voltage and SNR per Antenna
+                    '''
+                    >>> list(reader.keys())
+                    ['a_h', 'a_v', 'd', 'electric_field', 'energy_neutrino', 'index_antenna', 
+                    'index_station', 'inelasticity', 'info', 'observation_angle', 'p_detect', 
+                    'p_earth', 'p_interact', 'phi_0', 'solution', 't', 'theta_0', 'theta_ant', 
+                    'theta_ray', 'x_0', 'y_0', 'z_0']
+                    
+                    event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, anti=False,
+                    electricFieldDomain = 'freq',include_noise = False,plot_signals=False,plot_geometry=False,summed_signals=False,
+                    plot_threshold = 0,plot_filetype_extension = 'svg',image_path = './'):
+                    '''
+                    table_fig = pylab.subplot(gs_right[7])
+                    
+                    table_ax = pylab.gca()
+                    table_fig.patch.set_visible(False)
+                    table_ax.axis('off')
+                    table_ax.axis('tight')
+                    antenna =           ['%i'%i for i in info['antenna'].astype(int)]
+                    electric_field =    ['%0.3g'%i for i in info['electric_field'].astype(float)]
+                    dom_freqs =         ['%0.3g'%i for i in (info['dominant_freq']/1e6).astype(float)]
+                    SNRs =              ['%0.3g'%i for i in info['SNR'].astype(float)]
+                    df = pandas.DataFrame({'antenna':antenna , '$V_\mathrm{max}$ (V)':electric_field , 'SNR':SNRs, '$f_\mathrm{max}$ (MHz)':dom_freqs})
+                    table = pylab.table(cellText = df.values , colLabels = df.columns, loc = 'center')
+                    table.auto_set_font_size(False)
+                    table.set_fontsize(10)
+                    
+                    
+                    pylab.subplots_adjust(left = 0.05, bottom = 0.05, right = 0.99, top = 0.97, wspace = 0.15, hspace = 0.28)
+                    #pylab.show(block=True)
+                    try:
+                        pylab.savefig('%s%s-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
+                        pylab.close(fig)
+                        #print('Saved image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
+                    except:
+                        print('Failed to save image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
                     
             #By this point the signals for each antenna should be selected.  Here is where they could be plotted
             #or where phasing could take place. 
@@ -849,6 +885,7 @@ class Sim:
                           plot_signals=False,plot_spectrum=False,plot_potential = False,\
                           include_noise = True, resistance = 50, temperature = 320)[3]
             self.noise_rms = numpy.std(noise_signal)
+            self.scale_noise_to = 3
             
         #Loading Hulls (or creating if hulls have not been previously determined in the necessary folder)
         self.concave_hull = {}
