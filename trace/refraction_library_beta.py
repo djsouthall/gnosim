@@ -864,13 +864,13 @@ class RefractionLibrary:
 ############################################################
 
 if __name__ == '__main__':
-    make_library = False#True
-    split_library = False
+    make_library = False
+    split_library = True
     plot_library = True
-    save_envelope = False#True
+    save_envelope = True
     plot_envelope = True
-    z_array = [-200.,-207.]#[-200.,-201.,-202.,-203.,-204.,-205.,-206.,-207.]
-    n_rays = 120
+    z_array = [-173,-174]#[-175,-176,-177,-178,-179,-181,-183]#[-200.,-201.,-202.,-203.,-204.,-205.,-206.,-207.]
+    n_rays = 180
     r_limit = None #Note if this is NOT None, then all thrown rays will quit once they read this particular radius.  Use with care.  If you want a simulation with r = 6300m, it might be advisable to make r_limit = 7000 so the boundaries of hulls are still well defined
     for z_0 in z_array:
         library_dir = 'library_%i_polar_%i_rays'%(int(z_0),n_rays)
@@ -922,7 +922,7 @@ if __name__ == '__main__':
                     reader = h5py.File(infile, 'r')
                     file = h5py.File(in_path.replace(in_dir,sub_dir) + '/' + infile.split('/')[-1], 'w')
                     theta_ant_cut = numpy.where(numpy.isclose(test_lib.data[solution]['theta_ant'],infile_angles[ang_index], atol = 0.99*min(numpy.diff(infile_angles))))[0]
-                    file.attrs['solution_type'] = solution
+                    file.attrs['solution_type'] = solution.encode('utf8')
                     for attr in list(reader.attrs):
                         file.attrs[attr] = reader.attrs[attr]
                     print('Saving',len(theta_ant_cut),'values for solution type:',solution,'\ttheta_ant = ',infile_angles[ang_index])

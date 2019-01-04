@@ -556,7 +556,7 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
         V_rms_measured = numpy.sqrt(numpy.mean(V_noise[u < 0]**2)) #This is the 'measured' V_rms, rather than the set.  This is after system response
         SNR = (p2p_half/V_rms_measured)**2
         SNR_dB = 10*numpy.log10( SNR )#dB, using 10log10 because input is power ratio 
-        print('SNR', SNR)
+        #print('SNR', SNR)
     else:
         SNR = 0
         print('No noise included.  Cannot perform SNR calculation.')
@@ -638,7 +638,6 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
         return V_noiseless, u + t_offset, dominant_freq
 
 
-@profile
 def digitizeSignal(u,V,sampling_rate,bytes,scale_noise_from,scale_noise_to, dc_offset = 0, random_time_offset = 0, plot = False):
     '''
     This function is meant to act as the ADC for the simulation.  It will sample
@@ -716,7 +715,7 @@ def signalsFromInfo(eventid,reader,u_signal,n,h_fft,sys_fft,freqs,include_noise 
         Vd = []
         ud = []
         
-        noise_signal = quickSignalSingle( 0,1,numpy.unique(energy_neutrino),1.8,\
+        noise_signal = quickSignalSingle( 0,1,numpy.unique(energy_neutrino),n,\
                           0,0,0,u_signal,h_fft,sys_fft,freqs,\
                           plot_signals=False,plot_spectrum=False,plot_potential = False,\
                           include_noise = True, resistance = 50, temperature = 320)[3]
@@ -762,6 +761,8 @@ def signalsFromInfo(eventid,reader,u_signal,n,h_fft,sys_fft,freqs,include_noise 
         #Plotting signals
         
         first_in_loop = True
+        axis2 = []
+        max_ax1_range = numpy.array([1e20,-1e20])
         for index_antenna in range(0, len(t_offset)):
             antenna_label_number = event_info['antenna'][index_antenna]
             
@@ -771,7 +772,7 @@ def signalsFromInfo(eventid,reader,u_signal,n,h_fft,sys_fft,freqs,include_noise 
                 ax = pylab.subplot(gs_left[2*index_antenna])
             ax1 = pylab.subplot(gs_left[2*index_antenna],sharex = ax,sharey = ax)
             ax2 = ax1.twinx() #this is not perfect and can be janky with zooming.        
-            
+            axis2.append(ax2)
             if index_antenna == 0:
                 pylab.title('Event %i, summed_signals = %s'%(eventid,'False'))
                 
@@ -793,6 +794,16 @@ def signalsFromInfo(eventid,reader,u_signal,n,h_fft,sys_fft,freqs,include_noise 
             #    pylab.ylabel('V$_{%i}$ (V)'%(eventid),fontsize=12)
             ax1.legend(fontsize=8,loc='upper left')
             ax2.legend(fontsize=8,loc='upper right')
+            
+            ax1_ylim = numpy.array(ax1.get_ylim())
+                        
+            if ax1_ylim[0] < max_ax1_range[0]:
+                max_ax1_range[0] = ax1_ylim[0]
+            if ax1_ylim[1] > max_ax1_range[1]:
+                max_ax1_range[1] = ax1_ylim[1]
+                
+        for ax2 in axis2:
+            ax2.set_ylim(max_ax1_range * 3 / noise_rms)
         pylab.xlabel('t-t_emit (ns)',fontsize=12)
         
         
