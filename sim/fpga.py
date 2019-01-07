@@ -32,8 +32,8 @@ import gnosim.trace.refraction_library_beta
 from gnosim.trace.refraction_library_beta import *
 import gnosim.interaction.askaryan
 import gnosim.sim.detector
-pylab.ion()
 import gnosim.interaction.askaryan_testing
+pylab.ion()
 ############################################################
 
 import cProfile, pstats, io
@@ -65,8 +65,48 @@ def profile(fnc):
         return retval
 
     return inner
+
+
+def digitizeSignal(u,V,sampling_rate,bytes,scale_noise_from,scale_noise_to, dc_offset = 0, random_time_offset = 0, plot = False):
+    '''
+    This function is meant to act as the ADC for the simulation.  It will sample
+    the signal using the provided sampling rate.  The value of
+    bytes sets the number of voltage bins, those will be distributed from 
+    -2**(bytes-1)+1 to 2**(bytes-1).  The input V will be sampled and scaled linearly
+    using a linear scaling with V_new = (scale_noise_to/scale_noise_from) * V_sampled
+    And then V_sampled is scaled to be one of the byte values using a floor.  Everything
+    outside of the max will be rounded.  
     
-def getBeams( config, n_beams, n_baselines , n , dt , verbose = False):
+    Sampleing rate should be in GHz
+    '''
+    V = V + dc_offset
+    sampling_period = 1.0 / sampling_rate #ns
+    sample_times = numpy.arange(u[1],u[-1],sampling_period) + random_time_offset
+    sample_times = sample_times[numpy.logical_and(sample_times <= u[-1],sample_times >= u[1])] #otherwise interpolation error for out of bounds. 
+    V_sampled = scipy.interpolate.interp1d(u,V)(sample_times)
+    
+    #byte_vals = numpy.linspace(-2**(bytes-1)+1,2**(bytes-1),2**bytes,dtype=int)
+    byte_vals = numpy.array([-2**(bytes-1)+1,2**(bytes-1)],dtype=int) #only really need endpoints
+    slope = scale_noise_to/scale_noise_from
+    f = scipy.interpolate.interp1d(byte_vals/slope,byte_vals,bounds_error = False,fill_value = (byte_vals[0],byte_vals[-1]) )
+    V_bit = numpy.floor(f(V_sampled)) #not sure if round or floor should be used to best approximate the actual process.
+    
+    if plot == True:
+        pylab.figure()
+        ax = pylab.subplot(2,1,1)
+        pylab.ylabel('V (V)')
+        pylab.xlabel('t (ns)')
+        pylab.scatter(u,V,label='Signal')
+        pylab.stem(sample_times,V_sampled,bottom = dc_offset, linefmt='r-', markerfmt='rs', basefmt='r-',label='Interp Sampled at %0.2f GSPS'%sampling_rate)
+        
+        ax = pylab.subplot(2,1,2,sharex=ax)
+        pylab.ylabel('Voltage (Scaled so VRMS = 3)')
+        pylab.xlabel('t (ns)')
+        pylab.plot(u,V*slope)
+        pylab.stem(sample_times,V_bit,bottom = dc_offset*slope, linefmt='r-', markerfmt='rs', basefmt='r-',label='Interp Sampled at %0.2f GSPS'%sampling_rate)
+    return V_bit, sample_times
+
+def getBeams( config, n_beams, n_baselines , n , dt ,power_calculation_sum_length = 16, power_calculation_interval = 8, verbose = False):
     '''
     The goal of this function is to determine the beam and subbeam time delays 
     semiautomatically given a config file.
@@ -90,8 +130,8 @@ def getBeams( config, n_beams, n_baselines , n , dt , verbose = False):
     baselines = baselines[baselines!= 0][range(n_baselines)]
     
     antenna_list = numpy.arange(n_antennas)
-    beam_dict = {'attrs' :  {'power_calculation_sum_length' : 16,
-                             'power_calculation_interval'   :  8},
+    beam_dict = {'attrs' :  {'power_calculation_sum_length' : power_calculation_sum_length,
+                             'power_calculation_interval'   : power_calculation_interval},
                  'beams':{}}
     #Both power_calculation_sum_length and power_calculation_interval can probably be made into input parameters if needed
     subbeam_list = [] 
@@ -216,60 +256,6 @@ def sumBeams( u_in, V_in, beam_dict , config , plot = False,save_figs = False, i
                 print('Failed to save image %s%s.%s'%(image_path,beam_label,plot_filetype_extension))
     return out_beams
 
- 
-def doFPGAPowerCalcSingleBeamOld(beam, sum_length=16, interval=8):
-    '''
-    This is straight from Eric's code
-    '''
-    num_frames = int(math.floor((len(beam)-sum_length) / interval))
-        
-    power = numpy.zeros(num_frames)
-    for frame in range(num_frames):
-        for i in range(frame*interval, frame*interval + sum_length):
-            power[frame] += beam[i]
-    return numpy.array(power)
-
-@profile 
-def doFPGAPowerCalcAllBeamsOld(summed_beam_dict,plot = False):
-    '''
-    This is an adapted version of Eric's code to account for my organizational
-    structure for the various beams and subbeams. 
-    '''
-    beam_powers = {}
-    power_beam_dict = summed_beam_dict
-    if plot == True:
-        fig = pylab.figure(figsize=(16.,11.2))
-        #ax = pylab.subplot(len( summed_beam_dict['beams'].keys() ), 1, 1)
-    for beam_index, beam_label in enumerate(summed_beam_dict['beams'].keys()):
-        first_subbeam = True
-        for subbeam_label in summed_beam_dict['beams'][beam_label].keys():
-            power_beam_dict['beams'][beam_label][subbeam_label]['power_sum'] = doFPGAPowerCalcSingleBeamOld(summed_beam_dict['beams'][beam_label][subbeam_label]['beam_power_signal'], beam_dict['attrs']['power_calculation_sum_length'], beam_dict['attrs']['power_calculation_interval'])
-            if first_subbeam == True:
-                first_subbeam = False
-                beam_powers[beam_label] = power_beam_dict['beams'][beam_label][subbeam_label]['power_sum']
-            else:
-                beam_powers[beam_label] = numpy.add(beam_powers[beam_label],power_beam_dict['beams'][beam_label][subbeam_label]['power_sum'])
-        
-        if plot == True:
-            #pylab.subplot(len( summed_beam_dict['beams'].keys() ), 1,beam_index + 1,sharey = ax)
-            #getting weighted angle in crude way
-            total_n = 0
-            weighted_theta_ant = 0
-            for subbeam_label in summed_beam_dict['beams'][beam_label].keys():
-                weighted_theta_ant += summed_beam_dict['beams'][beam_label][subbeam_label]['theta_ant'] * len(summed_beam_dict['beams'][beam_label][subbeam_label]['antennas'])
-                total_n += len(summed_beam_dict['beams'][beam_label][subbeam_label]['antennas'])
-            weighted_theta_ant = weighted_theta_ant / total_n
-            pylab.plot(beam_powers[beam_label],label = '%s, $\\theta_{ant} = $ %0.2f'%(beam_label,weighted_theta_ant))
-    if plot == True:
-        ax = pylab.gca()
-        colormap = pylab.cm.gist_ncar #nipy_spectral, Set1,Paired   
-        colors = [colormap(i) for i in numpy.linspace(0, 1,len(ax.lines))]
-        for line_index,line in enumerate(ax.lines):
-            line.set_color(colors[line_index])
-        pylab.legend()
-    return power_beam_dict, beam_powers
-
-@profile
 def doFPGAPowerCalcAllBeams(summed_beam_dict,plot = False):
     '''
     This replicates the results of Eric's code but does so using more numpy operations
@@ -318,21 +304,18 @@ def doFPGAPowerCalcAllBeams(summed_beam_dict,plot = False):
         pylab.legend()
     return power_beam_dict, beam_powers
 
-def beamCalculations(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False):
+def testingBeamCalculations(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False):
     '''
     This function should do everything that would be calculated per event in the simulation
     such that I can profile the individual functios to ensure it all runs quickly.
     '''
     V, u = syncSignals(ud,Vd)
     summed_beam_dict = sumBeams( u, V, beam_dict , config, plot = plot1,save_figs=False)
-    power_beam_dict, beam_powers = doFPGAPowerCalcAllBeamsOld(summed_beam_dict,plot = plot2)
+    power_beam_dict, beam_powers = doFPGAPowerCalcAllBeams(summed_beam_dict,plot = plot2)
     
 ############################################################
 
 if __name__ == "__main__":
-    old_testing = True
-    new_testing = False
-    
     pylab.close('all')
     energy_neutrino = 3.e9 # GeV
     n = 1.78
@@ -341,11 +324,11 @@ if __name__ == "__main__":
     R = 1000. #m
     cherenkov_angle = numpy.arccos(1./n)
     cherenkov_angle_deg = numpy.rad2deg(numpy.arccos(1./n))
-    h_fft,sys_fft,freqs = gnosim.interaction.askaryan_testing.loadSignalResponse()
-    input_u, h_fft, sys_fft, freqs = gnosim.interaction.askaryan_testing.calculateTimes(up_sample_factor=20)
+    h_fft,sys_fft,freqs = gnosim.interaction.askaryan.loadSignalResponse()
+    input_u, h_fft, sys_fft, freqs = gnosim.interaction.askaryan.calculateTimes(up_sample_factor=20)
     inelasticity = 0.2
-    noise_rms = numpy.std(gnosim.interaction.askaryan_testing.quickSignalSingle(0,R,inelasticity*energy_neutrino,n,R,0,0,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)[3])
-    V_noiseless, u, dominant_freq, V_noise,  SNR = gnosim.interaction.askaryan_testing.quickSignalSingle(numpy.deg2rad(50),R,inelasticity*energy_neutrino,n,2500,0.7,0.7,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)
+    noise_rms = numpy.std(gnosim.interaction.askaryan.quickSignalSingle(0,R,inelasticity*energy_neutrino,n,R,0,0,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)[3])
+    V_noiseless, u, dominant_freq, V_noise,  SNR = gnosim.interaction.askaryan.quickSignalSingle(numpy.deg2rad(50),R,inelasticity*energy_neutrino,n,2500,0.7,0.7,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)
     sampling_rate = 1.5 #GHz
     bytes = 7
     scale_noise_from = noise_rms
@@ -353,7 +336,7 @@ if __name__ == "__main__":
     
     random_time_offset = numpy.random.uniform(-5.0,5.0) #ns
     dc_offset = 0.0 #V
-    V_bit, sampled_times = gnosim.sim.fpga.digitizeSignal(u,V_noise,sampling_rate,bytes,scale_noise_from,scale_noise_to, random_time_offset = random_time_offset, dc_offset = dc_offset, plot = False)
+    V_bit, sampled_times = digitizeSignal(u,V_noise,sampling_rate,bytes,scale_noise_from,scale_noise_to, random_time_offset = random_time_offset, dc_offset = dc_offset, plot = False)
     dt = sampled_times[1] - sampled_times[0]
     #################################################################
     config_file = '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_dipole_octo_-200_polar_120_rays.py'
@@ -378,22 +361,16 @@ if __name__ == "__main__":
         do_events = numpy.random.choice(eventids,5,replace=False)
     except:
         do_events = numpy.unique(numpy.random.choice(eventids,5,replace=True))
-    #do_events = eventids[numpy.random.randint(0,len(eventids),size = 5)]
     plot_beams = False
     plot_sums = True
     for eventid in do_events:
-        #Note noise is kind of jank and will always be the same
         print('On event %i'%eventid)
         V, u, Vd, ud = gnosim.interaction.askaryan_testing.signalsFromInfo(eventid,reader,input_u,n,h_fft,sys_fft,freqs,include_noise = True,resistance = 50, temperature = 320)
         sub_info = info[info['eventid'] == eventid]
         Vd2, ud2 = syncSignals(ud,Vd)
         print('Mean angle for event %i is %0.2f'%(eventid, numpy.mean(info[info['eventid'] == eventid]['theta_ant'])))
-        beamCalculations(ud, Vd, beam_dict , config, plot1 = plot_beams, plot2 = plot_sums)
-        #dips in signals near the ends is likely due to zeros created when synching signals.  These are regions with no overlapping noise, so leass overall power from noise. 
-    #sumBeams( ud, Vd, beam_dict , config, plot = True)
+        testingBeamCalculations(ud, Vd, beam_dict , config, plot1 = plot_beams, plot2 = plot_sums)
     
-    #summed_beam_dict = sumBeams( ud2, Vd2, beam_dict , config, plot = False,save_figs=False)
-    #power_beam_dict, beam_powers = doFPGAPowerCalcAllBeams(summed_beam_dict,plot=True)
     
     
 ############################################################

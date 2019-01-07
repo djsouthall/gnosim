@@ -33,7 +33,7 @@ import gnosim.trace.refraction_library_beta
 from gnosim.trace.refraction_library_beta import *
 import gnosim.interaction.askaryan
 import gnosim.sim.detector
-
+import gnosim.sim.fpga
 pylab.ion()
 
 ############################################################
@@ -265,7 +265,7 @@ class Sim:
                                       include_noise = True, resistance = 50, temperature = 320)  #expects ovbservation_angle to be in radians (hence the deg2rad on input)
                                     
                                     electric_array = V_noise
-                                    electric_array_digitized, u_digitized = gnosim.interaction.askaryan.digitizeSignal(u,V_noise,self.stations[index_station].antennas[index_antenna].sampling_rate,self.stations[index_station].antennas[index_antenna].sampling_bits,self.noise_rms,self.scale_noise_to, dc_offset = dc_offset, random_time_offset = random_time_offset, plot = False)
+                                    electric_array_digitized, u_digitized = gnosim.sim.fpga.digitizeSignal(u,V_noise,self.stations[index_station].antennas[index_antenna].sampling_rate,self.stations[index_station].antennas[index_antenna].sampling_bits,self.noise_rms,self.scale_noise_to, dc_offset = dc_offset, random_time_offset = random_time_offset, plot = False)
                                     
                                 else:
                                     V_noiseless, u , dominant_freq = gnosim.interaction.askaryan.quickSignalSingle( numpy.deg2rad(observation_angle),\
