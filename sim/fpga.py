@@ -19,6 +19,7 @@ import scipy.signal
 import scipy.misc
 import time
 import math
+import copy
 sys.path.append("/home/dsouthall/Projects/GNOSim/")
 from matplotlib import gridspec
 import pandas
@@ -116,6 +117,9 @@ def getBeams( config, n_beams, n_baselines , n , dt ,power_calculation_sum_lengt
     minimum baseline. i.e. all subbeam baselines must be in integer multiples of 
     the minimum baseline.  
     Currently requires all other baselines to be an integer multiple of the minimum baseline
+    
+    n should be average index of refraction of array (used for angle estimates)
+    dt should be in nanoseconds (used for angle estimates)
     '''
     n_antennas = config['antennas']['n']
     min_antennas_per_subbeam =  2#numpy.round(n_antennas/3) #if the number of antennas satisfying a baseline is less than this that beam won't be counted
@@ -154,9 +158,12 @@ def getBeams( config, n_beams, n_baselines , n , dt ,power_calculation_sum_lengt
         print(subbeam_list) 
     
     all_time_delays = numpy.array([])
+    beam_dict['theta_ant'] = {}
     for beam_index in range(n_beams):
         beam_label = 'beam%i'%beam_index
         beam_dict['beams'][beam_label] = {}
+        theta_ant_beam = 0
+        total_ant = 0
         for subbeam_index, subbeam in enumerate(subbeam_list):
             subbeam_label = 'subbeam%i'%subbeam_index
             baseline = min(numpy.unique(numpy.abs(numpy.diff(relative_antenna_depths[subbeam]))))
@@ -164,7 +171,7 @@ def getBeams( config, n_beams, n_baselines , n , dt ,power_calculation_sum_lengt
             if baseline % min_baseline != 0:
                 continue
                 
-            theta_elevation = numpy.rad2deg(numpy.arcsin(c * ms[beam_index] * dt  / ( n * baseline) ))
+            theta_elevation = numpy.rad2deg(numpy.arcsin(gnosim.utils.constants.speed_light * ms[beam_index] * dt  / ( n * baseline) ))
             theta_ant = 90-theta_elevation    
             beam_dict['beams'][beam_label][subbeam_label] = {'baseline'       : baseline,
                                                     'antennas'       : subbeam,
@@ -174,7 +181,10 @@ def getBeams( config, n_beams, n_baselines , n , dt ,power_calculation_sum_lengt
                                                     'theta_ant': theta_ant,
                                                     'adjusted_m' : ms[beam_index]
                                                     }
+            theta_ant_beam += len(subbeam)*theta_ant
+            total_ant += len(subbeam)
             all_time_delays = numpy.append(all_time_delays,beam_dict['beams'][beam_label][subbeam_label]['time_delays'])
+        beam_dict['theta_ant'][beam_label] = theta_ant_beam/total_ant
     beam_dict['attrs']['unique_delays'] = numpy.array(numpy.sort(numpy.unique(all_time_delays)),dtype=int)
     if verbose == True:
         for k in beam_dict['beams'].keys():
@@ -186,6 +196,7 @@ def getBeams( config, n_beams, n_baselines , n , dt ,power_calculation_sum_lengt
 
     return beam_dict
 
+@profile
 def syncSignals( u_in, V_in ):
     '''
     Given an array of u_in times and V_in signals with the same number
@@ -214,7 +225,8 @@ def syncSignals( u_in, V_in ):
             cut = numpy.arange(left_index,right_index)
             V_out[i][cut] += V
         return V_out, u_out
-            
+        
+@profile       
 def fpgaBeamForming(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False, save_figs = False):
     '''
     This is one function which uses the code from what were the sumBeams and 
@@ -233,28 +245,29 @@ def fpgaBeamForming(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False
     #Doing the beam summing portion below:
     #####
     n_antennas = config['antennas']['n']
-    beam_dict['attrs']['signal_length'] = numpy.shape(V_in)[1]
-    
+    signal_length = numpy.shape(V_in)[1]
     #below is the fastest way I could figure out of doing these sums.  Originally
     #a roll function was used, however this took too long.  I tried to reduce
     #the number of times things are redundently done by calculating them in advance
     #as well as avoid things like appending and such.  It isn't as readable as I would
     #like it to be but it is faster and reproduces the same results as the old
     #algorithm.
-    zeros_delay = numpy.arange(beam_dict['attrs']['signal_length']) #any zero delays are the same, no need to do this arange multiple times
-    delay_indices = numpy.zeros((len(beam_dict['attrs']['unique_delays']),beam_dict['attrs']['signal_length'])) #will hold the indices for each delay that replicate the roll required.  Ordered in the same way as beam_dict['attrs']['unique_delays'], so call the correct row by from indexing that
+    zeros_delay = numpy.arange(signal_length) #any zero delays are the same, no need to do this arange multiple times
+    delay_indices = numpy.zeros((len(beam_dict['attrs']['unique_delays']),signal_length)) #will hold the indices for each delay that replicate the roll required.  Ordered in the same way as beam_dict['attrs']['unique_delays'], so call the correct row by from indexing that
     for index, shift in enumerate(beam_dict['attrs']['unique_delays']):
         if shift < 0:
-            delay_indices[index,0:beam_dict['attrs']['signal_length'] + shift] = numpy.arange(-shift,beam_dict['attrs']['signal_length'])
-            delay_indices[index,beam_dict['attrs']['signal_length'] + shift:beam_dict['attrs']['signal_length']] = numpy.arange(0,-shift)
+            delay_indices[index,0:signal_length + shift] = numpy.arange(-shift,signal_length)
+            delay_indices[index,signal_length + shift:signal_length] = numpy.arange(0,-shift)
         elif shift > 0:
-            delay_indices[index,0:shift] = numpy.arange(beam_dict['attrs']['signal_length'] - shift, beam_dict['attrs']['signal_length'])
-            delay_indices[index,shift:beam_dict['attrs']['signal_length']] = numpy.arange(0,beam_dict['attrs']['signal_length'] - shift)
+            delay_indices[index,0:shift] = numpy.arange(signal_length - shift, signal_length)
+            delay_indices[index,shift:signal_length] = numpy.arange(0,signal_length - shift)
         else:
             delay_indices[index,:] = zeros_delay
     delay_indices = numpy.array(delay_indices,dtype=int)
     
+    formed_beam_powers = {}
     for beam_index, beam_label in enumerate(beam_dict['beams'].keys()):
+        formed_beam_powers[beam_label] = {}
         if plot1 == True:
             fig = pylab.figure(figsize=(16.,11.2))
         first_in_loop  = True
@@ -266,7 +279,8 @@ def fpgaBeamForming(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False
                     V_subbeam = V_in[beam_dict['beams'][beam_label][subbeam_label]['antennas'][i],:][delay_indices[numpy.where(beam_dict['attrs']['unique_delays']==beam_dict['beams'][beam_label][subbeam_label]['time_delays'][i])[0][0],:]]
                 else:
                     V_subbeam = numpy.add(V_subbeam, V_in[beam_dict['beams'][beam_label][subbeam_label]['antennas'][i],:][delay_indices[numpy.where(beam_dict['attrs']['unique_delays']==beam_dict['beams'][beam_label][subbeam_label]['time_delays'][i])[0][0],:]])
-            beam_dict['beams'][beam_label][subbeam_label]['beam_power_signal'] = V_subbeam**2
+            #beam_dict['beams'][beam_label][subbeam_label]['beam_power_signal'] = V_subbeam**2
+            formed_beam_powers[beam_label][subbeam_label] = V_subbeam**2
             if plot1 == True:
                 if first_in_loop == True:
                     first_in_loop = False
@@ -291,13 +305,13 @@ def fpgaBeamForming(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False
     #####
     #Doing the power window calculation portion
     #####
-    beam_powers = {}
+    beam_powersums = {}
     if plot2 == True:
         fig = pylab.figure(figsize=(16.,11.2))
         
     test_interval = 8
     test_length = 16
-    left = numpy.arange(0,beam_dict['attrs']['signal_length'] - beam_dict['attrs']['power_calculation_sum_length'] + 1,beam_dict['attrs']['power_calculation_interval']) #probably need to cap 
+    left = numpy.arange(0,signal_length - beam_dict['attrs']['power_calculation_sum_length'] + 1,beam_dict['attrs']['power_calculation_interval']) #probably need to cap 
     span = numpy.arange( beam_dict['attrs']['power_calculation_sum_length'] )
     spans = numpy.tile(span,(len(left),1))
     lefts = numpy.tile(left,(len(span),1)).T
@@ -307,12 +321,12 @@ def fpgaBeamForming(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False
         first_subbeam = True
         
         for subbeam_label in beam_dict['beams'][beam_label].keys():
-            beam_dict['beams'][beam_label][subbeam_label]['power_sum'] = numpy.sum(beam_dict['beams'][beam_label][subbeam_label]['beam_power_signal'][indices],axis=1)
+            subbeam_powersum = numpy.sum(formed_beam_powers[beam_label][subbeam_label][indices],axis=1)
             if first_subbeam == True:
                 first_subbeam = False
-                beam_powers[beam_label] = beam_dict['beams'][beam_label][subbeam_label]['power_sum']
+                beam_powersums[beam_label] = subbeam_powersum
             else:
-                beam_powers[beam_label] = numpy.add(beam_powers[beam_label],beam_dict['beams'][beam_label][subbeam_label]['power_sum'])
+                beam_powersums[beam_label] = numpy.add(beam_powersums[beam_label],subbeam_powersum)
         if plot2 == True:
             #getting weighted angle in crude way, angle is not a real angle anyways
             total_n = 0
@@ -321,7 +335,7 @@ def fpgaBeamForming(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False
                 weighted_theta_ant += beam_dict['beams'][beam_label][subbeam_label]['theta_ant'] * len(beam_dict['beams'][beam_label][subbeam_label]['antennas'])
                 total_n += len(beam_dict['beams'][beam_label][subbeam_label]['antennas'])
             weighted_theta_ant = weighted_theta_ant / total_n
-            pylab.plot(beam_powers[beam_label],label = '%s, $\\theta_{ant} = $ %0.2f'%(beam_label,weighted_theta_ant))
+            pylab.plot(beam_powersums[beam_label],label = '%s, $\\theta_{ant} = $ %0.2f'%(beam_label,weighted_theta_ant))
     if plot2 == True:
         ax = pylab.gca()
         colormap = pylab.cm.gist_ncar #nipy_spectral, Set1,Paired   
@@ -336,16 +350,28 @@ def fpgaBeamForming(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False
                 pylab.close(fig)
             except:
                 print('Failed to save image %spowersum_allbeams.%s'%(image_path,plot_filetype_extension))
-    return beam_dict, beam_powers
+            
+    return formed_beam_powers, beam_powersums
 
-@profile
+#@profile
 def testingBeamCalculations(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False):
     '''
     This function should do everything that would be calculated per event in the simulation
     such that I can profile the individual functios to ensure it all runs quickly.
     '''
     V, u = syncSignals(ud,Vd)
-    power_beam_dict, beam_powers = fpgaBeamForming(u, V, beam_dict , config, plot1 = plot1, plot2 = plot2, save_figs = False)
+    formed_beam_powers, beam_powersums = fpgaBeamForming(u, V, beam_dict , config, plot1 = plot1, plot2 = plot2, save_figs = False)
+    max_power_bin = 0
+    triggered_beam = ''
+    for beam_label, beam in beam_powersums.items():
+        cur_max = max(beam)
+        if cur_max > max_power_bin:
+            max_power_bin = cur_max
+            triggered_beam = beam_label
+    print(triggered_beam)
+    print(max_power_bin)
+    return beam_powersums
+    #print(beam_powersums)
 ############################################################
 
 if __name__ == "__main__":
@@ -384,11 +410,15 @@ if __name__ == "__main__":
     #beam_dict = getBeams( config2, n_beams, n_baselines , n , dt, verbose = False )
     
     from gnosim.trace.refraction_library_beta import *
-    reader = h5py.File('./Output/results_2018_Dec_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_100_events_1_seed_6.h5' , 'r')
+    #reader = h5py.File('./Output/results_2018_Dec_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_100_events_1_seed_6.h5' , 'r')
+    reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.10e+09_GeV_100_events_1_seed_2.h5' , 'r')
+    
+    
     info = reader['info'][...]
     #info_cut = info[numpy.logical_and(info['SNR'] > 1 , info['SNR'] < 10) ]
     info_cut = info[numpy.logical_and(info['SNR'] > 1 , info['SNR'] < 100) ]
     #events 15, 92
+    '''
     eventids = numpy.unique(info_cut[info_cut['has_solution']==1]['eventid'])
     choose_n = 1
     try:
@@ -403,8 +433,24 @@ if __name__ == "__main__":
         sub_info = info[info['eventid'] == eventid]
         Vd2, ud2 = syncSignals(ud,Vd)
         print('Mean angle for event %i is %0.2f'%(eventid, numpy.mean(info[info['eventid'] == eventid]['theta_ant'])))
-        testingBeamCalculations(ud, Vd, beam_dict , config, plot1 = plot_beams, plot2 = plot_sums)
+        print(beam_dict['beams']['beam0']['subbeam0'])
+        beam_powersums = testingBeamCalculations(ud, Vd, beam_dict , config, plot1 = plot_beams, plot2 = plot_sums)
+        print(beam_dict['beams']['beam0']['subbeam0'])
     
+    beam_label_list = numpy.array(list(beam_powersums.keys()))
+    stacked_beams = numpy.zeros((len(beam_label_list),len(beam_powersums[beam_label_list[0]])))
+    for beam_index, beam_label in enumerate(beam_label_list):
+        stacked_beams[beam_index,:] = beam_powersums[beam_label]
+    max_vals = numpy.max(stacked_beams,axis=1)
     
-    
+    keep_top = 3
+    top_val_indices = numpy.argsort(max_vals)[-numpy.arange(1,keep_top+1)]
+    top_vals = max_vals[top_val_indices]
+    top_val_beams = beam_label_list[top_val_indices]
+    top_val_theta_ant = numpy.array([beam_dict['theta_ant'][beam_label] for beam_label in top_val_beams]) 
+    print(max_vals)
+    print(top_vals)
+    print(top_val_beams)
+    print(top_val_theta_ant)
+    '''
 ############################################################
