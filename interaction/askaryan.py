@@ -347,27 +347,42 @@ def addSignals(u_in,V_in,plot=False):
     u is assumed to be in order, i.e. u[0] is the min of each row and u[-1] is the max.
     Each row of u is also assumed to have the same time step.  
     V_in should be an array of electric fields with dimensions (n_signal , n_timestep )
-    Not that the timing of signals may be shifted by up to a u-step here to align 
+    Note that the timing of signals may be shifted by up to a u-step here to align 
     descretized timing values.  There may be a more elegant want do this if this
     added wiggle becomes a problem. 
+    
+    For future Dan:  I need to add an option input for when adding signals with Noise
+    to remove noise in overlapping region.  Should have a flag for remove_noise=True
+    and then two required inputs: V_in_no_noise, u_in_no_noise. That should be
+    the same length as u_in, V_in. In region of overlapping noise/signal I need
+    to subtract off real signs, ramp noise in overlapping regions, and then add
+    back the signals.  
     '''
-    if numpy.shape(u_in)[0] <= 1:
+    if len(numpy.shape(u_in)) <=1:
+        #print('Exit on 1')
+        return V_in, u_in
+    elif numpy.shape(u_in)[0] == 1:
+        #print('Exit on 2')
         return V_in.flatten(),u_in.flatten()
+        #return V_in, u_in
     else:
         #print(u_in)
         #print(numpy.shape(u_in))
+        #print('Enter on 3')
         u_step = u_in[0,1]-u_in[0,0]
         u_out_min = min(u_in[:,0])
         u_out_max = max(u_in[:,-1])
         u_out = numpy.arange(u_out_min,u_out_max+u_step,u_step)
         V_out = numpy.zeros_like(u_out)
+        #print('numpy.shape(u_out)',numpy.shape(u_out))
+        #print('numpy.shape(V_out)',numpy.shape(V_out))
         if plot == True:
             pylab.figure()    
             ax = pylab.subplot(numpy.shape(V_in)[0]+1,1,numpy.shape(V_in)[0]+1)
             pylab.xlim((u_out_min,u_out_max))
         for i in range(numpy.shape(V_in)[0]):
-            V = V_in[i]
-            u = u_in[i]
+            V = V_in[i,:]
+            u = u_in[i,:]
             
             if len(u) == 0:
                 u = u_out
@@ -380,9 +395,12 @@ def addSignals(u_in,V_in,plot=False):
             right_index = left_index + len(V)
             #print('left_index',left_index)
             #print('right_index',right_index)
-            cut = numpy.arange(left_index,right_index)
+            #cut = numpy.arange(left_index,right_index)
             #print(len(cut))
-            V_out[cut] += V
+            #print('2 numpy.shape(V_out)',numpy.shape(V_out))
+            #print('2 numpy.shape(V_out[left_index:right_index])',numpy.shape(V_out[left_index:right_index]))
+            #print('2 numpy.shape(V)',numpy.shape(V))
+            V_out[left_index:right_index] += V
             if plot == True:
                 pylab.subplot(numpy.shape(V_in)[0]+1,1,i+1,sharex=ax)
                 pylab.plot(u,V,label='Signal %i'%(i))
@@ -396,6 +414,9 @@ def addSignals(u_in,V_in,plot=False):
             pylab.xlabel('t-t_emit (ns)',fontsize=16)
             pylab.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=0.4)
             pylab.legend(fontsize=14)
+        
+        #print('numpy.shape(u_out)',numpy.shape(u_out))
+        #print('numpy.shape(V_out)',numpy.shape(V_out))
         return V_out,u_out
 
 def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode='v2'):

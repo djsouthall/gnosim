@@ -366,31 +366,27 @@ def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1., r_limit = None):
 def plotGeometry(origin,neutrino_loc,phi_0,info):
     '''
     origin shuold be of the form [[x_0, y_0, z_0],[x_1, y_1, z_1],[x_2, y_2, z_2]]
-    neutrino_loc should be similar but for neutrino location
+    neutrino_loc should be similar but for neutrino location but [x, y, z]
     
     '''
     if len(numpy.shape(origin)) == 1:
         origin = [origin]
-    #print(origin)
-    #print(neutrino_loc)
     neutrino_loc_r = numpy.sqrt(neutrino_loc[0]**2 + neutrino_loc[1]**2)
     if len(numpy.unique(info['eventid'])) == 1:
-        eventid = numpy.unique(info['eventid'])
+        eventid = numpy.unique(info['eventid'])[0]
         fig = pylab.figure(figsize=(16.,11.2)) #my screensize
         pylab.title('Event %i'%(eventid))
-        pylab.scatter(neutrino_loc_r,neutrino_loc[2],label='Neutrino Loc',marker = '*',color = 'k')
         sub_info = numpy.unique(info[info['eventid'] == eventid])
-        for counter,antenna in enumerate(sub_info['antenna']): #might need to put a unique here to solve problem 
-            origin_r = numpy.sqrt(origin[counter][0]**2 + origin[counter][1]**2)
-            pylab.scatter(origin_r,origin[counter][2],label='Antenna %i'%(antenna))
+        for index_antenna,antenna in enumerate(numpy.unique(sub_info['antenna'])): 
+            origin_r = numpy.sqrt(origin[index_antenna][0]**2 + origin[index_antenna][1]**2)
             ssub_info = sub_info[sub_info['antenna'] == antenna]
-            
-            for solution in ssub_info['solution']:
-                x, y, z, t, d, phi, theta, a_v, a_h, index_reflect_air, index_reflect_water = gnosim.trace.refraction_library_beta.rayTrace(origin[counter], phi_0, ssub_info['theta_ant'][ssub_info['solution'] == solution], r_limit = 1.01*neutrino_loc_r)
+            for index_solution, solution in enumerate(ssub_info['solution']):
+                x, y, z, t, d, phi, theta, a_v, a_h, index_reflect_air, index_reflect_water = rayTrace(origin[index_antenna], phi_0, ssub_info['theta_ant'][ssub_info['solution'] == solution], r_limit = 1.01*neutrino_loc_r)
                 r = numpy.sqrt(x**2 + y**2)
                 label = 'A%i %s'%(antenna,solution)
-                #print(label)
                 pylab.plot(r,z,label=label)
+            pylab.scatter(origin_r,origin[index_antenna][2],label='Antenna %i'%(antenna))
+        pylab.scatter(neutrino_loc_r,neutrino_loc[2],label='Neutrino Loc',marker = '*',color = 'k')
         pylab.legend()
     else:
         print('Info should be input with only one event, otherwise this breaks')

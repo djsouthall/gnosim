@@ -67,8 +67,22 @@ def profile(fnc):
 
     return inner
 
-
-def digitizeSignal(u,V,sampling_rate,bytes,scale_noise_from,scale_noise_to, dc_offset = 0, random_time_offset = 0, plot = False):
+def calculateDigitalTimes(u_min,u_max,sampling_period,random_time_offset = 0):
+    '''
+    This calculates the times to sample a signal given some u_min and u_max. 
+    
+    This should be the same for every antenna (i.e. it is on the array clock).
+    
+    So I shouldbe able to create it in advance for a wide window, and then sample
+    signals later for the subset of time that they occupy. 
+    
+    This probably doesn't need to be a function.
+    '''
+    sample_times = numpy.arange(u[1],u[-1],sampling_period) + random_time_offset
+    #sample_times = sample_times[numpy.logical_and(sample_times <= u[-1],sample_times >= u[1])] 
+    return sample_times
+    
+def digitizeSignal(u,V,sample_times,bytes,scale_noise_from,scale_noise_to, dc_offset = 0, plot = False):
     '''
     This function is meant to act as the ADC for the simulation.  It will sample
     the signal using the provided sampling rate.  The value of
@@ -81,14 +95,16 @@ def digitizeSignal(u,V,sampling_rate,bytes,scale_noise_from,scale_noise_to, dc_o
     Sampleing rate should be in GHz
     '''
     V = V + dc_offset
-    sampling_period = 1.0 / sampling_rate #ns
-    sample_times = numpy.arange(u[1],u[-1],sampling_period) + random_time_offset
-    sample_times = sample_times[numpy.logical_and(sample_times <= u[-1],sample_times >= u[1])] #otherwise interpolation error for out of bounds. 
-    V_sampled = scipy.interpolate.interp1d(u,V)(sample_times)
+    #sampling_period = 1.0 / sampling_rate #ns
+    #sample_times = numpy.arange(u[1],u[-1],sampling_period) + random_time_offset
+    #sample_times = sample_times[numpy.logical_and(sample_times <= u[-1],sample_times >= u[1])] #otherwise interpolation error for out of bounds. 
+    V_sampled = scipy.interpolate.interp1d(u,V,bounds_error = False,fill_value = 0.0)(sample_times) #sampletimes will now extend beyond the interpolated range, but here it returns 0 voltage
     
     #byte_vals = numpy.linspace(-2**(bytes-1)+1,2**(bytes-1),2**bytes,dtype=int)
     byte_vals = numpy.array([-2**(bytes-1)+1,2**(bytes-1)],dtype=int) #only really need endpoints
     slope = scale_noise_to/scale_noise_from
+    print(byte_vals/slope)
+    print(byte_vals)
     f = scipy.interpolate.interp1d(byte_vals/slope,byte_vals,bounds_error = False,fill_value = (byte_vals[0],byte_vals[-1]) )
     V_bit = numpy.floor(f(V_sampled)) #not sure if round or floor should be used to best approximate the actual process.
     
@@ -196,37 +212,25 @@ def getBeams( config, n_beams, n_baselines , n , dt ,power_calculation_sum_lengt
 
     return beam_dict
 
-@profile
-def syncSignals( u_in, V_in ):
+def syncSignals( u_in, V_in, min_time, max_time, u_step ):
     '''
-    Given an array of u_in times and V_in signals with the same number
-    of rows as there are antennas. This will extend the temporal range of
-    each signal to be the same, and appropriately place the V_in along this
-    extended timeline.  This should be used before beam summing. 
+    Given a dictionary with an array (or empty array) for each antenna, This 
+    will extend the temporal range of each signal to be the same, and 
+    produce an ndarray with each row representing a signal and
+    appropriately place the V_in along this extended timeline.  This should be 
+    used before beam summing. 
     '''
-    if numpy.shape(u_in)[0] <= 1:
-        return V_in.flatten(),u_in.flatten()
-    else:
-        #print(u_in)
-        #print(numpy.shape(u_in))
-        u_step = u_in[0,1]-u_in[0,0]
-        u_out_min = min(u_in[:,0])
-        u_out_max = max(u_in[:,-1])
-        u_out = numpy.tile(numpy.arange(u_out_min,u_out_max+u_step,u_step), (numpy.shape(V_in)[0],1))
-        V_out = numpy.zeros_like(u_out)
-        for i in range(numpy.shape(V_in)[0]):
-            V = V_in[i]
-            u = u_in[i]
-            if len(u) == 0:
-                u = u_out
-                V = numpy.zeros_like(u_out)   
-            left_index = numpy.argmin(abs(u_out - u[0]))
+    u_out = numpy.tile(numpy.arange(min_time,max_time+u_step,u_step), (len(list(V_in.keys())),1))
+    V_out = numpy.zeros_like(u_out)
+    for antenna_index,antenna_label in enumerate(list(V_in.keys())):
+        V = V_in[antenna_label]
+        u = u_in[antenna_label]
+        if numpy.size(u) != 0:
+            left_index = numpy.argmin(abs(u_out[antenna_index] - u[0]))
             right_index = left_index + len(V)
-            cut = numpy.arange(left_index,right_index)
-            V_out[i][cut] += V
-        return V_out, u_out
-        
-@profile       
+            V_out[antenna_index,left_index:right_index] +=  V
+    return V_out, u_out
+
 def fpgaBeamForming(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False, save_figs = False):
     '''
     This is one function which uses the code from what were the sumBeams and 
@@ -353,27 +357,9 @@ def fpgaBeamForming(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False
             
     return formed_beam_powers, beam_powersums
 
-#@profile
-def testingBeamCalculations(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False):
-    '''
-    This function should do everything that would be calculated per event in the simulation
-    such that I can profile the individual functios to ensure it all runs quickly.
-    '''
-    V, u = syncSignals(ud,Vd)
-    formed_beam_powers, beam_powersums = fpgaBeamForming(u, V, beam_dict , config, plot1 = plot1, plot2 = plot2, save_figs = False)
-    max_power_bin = 0
-    triggered_beam = ''
-    for beam_label, beam in beam_powersums.items():
-        cur_max = max(beam)
-        if cur_max > max_power_bin:
-            max_power_bin = cur_max
-            triggered_beam = beam_label
-    print(triggered_beam)
-    print(max_power_bin)
-    return beam_powersums
-    #print(beam_powersums)
 ############################################################
 
+#
 if __name__ == "__main__":
     pylab.close('all')
     energy_neutrino = 3.e9 # GeV
@@ -395,7 +381,8 @@ if __name__ == "__main__":
     
     random_time_offset = numpy.random.uniform(-5.0,5.0) #ns
     dc_offset = 0.0 #V
-    V_bit, sampled_times = digitizeSignal(u,V_noise,sampling_rate,bytes,scale_noise_from,scale_noise_to, random_time_offset = random_time_offset, dc_offset = dc_offset, plot = False)
+    sample_times=calculateDigitalTimes(u[0],u[-1],sampling_rate,  random_time_offset = random_time_offset)
+    V_bit, sampled_times = digitizeSignal(u,V_noise,sample_times,bytes,scale_noise_from,scale_noise_to, dc_offset = dc_offset, plot = False)
     dt = sampled_times[1] - sampled_times[0]
     #################################################################
     config_file = '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_dipole_octo_-200_polar_120_rays.py'
@@ -411,7 +398,7 @@ if __name__ == "__main__":
     
     from gnosim.trace.refraction_library_beta import *
     #reader = h5py.File('./Output/results_2018_Dec_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_100_events_1_seed_6.h5' , 'r')
-    reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.10e+09_GeV_100_events_1_seed_2.h5' , 'r')
+    reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.10e+09_GeV_100_events_1_seed_3.h5' , 'r')
     
     
     info = reader['info'][...]
@@ -453,4 +440,36 @@ if __name__ == "__main__":
     print(top_val_beams)
     print(top_val_theta_ant)
     '''
+    V_in = {}
+    u_in = {}
+    min_u = 1e20
+    max_u = -1e20
+    solutions = ['direct','cross','reflect']
+    
+    do_solutions = False
+    for station_index in numpy.arange(1):
+        station_label = 'station%i'%station_index
+        V_in[station_label] = {}
+        u_in[station_label] = {}
+        for antenna_index in numpy.arange(8):
+            antenna_label = 'antenna%i'%antenna_index
+            V_in[station_label][antenna_label] = {}
+            u_in[station_label][antenna_label] = {}
+            if do_solutions == True:
+                for solution in solutions:
+                    V_in[station_label][antenna_label][solution] = numpy.random.rand(100)
+                    u_in[station_label][antenna_label][solution] = numpy.arange(100)+antenna_index+numpy.random.randint(low=-10,high=10)
+                    min_u = numpy.min([min_u,u_in[station_label][antenna_label][solution][0]])
+                    max_u = numpy.max([max_u,u_in[station_label][antenna_label][solution][-1]])
+            else:
+                V_in[station_label][antenna_label] = numpy.random.rand(100)
+                u_in[station_label][antenna_label] = numpy.arange(100)+antenna_index+numpy.random.randint(low=-10,high=10)
+                min_u = numpy.min([min_u,u_in[station_label][antenna_label][0]])
+                max_u = numpy.max([max_u,u_in[station_label][antenna_label][-1]])
+    dt = 1
+    V_out,u_out = syncSignals( u_in['station0'], V_in['station0'], min_u, max_u, dt )
+    
+    
+    #use the above to test a trigger algorithm
+    
 ############################################################

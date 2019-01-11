@@ -130,7 +130,7 @@ def getBeams( config, n_beams, n_baselines , n , dt ,power_calculation_sum_lengt
             if baseline % min_baseline != 0:
                 continue
                 
-            theta_elevation = numpy.rad2deg(numpy.arcsin(gnosim.utils.constants.speed_light #m/ns * ms[beam_index] * dt  / ( n * baseline) ))
+            theta_elevation = numpy.rad2deg(numpy.arcsin(gnosim.utils.constants.speed_light * ms[beam_index] * dt  / ( n * baseline) ))
             theta_ant = 90-theta_elevation    
             beam_dict['beams'][beam_label][subbeam_label] = {'baseline'       : baseline,
                                                     'antennas'       : subbeam,
