@@ -390,6 +390,7 @@ def plotGeometry(origin,neutrino_loc,phi_0,info):
         pylab.legend()
     else:
         print('Info should be input with only one event, otherwise this breaks')
+        return
     return fig
 ############################################################
 

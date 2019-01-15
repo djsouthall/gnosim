@@ -78,7 +78,7 @@ def calculateDigitalTimes(u_min,u_max,sampling_period,random_time_offset = 0):
     
     This probably doesn't need to be a function.
     '''
-    sample_times = numpy.arange(u[1],u[-1],sampling_period) + random_time_offset
+    sample_times = numpy.arange(u_min,u_max,sampling_period) + random_time_offset
     #sample_times = sample_times[numpy.logical_and(sample_times <= u[-1],sample_times >= u[1])] 
     return sample_times
     
@@ -103,8 +103,6 @@ def digitizeSignal(u,V,sample_times,bytes,scale_noise_from,scale_noise_to, dc_of
     #byte_vals = numpy.linspace(-2**(bytes-1)+1,2**(bytes-1),2**bytes,dtype=int)
     byte_vals = numpy.array([-2**(bytes-1)+1,2**(bytes-1)],dtype=int) #only really need endpoints
     slope = scale_noise_to/scale_noise_from
-    print(byte_vals/slope)
-    print(byte_vals)
     f = scipy.interpolate.interp1d(byte_vals/slope,byte_vals,bounds_error = False,fill_value = (byte_vals[0],byte_vals[-1]) )
     V_bit = numpy.floor(f(V_sampled)) #not sure if round or floor should be used to best approximate the actual process.
     

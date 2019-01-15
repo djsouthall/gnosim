@@ -341,7 +341,7 @@ def electricFieldTimeDomainSignal(theta_obs_rad,R,Energy_GeV,n,h_fft=None,sys_ff
     else:
         return V, u
 
-def addSignals(u_in,V_in,plot=False):
+def addSignals(u_in,V_in,plot=False,V_noise_in = [], remove_noise_overlap = False):
     '''
     u_in should be an array of times with dimensions (n_signal , n_timestep )
     u is assumed to be in order, i.e. u[0] is the min of each row and u[-1] is the max.
@@ -351,6 +351,14 @@ def addSignals(u_in,V_in,plot=False):
     descretized timing values.  There may be a more elegant want do this if this
     added wiggle becomes a problem. 
     
+    If remove_noise_overlap is true and an array V_noise_in is provided, this will
+    remove noise from each signal in regions of overlapping noise (using a ramp) such
+    that noise does not add where realistically it should be one continuous stream
+    of noise.  
+    
+    V_noise in should be the same shape as V_in, and should correspond to the same
+    times u_in.  
+    
     For future Dan:  I need to add an option input for when adding signals with Noise
     to remove noise in overlapping region.  Should have a flag for remove_noise=True
     and then two required inputs: V_in_no_noise, u_in_no_noise. That should be
@@ -359,26 +367,28 @@ def addSignals(u_in,V_in,plot=False):
     back the signals.  
     '''
     if len(numpy.shape(u_in)) <=1:
-        #print('Exit on 1')
         return V_in, u_in
     elif numpy.shape(u_in)[0] == 1:
-        #print('Exit on 2')
         return V_in.flatten(),u_in.flatten()
-        #return V_in, u_in
     else:
-        #print(u_in)
-        #print(numpy.shape(u_in))
-        #print('Enter on 3')
+        if numpy.logical_and(remove_noise_overlap == True, V_noise_in == []):
+            print('V_noise_in is empty, ignoring.')
+            remove_noise_overlap = False
         u_step = u_in[0,1]-u_in[0,0]
         u_out_min = min(u_in[:,0])
         u_out_max = max(u_in[:,-1])
+        
         u_out = numpy.arange(u_out_min,u_out_max+u_step,u_step)
-        V_out = numpy.zeros_like(u_out)
-        #print('numpy.shape(u_out)',numpy.shape(u_out))
-        #print('numpy.shape(V_out)',numpy.shape(V_out))
+        
+        if remove_noise_overlap == True:
+            V_just_signal = numpy.zeros_like(u_out)
+            V_out = numpy.tile(V_just_signal,(numpy.shape(V_in)[0],1))
+        else:
+            V_out = numpy.zeros_like(u_out)
         if plot == True:
-            pylab.figure()    
+            pylab.figure(figsize=(16.,11.2))   
             ax = pylab.subplot(numpy.shape(V_in)[0]+1,1,numpy.shape(V_in)[0]+1)
+            
             pylab.xlim((u_out_min,u_out_max))
         for i in range(numpy.shape(V_in)[0]):
             V = V_in[i,:]
@@ -387,36 +397,38 @@ def addSignals(u_in,V_in,plot=False):
             if len(u) == 0:
                 u = u_out
                 V = numpy.zeros_like(u_out)   
-            #print('Lengths:')
-            #print(len(V))
-            #print(len(u))
-            #print('%i:%i ->%i'%(numpy.argmin(abs(u_out - min(u))),numpy.argmin(abs(u_out - min(u)))+len(u),len(V_out[numpy.argmin(abs(u_out - min(u))):numpy.argmin(abs(u_out - min(u)))+len(u)])))
             left_index = numpy.argmin(abs(u_out - u[0]))
             right_index = left_index + len(V)
-            #print('left_index',left_index)
-            #print('right_index',right_index)
-            #cut = numpy.arange(left_index,right_index)
-            #print(len(cut))
-            #print('2 numpy.shape(V_out)',numpy.shape(V_out))
-            #print('2 numpy.shape(V_out[left_index:right_index])',numpy.shape(V_out[left_index:right_index]))
-            #print('2 numpy.shape(V)',numpy.shape(V))
-            V_out[left_index:right_index] += V
+            
+            if remove_noise_overlap == True:
+                V_out[i,left_index:right_index] += V_noise_in[i,:]
+                V_just_signal[left_index:right_index] += numpy.add(V,-V_noise_in[i,:])
+            else:
+                V_out[left_index:right_index] += V
             if plot == True:
-                pylab.subplot(numpy.shape(V_in)[0]+1,1,i+1,sharex=ax)
+                pylab.subplot(numpy.shape(V_in)[0]+1,1,i+1,sharex=ax,sharey=ax)
+                if i == 0:
+                    if remove_noise_overlap == True:
+                        pylab.title('Overlapping Noise Effect Removed') 
+                    else:
+                        pylab.title('Overlapping Noise Effect NOT Removed') 
                 pylab.plot(u,V,label='Signal %i'%(i))
-                pylab.ylabel('V (V)',fontsize=16)
-                pylab.xlabel('t-t_emit (ns)',fontsize=16)
-                pylab.legend(fontsize=14)
-        if plot == True:
-            pylab.subplot(numpy.shape(V_in)[0]+1,1,numpy.shape(V_in)[0]+1)
-            pylab.plot(u_out,V_out,label='Total Signal')
-            pylab.ylabel('V (V)',fontsize=16)
-            pylab.xlabel('t-t_emit (ns)',fontsize=16)
-            pylab.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=0.4)
-            pylab.legend(fontsize=14)
+                pylab.ylabel('V (V)',fontsize=14)
+                #pylab.xlabel('t-t_emit (ns)',fontsize=14)
+                pylab.legend(fontsize=12,loc='upper right')
         
-        #print('numpy.shape(u_out)',numpy.shape(u_out))
-        #print('numpy.shape(V_out)',numpy.shape(V_out))
+        if remove_noise_overlap == True:
+            weights = 1/numpy.sqrt(numpy.maximum(numpy.sum((V_out != 0)*1.0,axis=0),numpy.ones_like(u_out)))
+            V_out = numpy.multiply(numpy.sum(V_out,axis=0),weights) + V_just_signal
+        
+        if plot == True:
+            pylab.subplot(numpy.shape(V_in)[0]+1,1,numpy.shape(V_in)[0]+1,sharex=ax,sharey=ax)
+            pylab.plot(u_out,V_out,label='Total Signal')
+            pylab.ylabel('V (V)',fontsize=14)
+            pylab.xlabel('t-t_emit (ns)',fontsize=14)
+            pylab.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=0.4)
+            pylab.legend(fontsize=12,loc='upper right')
+            
         return V_out,u_out
 
 def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode='v2'):
@@ -663,7 +675,7 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
 
 
 if __name__ == "__main__":
-
+    '''
     energy_neutrino = 1.e9 # GeV
     mode = 'cc'
     d = 1000. # m
@@ -672,7 +684,7 @@ if __name__ == "__main__":
     inelasticity = gnosim.interaction.inelasticity.inelasticity(energy_neutrino, mode)
 
     #omega = 0.5 # GHz
-    
+    '''
     """
     omega_array = numpy.arange(0.1, 1., 0.05)
     electric_field_array = []
@@ -693,7 +705,7 @@ if __name__ == "__main__":
     for ii, angle in enumerate(angle_array):
         pylab.plot(omega, electric_field_array[ii])
     """
-    
+    '''
     frequency_mesh, angle_mesh = numpy.meshgrid(numpy.linspace(0.01, 1.5, 100), numpy.arange(50., 65. + 1.e-10, 0.1))
     electric_field = electricFieldFrequencyDomainRaw(frequency_mesh, d, angle_mesh, energy_neutrino, inelasticity, mode, index_of_refraction)
     pylab.figure()
@@ -709,5 +721,107 @@ if __name__ == "__main__":
     
     u,V,f_dom = electricFieldTimeDomainSignal(numpy.deg2rad(50),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=True,out_dom_freq = True,return_pos = True,mode='v2')
     u,V,f_dom = electricFieldTimeDomainSignal(numpy.deg2rad(50),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=True,out_dom_freq = True,return_pos = True,mode='v2')    
+    '''
+    pylab.close('all')
+    energy_neutrino = 3.e9 # GeV
+    n = 1.78
+    c = gnosim.utils.constants.speed_light #m/ns
     
-############################################################
+    R = 1000. #m
+    cherenkov_angle = numpy.arccos(1./n)
+    cherenkov_angle_deg = numpy.rad2deg(numpy.arccos(1./n))
+    h_fft,sys_fft,freqs = loadSignalResponse()
+    input_u, h_fft, sys_fft, freqs = calculateTimes(up_sample_factor=20)
+    inelasticity = 0.2
+    noise_rms = numpy.std(quickSignalSingle(0,R,inelasticity*energy_neutrino,n,R,0,0,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)[3])
+    V_noiseless, u, dominant_freq, V_noise,  SNR = quickSignalSingle(numpy.deg2rad(50),R,inelasticity*energy_neutrino,n,2500,0.7,0.7,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)
+    sampling_rate = 1.5 #GHz
+    bytes = 7
+    scale_noise_from = noise_rms
+    scale_noise_to = 3
+    
+    random_time_offset = numpy.random.uniform(-5.0,5.0) #ns
+    dc_offset = 0.0 #V
+    sample_times=gnosim.sim.fpga.calculateDigitalTimes(u[0],u[-1],sampling_rate,  random_time_offset = random_time_offset)
+    V_bit, sampled_times = gnosim.sim.fpga.digitizeSignal(u,V_noise,sample_times,bytes,scale_noise_from,scale_noise_to, dc_offset = dc_offset, plot = False)
+    dt = sampled_times[1] - sampled_times[0]
+    #################################################################
+    config_file = '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_dipole_octo_-200_polar_120_rays.py'
+    import yaml
+    config = yaml.load(open(config_file))
+    
+    from gnosim.trace.refraction_library_beta import *
+    #reader = h5py.File('./Output/results_2018_Dec_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_100_events_1_seed_6.h5' , 'r')
+    reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.10e+09_GeV_100_events_1_seed_3.h5' , 'r')
+    
+    
+    info = reader['info'][...]
+    #info_cut = info[numpy.logical_and(info['SNR'] > 1 , info['SNR'] < 10) ]
+    info_cut = info[numpy.logical_and(info['SNR'] > 1 , info['SNR'] < 100) ]
+    #events 15, 92
+    
+    eventids = numpy.unique(info_cut[info_cut['has_solution']==1]['eventid'])
+    choose_n = 3
+    try:
+        do_events = numpy.random.choice(eventids,choose_n,replace=False)
+    except:
+        do_events = numpy.unique(numpy.random.choice(eventids,choose_n,replace=True))
+    
+    output_just_noise = True
+    for eventid in do_events:
+        print('On event %i'%eventid)
+        if output_just_noise == True:
+            V, u, Vd, ud, V_just_noise = gnosim.interaction.askaryan_testing.signalsFromInfo(eventid,reader,input_u,n,h_fft,sys_fft,freqs,include_noise = True,resistance = 50, temperature = 320,plot = True,output_just_noise = True)
+            V_out2,u_out2 = addSignals(u,V,plot=True,V_noise_in = [], remove_noise_overlap = False)
+            V_out,u_out = addSignals(u,V,plot=True,V_noise_in = V_just_noise, remove_noise_overlap = True)
+            '''
+            V_in = V
+            u_in = u
+            left_indices = []
+            right_indices = []
+            
+            u_step = u_in[0,1]-u_in[0,0]
+            u_out_min = min(u_in[:,0])
+            u_out_max = max(u_in[:,-1])
+            u_out = numpy.arange(u_out_min,u_out_max+u_step,u_step)
+            V_just_signal = numpy.zeros_like(u_out)
+            V_out = numpy.tile(V_just_signal,(numpy.shape(V_in)[0],1))
+            
+            
+            for i in range(numpy.shape(V_in)[0]):
+                V = V_in[i,:]
+                u = u_in[i,:]
+                
+                if len(u) == 0:
+                    u = u_out
+                    V = numpy.zeros_like(u_out)   
+                left_index = numpy.argmin(abs(u_out - u[0]))
+                right_index = left_index + len(V)
+                
+                V_out[i,left_index:right_index] += V_just_noise[i,:]
+                
+                V_just_signal[left_index:right_index] += numpy.add(V,-V_just_noise[i,:])
+            
+            
+            weights = 1/numpy.sqrt(numpy.maximum(numpy.sum((V_out != 0)*1.0,axis=0),numpy.ones_like(u_out)))
+            #V_out = numpy.sum(V_out,axis = 0)
+            V_out = numpy.multiply(numpy.sum(V_out,axis=0),weights) + V_just_signal
+            '''
+            '''
+            pylab.figure(figsize=(16.,11.2))
+            pylab.plot(1/weights)
+            
+            pylab.figure(figsize=(16.,11.2))
+            
+            pylab.plot(u_out2,V_out2,label='Old')
+            pylab.plot(u_out,V_out,label='New')
+            
+            pylab.legend()
+            '''
+        else:
+            V, u, Vd, ud = gnosim.interaction.askaryan_testing.signalsFromInfo(eventid,reader,input_u,n,h_fft,sys_fft,freqs,include_noise = True,resistance = 50, temperature = 320,plot = False,output_just_noise = False)
+        sub_info = info[info['eventid'] == eventid]
+    
+    
+    
+    
