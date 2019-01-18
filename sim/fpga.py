@@ -185,6 +185,8 @@ def getBeams( config, n_beams, n_baselines , n , dt ,power_calculation_sum_lengt
             if baseline % min_baseline != 0:
                 continue
                 
+            #print('gnosim.utils.constants.speed_light * ms[beam_index] * dt  / ( n * baseline)',gnosim.utils.constants.speed_light * ms[beam_index] * dt  / ( n * baseline))
+            #theta_elevation = 0
             theta_elevation = numpy.rad2deg(numpy.arcsin(gnosim.utils.constants.speed_light * ms[beam_index] * dt  / ( n * baseline) ))
             theta_ant = 90-theta_elevation    
             beam_dict['beams'][beam_label][subbeam_label] = {'baseline'       : baseline,
@@ -373,13 +375,14 @@ if __name__ == "__main__":
     noise_rms = numpy.std(gnosim.interaction.askaryan.quickSignalSingle(0,R,inelasticity*energy_neutrino,n,R,0,0,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)[3])
     V_noiseless, u, dominant_freq, V_noise,  SNR = gnosim.interaction.askaryan.quickSignalSingle(numpy.deg2rad(50),R,inelasticity*energy_neutrino,n,2500,0.7,0.7,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)
     sampling_rate = 1.5 #GHz
+    sampling_period = 1/sampling_rate
     bytes = 7
     scale_noise_from = noise_rms
     scale_noise_to = 3
     
     random_time_offset = numpy.random.uniform(-5.0,5.0) #ns
     dc_offset = 0.0 #V
-    sample_times=calculateDigitalTimes(u[0],u[-1],sampling_rate,  random_time_offset = random_time_offset)
+    sample_times=calculateDigitalTimes(u[0],u[-1],sampling_period,  random_time_offset = random_time_offset)
     V_bit, sampled_times = digitizeSignal(u,V_noise,sample_times,bytes,scale_noise_from,scale_noise_to, dc_offset = dc_offset, plot = False)
     dt = sampled_times[1] - sampled_times[0]
     #################################################################
@@ -395,8 +398,8 @@ if __name__ == "__main__":
     #beam_dict = getBeams( config2, n_beams, n_baselines , n , dt, verbose = False )
     
     from gnosim.trace.refraction_library_beta import *
-    #reader = h5py.File('./Output/results_2018_Dec_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_100_events_1_seed_6.h5' , 'r')
-    reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.10e+09_GeV_100_events_1_seed_3.h5' , 'r')
+    reader = h5py.File('./results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_100_events_1_seed_4_new_new_new_new_new_new.h5' , 'r')
+    #reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.10e+09_GeV_100_events_1_seed_3.h5' , 'r')
     
     
     info = reader['info'][...]

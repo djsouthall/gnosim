@@ -22,3 +22,8 @@ errors in dB, so the attached files should be close to (or are) the final produc
 Dan said in person that he still has to double check with Cosmin about the specifics
 of his calculation, final factors, and if he is in SI or gaussian units for the
 calculation.  
+
+v3 and v4 are functionally the same but with different binning.  Dan Smith is
+still trying to get my a finalized version.  I will be making a tool to scale
+the system response such that the noise matches the levels seen in the
+experiement, but for the antenna response I still need Dan to get it for me.

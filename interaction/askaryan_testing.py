@@ -75,16 +75,28 @@ def loadSignalResponse(mode='v2'):
     individual response functions could be input per antenna.  
     '''
     if mode == 'v1':
+        print('Loading Signal Response V1')
         antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response.npy')
         electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_elect_response.npy')
         
     elif mode == 'v2':
+        print('Loading Signal Response V2')
         antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v2.npy')
         electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_elect_response_v2.npy')
+    elif mode == 'v3':
+        print('Loading Signal Response V3')
+        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v3.npy')
+        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_v3.npy')
+    elif mode == 'v4':
+        print('Loading Signal Response V4')
+        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v4.npy')
+        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_v4.npy')
     else:
+        print('Error, defaulting to loading Signal Response V2')
         antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v2.npy')
         electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_elect_response_v2.npy')
     freqs, h_fft = numpy.hsplit(antenna_response, 2)
+    
     freqs, sys_fft = numpy.hsplit(electronic_response, 2)
     h_fft = numpy.ravel(h_fft)
     sys_fft = numpy.ravel(sys_fft)
@@ -572,7 +584,7 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
         pylab.figure()
         if include_noise == True:
             pylab.subplot(411)
-            pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f\tt_step = %g ns'%(energy_neutrino,numpy.rad2deg(theta_obs_rad),n,t_step),fontsize=20)
+            pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f\tt_step = %g ns'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n,t_step),fontsize=20)
             pylab.ylabel('R*|A| (V s)')
             pylab.xlabel('t (ns)')
             #pylab.scatter(u,R*numpy.absolute(A),s=1)
@@ -597,7 +609,7 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
             pylab.plot(u,V_noise)
         else:
             pylab.subplot(311)
-            pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f\tt_step = %g ns'%(energy_neutrino,numpy.rad2deg(theta_obs_rad),n,t_step),fontsize=20)
+            pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f\tt_step = %g ns'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n,t_step),fontsize=20)
             pylab.ylabel('R*|A| (V s)')
             pylab.xlabel('t (ns)')
             #pylab.scatter(u,R*numpy.absolute(A),s=1)
@@ -638,7 +650,7 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
         dominant_freq = freqs[numpy.argmax(numpy.absolute(V_fft_noiseless))]
         return V_noiseless, u + t_offset, dominant_freq
 
-def signalsFromInfo(eventid,reader,u_signal,n,h_fft,sys_fft,freqs,include_noise = False,resistance = 50, temperature = 320, plot= True,output_just_noise = False):
+def signalsFromInfo(eventid,reader,u_signal,n,h_fft,sys_fft,freqs,include_noise = False,resistance = 50, temperature = 320, plot = True,output_just_noise = False,single_plot_signals=False,single_plot_spectrum=False,single_plot_potential = False):
     #quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,
     #           u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,
     #           plot_potential = False,out_dom_freq = False,include_noise = False, 
@@ -671,7 +683,7 @@ def signalsFromInfo(eventid,reader,u_signal,n,h_fft,sys_fft,freqs,include_noise 
         Vd = []
         ud = []
         
-        noise_signal = quickSignalSingle( 0,1,numpy.unique(energy_neutrino),n,\
+        noise_signal = gnosim.interaction.askaryan.quickSignalSingle( 0,1,numpy.unique(energy_neutrino),n,\
                           0,0,0,u_signal,h_fft,sys_fft,freqs,\
                           plot_signals=False,plot_spectrum=False,plot_potential = False,\
                           include_noise = True, resistance = 50, temperature = 320)[3]
@@ -685,11 +697,11 @@ def signalsFromInfo(eventid,reader,u_signal,n,h_fft,sys_fft,freqs,include_noise 
             beam_pattern_factor = 1.0
         for index in range(len(Rs)):
             if include_noise == True:
-                _Vi, ui, fi,Vi,SNRi = quickSignalSingle(numpy.deg2rad(thetas[index]),Rs[index],inelasticity*energy_neutrino,n,t_offset[index],av[index],beam_pattern_factor[index],u_signal, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential = False,include_noise = include_noise,resistance = resistance, temperature = temperature)  
+                _Vi, ui, fi,Vi,SNRi = gnosim.interaction.askaryan.quickSignalSingle(numpy.deg2rad(thetas[index]),Rs[index],inelasticity*energy_neutrino,n,t_offset[index],av[index],beam_pattern_factor[index],u_signal, h_fft, sys_fft, freqs,plot_signals=single_plot_signals,plot_spectrum=single_plot_spectrum,plot_potential = single_plot_potential,include_noise = include_noise,resistance = resistance, temperature = temperature)  
                 just_noise = numpy.add(Vi,-_Vi)
                 #in this case I would want Vi to be the noisy signal, not _Vi which is the clean signal.
             else:
-                Vi, ui, fi = quickSignalSingle(numpy.deg2rad(thetas[index]),Rs[index],inelasticity*energy_neutrino,n,t_offset[index],av[index],beam_pattern_factor,u_signal, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential = False,include_noise = include_noise,resistance = resistance, temperature = temperature)   
+                Vi, ui, fi = gnosim.interaction.askaryan.quickSignalSingle(numpy.deg2rad(thetas[index]),Rs[index],inelasticity*energy_neutrino,n,t_offset[index],av[index],beam_pattern_factor,u_signal, h_fft, sys_fft, freqs,plot_signals=single_plot_signals,plot_spectrum=single_plot_spectrum,plot_potential = single_plot_potential,include_noise = include_noise,resistance = resistance, temperature = temperature)   
             
             sampling_rate = 1.5 #GHz
             bytes = 7

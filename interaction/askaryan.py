@@ -23,7 +23,7 @@ pylab.ion()
 
 ############################################################
 
-def electricFieldFrequencyDomainRaw(frequency, d, angle, energy_neutrino, inelasticity, mode, index_of_refraction):
+def electricFieldFrequencyDomainRaw(frequency, d, angle, Energy_GeV, inelasticity, mode, index_of_refraction):
     '''
     This is the old method
     Askaryan Emission
@@ -41,7 +41,7 @@ def electricFieldFrequencyDomainRaw(frequency, d, angle, energy_neutrino, inelas
     mu = 1.
     length = 1.5 # m
     
-    energy_shower = inelasticity * energy_neutrino # GeV
+    energy_shower = inelasticity * Energy_GeV # GeV
     q = 5.5e-20 * energy_shower # C
     k = index_of_refraction * omega / gnosim.utils.constants.speed_light
     
@@ -65,13 +65,24 @@ def loadSignalResponse(mode='v2'):
     individual response functions could be input per antenna.  
     '''
     if mode == 'v1':
+        print('Loading Signal Response V1')
         antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response.npy')
         electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_elect_response.npy')
         
     elif mode == 'v2':
+        print('Loading Signal Response V2')
         antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v2.npy')
         electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_elect_response_v2.npy')
+    elif mode == 'v3':
+        print('Loading Signal Response V3')
+        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v3.npy')
+        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_v3.npy')
+    elif mode == 'v4':
+        print('Loading Signal Response V4')
+        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v4.npy')
+        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_v4.npy')
     else:
+        print('Error, defaulting to loading Signal Response V2')
         antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v2.npy')
         electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_elect_response_v2.npy')
     freqs, h_fft = numpy.hsplit(antenna_response, 2)
@@ -442,11 +453,12 @@ def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode='
     '''
     #Loading in response function and setting frequency / time steps
     if any([numpy.size(h_fft) ==1,numpy.size(sys_fft)==1,numpy.size(freqs)==1]):
+        print('passing loadSignalResponse(mode=%s)'%mode)
         h_fft,sys_fft,freqs = loadSignalResponse(mode=mode)
 
     if up_sample_factor <= 0:
         up_sample_factor = 1
-
+    
     freqs = numpy.absolute(freqs)
     freq_step = freqs[1]-freqs[0] #1/(n_points*t_step*1e-9) #Hz
     possible_lengths = 2**numpy.arange(0,25)
@@ -455,7 +467,7 @@ def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode='
     
     h_fft = numpy.append(h_fft,numpy.zeros(n_points_freq - len(h_fft)))
     sys_fft = numpy.append(sys_fft,numpy.zeros(n_points_freq - len(sys_fft)))
-    response_fft = numpy.multiply(h_fft,sys_fft)
+    #response_fft = numpy.multiply(h_fft,sys_fft)
     
     t_step = 1/(2*max(freqs))*1e9 #ns
     u = numpy.arange(-(n_points_freq-1),(n_points_freq-1))*t_step #To increase time duration of signal I should just need to upsample?
@@ -523,7 +535,7 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
         A = numpy.fft.irfft(A_fft,n=len(u))
         A = numpy.fft.fftshift(A)
         if plot_potential == True:
-            pylab.figure()
+            pylab.figure(figsize=(16.,11.2))
             pylab.subplot(311)
             pylab.title('alpha = %0.3f, $\\theta$ = %0.2f deg'%(alpha,numpy.rad2deg(theta_obs_rad)),fontsize=20)
             pylab.plot(u,fp,label='fp')
@@ -563,7 +575,9 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
         
         #calculating noise
         bandwidth = freqs[-1]/1e9 #Calculating full band noise, response cuts out stuff we don't see
+        
         V_rms = numpy.sqrt(gnosim.utils.constants.boltzmann * temperature * resistance * bandwidth * gnosim.utils.constants.GHz_to_Hz)
+        #print('Internal V_rms is: %f'%V_rms)
         sigma = V_rms 
         
         #Noise in Polar
@@ -601,10 +615,10 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
             E_raw = numpy.fft.fftshift(E_raw) #This centres E so it occurs at t=0. and ensures it is located temporaly in the same place for if the calculation was done using the exception or on cone or not
             A = numpy.fft.fftshift(A) #This centres A so it occurs at t=0. and ensures it is located temporaly in the same place for if the calculation was done using the exception or on cone or not
             
-        pylab.figure()
+        pylab.figure(figsize=(16.,11.2))
         if include_noise == True:
             pylab.subplot(411)
-            pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f\tt_step = %g ns'%(energy_neutrino,numpy.rad2deg(theta_obs_rad),n,t_step),fontsize=20)
+            pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f\tt_step = %g ns'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n,t_step),fontsize=20)
             pylab.ylabel('R*|A| (V s)')
             pylab.xlabel('t (ns)')
             #pylab.scatter(u,R*numpy.absolute(A),s=1)
@@ -629,7 +643,7 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
             pylab.plot(u,V_noise)
         else:
             pylab.subplot(311)
-            pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f\tt_step = %g ns'%(energy_neutrino,numpy.rad2deg(theta_obs_rad),n,t_step),fontsize=20)
+            pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f\tt_step = %g ns'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n,t_step),fontsize=20)
             pylab.ylabel('R*|A| (V s)')
             pylab.xlabel('t (ns)')
             #pylab.scatter(u,R*numpy.absolute(A),s=1)
@@ -647,7 +661,7 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
             #pylab.scatter(u,V,s=1)
             pylab.plot(u,V_noiseless)
     if plot_spectrum == True:
-        pylab.figure()
+        pylab.figure(figsize=(16.,11.2))
         pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n))
         pylab.plot(freqs/1e6,20.0 * numpy.log10(numpy.absolute(E_raw_fft)),label='Raw Signal (fft)')
         pylab.plot(freqs/1e6,20.0 * numpy.log10(numpy.absolute(sys_fft)),label='System Response')
@@ -658,8 +672,8 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
             pylab.plot(freqs/1e6,20.0 * numpy.log10(numpy.absolute(V_fft_noiseless)),label='Processed Signal (fft)')
         
         pylab.xlabel('Freq. [MHz]',fontsize=16)
-        pylab.ylabel('dB',fontsize=16)
-        #pylab.ylim(-50,100)
+        pylab.ylabel('dB (20.0 log10(numpy.absolute(V_fft)))',fontsize=16)
+        pylab.ylim(-100,100)
         pylab.xlim(0,1500)
         pylab.legend()
     
