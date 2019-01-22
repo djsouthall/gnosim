@@ -158,6 +158,7 @@ class Sim:
         event_index_station_max = 0
         event_index_antenna_max = 0
         SNR_max = -999.
+        signals_out = {}
         
         station_wide_antenna_index = -1 #add one to it for each antenna, used for indexing temporary array
         
@@ -189,7 +190,6 @@ class Sim:
         if maximum_time == -1e20:
             maximum_time = self.signal_times[-1]
         digital_sample_times = numpy.arange(minimum_time,maximum_time,self.digital_sampling_period) + random_time_offset #these + random_time_offset #these
-        
         
         for index_station in range(0, len(self.stations)):
             # Loop over station antennas
@@ -354,7 +354,7 @@ class Sim:
                     info[ sum([len(self.stations[s].antennas) for s in range(0,index_station)]) + index_antenna] = numpy.array([(eventid,index_station,index_antenna,has_solution,0,'',-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0)],dtype = self.info_dtype)
             
             # Triggering Code below:
-            
+            signals_out[station_label] = numpy.array([])
             if numpy.any(info['has_solution']) == True:
                 if electricFieldDomain == 'time':
                     for index_antenna in range(0, len(self.stations[index_station].antennas)):
@@ -413,26 +413,26 @@ class Sim:
                 
                 #Triggering
                 if do_beamforming == True:
-                        #Here is where I perform the beamforming algorithms. 
-                        
-                        Vd_out_sync, ud_out_sync  = gnosim.sim.fpga.syncSignals(time_digital[station_label],V_digital[station_label], min_time, max_time, dt)
-                        formed_beam_powers, beam_powersums = gnosim.sim.fpga.fpgaBeamForming(ud_out_sync, Vd_out_sync, self.beam_dict , self.config, plot1 = False, plot2 = False, save_figs = False)
-                        #Getting max values
-                        keep_top = 3
-                        
-                        beam_label_list = numpy.array(list(beam_powersums.keys()))
-                        stacked_beams = numpy.zeros((len(beam_label_list),len(beam_powersums[beam_label_list[0]])))
-                        for beam_index, beam_label in enumerate(beam_label_list):
-                            stacked_beams[beam_index,:] = beam_powersums[beam_label]
-                        max_vals = numpy.max(stacked_beams,axis=1)
-                        top_val_indices = numpy.argsort(max_vals)[-numpy.arange(1,keep_top+1)]
-                        top_vals = max_vals[top_val_indices] #descending order
-                        top_val_beams = beam_label_list[top_val_indices]
-                        top_val_theta_ant = numpy.array([self.beam_dict['theta_ant'][beam_label] for beam_label in top_val_beams])
-                        #Currently don't know what to do with these values.  They will be written out as I progress but
-                        #right now I am just testing that they can be calculate without breaking the simulation.
-                        #Right now I am only storing the 3 highest values.  It is likely that I want to store every beam
-                        #that satisfies the trigger condiditon?
+                    #Here is where I perform the beamforming algorithms. 
+                    
+                    Vd_out_sync, ud_out_sync  = gnosim.sim.fpga.syncSignals(time_digital[station_label],V_digital[station_label], min_time, max_time, dt)
+                    formed_beam_powers, beam_powersums = gnosim.sim.fpga.fpgaBeamForming(ud_out_sync, Vd_out_sync, self.beam_dict , self.config, plot1 = False, plot2 = False, save_figs = False)
+                    #Getting max values
+                    keep_top = 3
+                    
+                    beam_label_list = numpy.array(list(beam_powersums.keys()))
+                    stacked_beams = numpy.zeros((len(beam_label_list),len(beam_powersums[beam_label_list[0]])))
+                    for beam_index, beam_label in enumerate(beam_label_list):
+                        stacked_beams[beam_index,:] = beam_powersums[beam_label]
+                    max_vals = numpy.max(stacked_beams,axis=1)
+                    top_val_indices = numpy.argsort(max_vals)[-numpy.arange(1,keep_top+1)]
+                    top_vals = max_vals[top_val_indices] #descending order
+                    top_val_beams = beam_label_list[top_val_indices]
+                    top_val_theta_ant = numpy.array([self.beam_dict['theta_ant'][beam_label] for beam_label in top_val_beams])
+                    #Currently don't know what to do with these values.  They will be written out as I progress but
+                    #right now I am just testing that they can be calculate without breaking the simulation.
+                    #Right now I am only storing the 3 highest values.  It is likely that I want to store every beam
+                    #that satisfies the trigger condiditon?
                 
                 if trigger_threshold_units == 'adu':
                     if numpy.size(V_out) > 0:
@@ -446,6 +446,8 @@ class Sim:
                     if numpy.size(V_out) > 0:
                         if numpy.any(V_out > trigger_threshold):
                             triggered = True
+                if numpy.logical_and(do_beamforming == False, triggered == True):
+                    Vd_out_sync, ud_out_sync  = gnosim.sim.fpga.syncSignals(time_digital[station_label],V_digital[station_label], min_time, max_time, dt)
                 
                 #RIGHT NOW I AM SWAPPING ORDERING OF WHEN I ADD SIGNALS.  DOING IT BEFORE I DIGITIZE
                 
@@ -456,7 +458,8 @@ class Sim:
                 if triggered == True:
                     info['triggered'] = 1
                     temporary_info['triggered'] = 1
-                
+                    signals_out[station_label] = numpy.vstack((Vd_out_sync, ud_out_sync[0,:]))
+                    
                     print('Triggered on event %i'%eventid)
                     if plot_geometry == True:
                         origin = []
@@ -662,12 +665,11 @@ class Sim:
                             print('Failed to save image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
                 else:
                     info['triggered'] = 0
-                    temporary_info['triggered'] = 0    
-            
+                    temporary_info['triggered'] = 0
         if output_all_solutions == True:
             info = temporary_info
         p_detect = numpy.any(info['has_solution'])
-        return p_interact, p_earth, p_detect, event_electric_field_max, dic_max, event_observation_angle_max, event_solution_max, event_index_station_max, event_index_antenna_max, info
+        return p_interact, p_earth, p_detect, event_electric_field_max, dic_max, event_observation_angle_max, event_solution_max, event_index_station_max, event_index_antenna_max, info, triggered, signals_out
         #return p_interact, p_earth, p_detect, electric_field_direct, electric_field_crossover, electric_field_reflect,  dic_direct, dic_crossover, dic_reflect
     
     def griddata_Event(self, x_query, y_query , z_query, method = 'cubic'):
@@ -864,7 +866,7 @@ class Sim:
               anti=False, n_events=10000, detector_volume_radius=6000., detector_volume_depth=3000., 
               outfile=None,seed = None,method = 'cubic',electricFieldDomain = 'freq',include_noise = False,summed_signals = False,
               plot_geometry = False, plot_signals = False, trigger_threshold = 0,trigger_threshold_units = 'V',plot_filetype_extension = 'svg',image_path = './',
-              use_threading = False, do_beamforming = False, n_beams = 15, n_baselines = 2, output_all_solutions = False):
+              use_threading = False, do_beamforming = False, n_beams = 15, n_baselines = 2, output_all_solutions = False,save_signals = False):
         '''
         electricFieldDomain should be either freq or time.  The freq domain uses
         the older electric field calculation, while the 'time' uses the new one.
@@ -978,68 +980,6 @@ class Sim:
         a_h_max = numpy.zeros(n_events)
         info = numpy.empty(n_events * len_info_per_event , dtype = self.info_dtype)
         
-        #Loading Hulls (or creating if hulls have not been previously determined in the necessary folder)
-        
-        self.concave_hull = {}
-        for lkey in self.lib.keys():
-            print('Loading Hull For:', lkey)
-            self.concave_hull[lkey] = {}
-            indir = self.config['antenna_definitions'][lkey]['lib'].replace('*.h5','concave_hull')
-            if os.path.isdir(indir) == False:
-                print('Hull not previously generated, calculating now.')
-                (self.lib[lkey]).saveEnvelope( self.config['antenna_definitions'][lkey]['lib'].replace('*.h5','') )
-            chull = (self.lib[lkey]).loadEnvelope( indir ,store_fit_data = False)
-            for dkey in self.lib[lkey].data.keys():
-                self.concave_hull[lkey][dkey] = {}
-                self.concave_hull[lkey][dkey]['z_min'] = chull[dkey]['z_min']
-                self.concave_hull[lkey][dkey]['z_max'] = chull[dkey]['z_max']
-                self.concave_hull[lkey][dkey]['f_inner_r_bound'] = chull[dkey]['f_inner_r_bound']
-                self.concave_hull[lkey][dkey]['f_outer_r_bound'] = chull[dkey]['f_outer_r_bound']
-        
-        print('About to run griddata_Event:')
-        ############################################################################
-        #Interpolating values from using griddata:
-        ############################################################################
-        
-        #If memory becomes an issue this might need to be adapted to run for chunks of events 
-        if use_threading == True:
-            n_cores = cpu_count()
-            self.multiThreadGridDataEvent(x_0, y_0, z_0, method = method,n_cores = n_cores)
-        else:
-            self.griddata_Event(x_0, y_0, z_0, method = method)   
-        print('Succesfully ran griddata_Event:')
-        
-        ############################################################################
-        #Using interpolated values for further calculations on an event/event basis:
-        ############################################################################
-        
-        for ii in range(0, n_events):
-            if (n_events//100 != 0):
-                if(ii%(n_events//100) == 0):
-                    print ('Event (%i/%i)'%(ii, n_events)) #might want to comment out these print statements to run faster and spew less
-            else:
-                print ('Event (%i/%i)'%(ii, n_events))
-            p_interact[ii], p_earth[ii], p_detect[ii], electric_field_max[ii], dic_max, observation_angle_max[ii], solution_max[ii], index_station_max[ii], index_antenna_max[ii], info[(ii * len_info_per_event ):((ii+1) * len_info_per_event )] \
-                = self.event(energy_neutrinos[ii], phi_0[ii], theta_0[ii], x_0[ii], y_0[ii], z_0[ii], \
-                            ii,inelasticity[ii], anti=anti,electricFieldDomain = electricFieldDomain, \
-                            include_noise = include_noise,plot_signals=plot_signals,plot_geometry=plot_geometry,\
-                            summed_signals = summed_signals,trigger_threshold = trigger_threshold, trigger_threshold_units = trigger_threshold_units, \
-                            plot_filetype_extension=plot_filetype_extension, image_path = image_path,
-                            random_time_offset = random_time_offsets[ii],\
-                            dc_offset = dc_offsets[ii], do_beamforming = do_beamforming, output_all_solutions = output_all_solutions)
-
-            if p_detect[ii] == 1.:
-                t_max[ii] = dic_max['t']
-                d_max[ii] = dic_max['d']
-                theta_ray_max[ii] = dic_max['theta']
-                theta_ant_max[ii] = dic_max['theta_ant']
-                a_v_max[ii] = dic_max['a_v']
-                a_h_max[ii] = dic_max['a_h']
-
-        cut = (p_detect == 1.)
-        cut_inv = numpy.logical_not(cut)
-        
-        
         if outfile:
             file = h5py.File(outfile, 'w')
             # ORIGINAL 28 MAY 2014
@@ -1082,7 +1022,81 @@ class Sim:
             file.create_dataset('a_h', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             file.create_dataset('info', ( n_events * len_info_per_event , ) , dtype=self.info_dtype, compression='gzip', compression_opts=9, shuffle=True)
 
-
+            file.create_group('signals')
+        
+        
+        
+        #Loading Hulls (or creating if hulls have not been previously determined in the necessary folder)
+        
+        self.concave_hull = {}
+        for lkey in self.lib.keys():
+            print('Loading Hull For:', lkey)
+            self.concave_hull[lkey] = {}
+            indir = self.config['antenna_definitions'][lkey]['lib'].replace('*.h5','concave_hull')
+            if os.path.isdir(indir) == False:
+                print('Hull not previously generated, calculating now.')
+                (self.lib[lkey]).saveEnvelope( self.config['antenna_definitions'][lkey]['lib'].replace('*.h5','') )
+            chull = (self.lib[lkey]).loadEnvelope( indir ,store_fit_data = False)
+            for dkey in self.lib[lkey].data.keys():
+                self.concave_hull[lkey][dkey] = {}
+                self.concave_hull[lkey][dkey]['z_min'] = chull[dkey]['z_min']
+                self.concave_hull[lkey][dkey]['z_max'] = chull[dkey]['z_max']
+                self.concave_hull[lkey][dkey]['f_inner_r_bound'] = chull[dkey]['f_inner_r_bound']
+                self.concave_hull[lkey][dkey]['f_outer_r_bound'] = chull[dkey]['f_outer_r_bound']
+        
+        print('About to run griddata_Event:')
+        ############################################################################
+        #Interpolating values from using griddata:
+        ############################################################################
+        
+        #If memory becomes an issue this might need to be adapted to run for chunks of events 
+        if use_threading == True:
+            n_cores = cpu_count()
+            self.multiThreadGridDataEvent(x_0, y_0, z_0, method = method,n_cores = n_cores)
+        else:
+            self.griddata_Event(x_0, y_0, z_0, method = method)   
+        print('Succesfully ran griddata_Event:')
+        
+        ############################################################################
+        #Using interpolated values for further calculations on an event/event basis:
+        ############################################################################
+        for ii in range(0, n_events):
+            event_label = 'event%i'%ii
+            if (n_events//100 != 0):
+                if(ii%(n_events//100) == 0):
+                    print ('Event (%i/%i)'%(ii, n_events)) #might want to comment out these print statements to run faster and spew less
+            else:
+                print ('Event (%i/%i)'%(ii, n_events))
+            p_interact[ii], p_earth[ii], p_detect[ii], electric_field_max[ii], dic_max, observation_angle_max[ii], \
+            solution_max[ii], index_station_max[ii], index_antenna_max[ii], info[(ii * len_info_per_event ):((ii+1) * len_info_per_event )], \
+            triggered, signals_out \
+                = self.event(energy_neutrinos[ii], phi_0[ii], theta_0[ii], x_0[ii], y_0[ii], z_0[ii], \
+                            ii,inelasticity[ii], anti=anti,electricFieldDomain = electricFieldDomain, \
+                            include_noise = include_noise,plot_signals=plot_signals,plot_geometry=plot_geometry,\
+                            summed_signals = summed_signals,trigger_threshold = trigger_threshold, trigger_threshold_units = trigger_threshold_units, \
+                            plot_filetype_extension=plot_filetype_extension, image_path = image_path,
+                            random_time_offset = random_time_offsets[ii],\
+                            dc_offset = dc_offsets[ii], do_beamforming = do_beamforming, output_all_solutions = output_all_solutions)
+            if numpy.logical_and(save_signals == True,triggered == True):
+                #This region I will need to be careful adjustig when/if I add multithreading per event. 
+                file['signals'].create_group(event_label)
+                for index_station in range(self.config['stations']['n']):
+                    station_label = 'station%i'%index_station
+                    file['signals'][event_label].create_dataset(station_label, numpy.shape(signals_out[station_label]), dtype='f', compression='gzip', compression_opts=9, shuffle=True)  
+                    file['signals'][event_label][station_label][...] = signals_out[station_label]
+            if p_detect[ii] == 1.:
+                t_max[ii] = dic_max['t']
+                d_max[ii] = dic_max['d']
+                theta_ray_max[ii] = dic_max['theta']
+                theta_ant_max[ii] = dic_max['theta_ant']
+                a_v_max[ii] = dic_max['a_v']
+                a_h_max[ii] = dic_max['a_h']
+        
+        cut = (p_detect == 1.)
+        cut_inv = numpy.logical_not(cut)
+        
+        
+        if outfile:
             file['energy_neutrino'][...] = energy_neutrinos
             file['inelasticity'][...] = inelasticity
             file['x_0'][...] = x_0
@@ -1273,9 +1287,9 @@ if __name__ == "__main__":
                  detector_volume_radius=my_sim.config['detector_volume']['radius'],
                  detector_volume_depth=my_sim.config['detector_volume']['depth'],
                  outfile=outfile,seed=seed,electricFieldDomain = 'time',include_noise = True,summed_signals = True, 
-                 plot_geometry = False, plot_signals = True, trigger_threshold = 7000, trigger_threshold_units = 'fpga',
+                 plot_geometry = False, plot_signals = False, trigger_threshold = 7000, trigger_threshold_units = 'fpga',
                  plot_filetype_extension = image_extension,image_path = image_path,use_threading = True,
-                 do_beamforming = True, n_beams = 15, n_baselines = 2,output_all_solutions = True)
+                 do_beamforming = True, n_beams = 15, n_baselines = 2,output_all_solutions = True,save_signals = True)
     
     
     print('Trying to print station geometry and antenna orientations')

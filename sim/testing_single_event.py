@@ -38,9 +38,10 @@ import gnosim.sim.detector
 import gnosim.sim.fpga
 pylab.ion()
 
-def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_times,h_fft,sys_fft,freqs_response,sampling_bits,noise_rms,scale_noise_to,digital_sampling_period,random_time_offset,dc_offset,beam_dict,plot_threshold_units, plot_threshold,include_noise = True,summed_signals = True,do_beamforming = True, plot_geometry = True, plot_signals = True,plot_first = False,single_plot_signals   = False,single_plot_spectrum  = False,single_plot_potential = False,plot_each_beam = False):
+def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_times,h_fft,sys_fft,freqs_response,sampling_bits,noise_rms,scale_noise_to,digital_sampling_period,random_time_offset,dc_offset,beam_dict,trigger_threshold_units, trigger_threshold,include_noise = True,summed_signals = True,do_beamforming = True, plot_geometry = True, plot_signals = True,plot_first = False,single_plot_signals   = False,single_plot_spectrum  = False,single_plot_potential = False,plot_each_beam = False):
     '''
     '''
+    event_label = 'event%i'%eventid
     config = yaml.load(open(reader.attrs['config']))
     info = reader['info'][...]
     solutions = numpy.unique(info['solution'])
@@ -52,6 +53,8 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
     phi_0 = reader['phi_0'][eventid]
     p_interact = reader['p_interact'][eventid]
     p_earth = reader['p_earth'][eventid]
+    signals_out = {}
+    
     if numpy.size(info) != 0:
     
         time_analog = {}
@@ -100,7 +103,7 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                 for solution in numpy.unique(info['solution']):
                     solution_cut = numpy.logical_and(info['solution'] == solution, antenna_cut)
                     sub_info = info[solution_cut]
-                    print(sub_info)
+                    #print(sub_info)
                     if sub_info['has_solution'] == 1:
                         if include_noise == True:
                             '''
@@ -144,7 +147,7 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                 
             
             # Triggering Preparation below:
-
+            signals_out[station_label] = numpy.array([])
             station_cut = info['has_solution'] == 1
             if numpy.any(info['has_solution']) == True:
                 for index_antenna in range(0, config['antennas']['n']):
@@ -203,7 +206,7 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                 dt = digital_sample_times[1] - digital_sample_times[0]
             
             #Triggering
-            plot_threshold_passed = False
+            triggered = False
             if do_beamforming == True:
                 #Here is where I perform the beamforming algorithms. 
                 
@@ -226,23 +229,25 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                 #Right now I am only storing the 3 highest values.  It is likely that I want to store every beam
                 #that satisfies the trigger condiditon?
             
-            if plot_threshold_units == 'adu':
+            if trigger_threshold_units == 'adu':
                 if numpy.size(V_out) > 0:
-                    if numpy.any(Vd_out > plot_threshold):
-                        plot_threshold_passed = True
-            elif plot_threshold_units == 'fpga':
+                    if numpy.any(Vd_out > trigger_threshold):
+                        triggered = True
+            elif trigger_threshold_units == 'fpga':
                 #DO FPGA CODE
-                if top_vals[0] > plot_threshold:
-                    plot_threshold_passed = True
+                if top_vals[0] > trigger_threshold:
+                    triggered = True
             else:
                 if numpy.size(V_out) > 0:
-                    if numpy.any(V_out > plot_threshold):
-                        plot_threshold_passed = True
-            
+                    if numpy.any(V_out > trigger_threshold):
+                        triggered = True
+            if numpy.logical_and(do_beamforming == False, triggered == True):
+                Vd_out_sync, ud_out_sync  = gnosim.sim.fpga.syncSignals(time_digital[station_label],V_digital[station_label], min_time, max_time, dt)
             
             #Plotting
-            if plot_threshold_passed == True:
+            if triggered == True:
                 print('Triggered on event %i'%eventid)
+                signals_out[station_label] = numpy.vstack((Vd_out_sync, ud_out_sync[0,:]))
                 if plot_geometry == True:
                     origin = []
                     for index_antenna in info[info['has_solution'] == 1]['antenna']:
@@ -364,7 +369,7 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                     
                     event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, anti=False,
                     electricFieldDomain = 'freq',include_noise = False,plot_signals=False,plot_geometry=False,summed_signals=False,
-                    plot_threshold = 0,plot_filetype_extension = 'svg',image_path = './'):
+                    trigger_threshold = 0,plot_filetype_extension = 'svg',image_path = './'):
                     '''
                     table_fig = pylab.subplot(gs_right[3])
                     
@@ -409,7 +414,7 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                     
                     event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, anti=False,
                     electricFieldDomain = 'freq',include_noise = False,plot_signals=False,plot_geometry=False,summed_signals=False,
-                    plot_threshold = 0,plot_filetype_extension = 'svg',image_path = './'):
+                    trigger_threshold = 0,plot_filetype_extension = 'svg',image_path = './'):
                     '''
                     table_fig = pylab.subplot(gs_right[7])
                     
@@ -466,24 +471,310 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                     except:
                         print('Failed to save image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
                     '''
+            return triggered,signals_out
+                
+def plotFromReader(reader,eventid,trigger_threshold_units = 'fpga', trigger_threshold = 7000, do_beamforming = True,beam_dict = {}, plot_signals = True, plot_geometry = False):
+    '''
+    Unlike redoEventFromInfo, this does not redo the calculation of the signals, 
+    but rather assumes reader['signals'] exists with saved waveforms.  As such this
+    only works for events that triggered, and only has access to the digitized 
+    waveforms.  Plots will differ slightly from those in redoEventFromInfo because
+    of this.
+    '''
+    if numpy.logical_and(trigger_threshold_units == 'fpga', numpy.logical_or(beam_dict == {}, do_beamforming == False)): 
+        print('fpga triggering requested but either beam_dict is not given, or do_beamforming is set to False')
+        if beam_dict != {}:
+            print('Setting do_beamorming = True')
+            do_beamforming = True
+        else:
+            print('Breaking')
+            return
+    event_label = 'event%i'%eventid
+    config = yaml.load(open(reader.attrs['config']))
+    info = reader['info'][...]
+    solutions = numpy.unique(info['solution'])
+    info = info[info['eventid'] == eventid]
+    inelasticity = reader['inelasticity'][eventid]
+    x_0 = reader['x_0'][eventid]
+    y_0 = reader['y_0'][eventid]
+    z_0 = reader['z_0'][eventid]
+    phi_0 = reader['phi_0'][eventid]
+    p_interact = reader['p_interact'][eventid]
+    p_earth = reader['p_earth'][eventid]
+    if numpy.isin('signals',numpy.array(list(reader.keys()))):
+        for index_station in range(config['stations']['n']):
+            station_label = 'station%i'%index_station
+            station_cut = info['station'] == index_station
+            if numpy.isin(event_label,numpy.array(list(reader['signals']))):
+                signals = reader['signals'][event_label][station_label][...]
+                Vd_out_sync = signals[0:(numpy.shape(signals)[0]-1),:]
+                ud_out_sync = numpy.tile(signals[-1,:],(numpy.shape(Vd_out_sync)[0],1))
+                
+                if do_beamforming == True:
+                    #Here is where I perform the beamforming algorithms. 
+                    formed_beam_powers, beam_powersums = gnosim.sim.fpga.fpgaBeamForming(ud_out_sync, Vd_out_sync, beam_dict , config, plot1 = plot_each_beam, plot2 = False, save_figs = False)
+                    #Getting max values
+                    keep_top = 3
+                    
+                    beam_label_list = numpy.array(list(beam_powersums.keys()))
+                    stacked_beams = numpy.zeros((len(beam_label_list),len(beam_powersums[beam_label_list[0]])))
+                    for beam_index, beam_label in enumerate(beam_label_list):
+                        stacked_beams[beam_index,:] = beam_powersums[beam_label]
+                    max_vals = numpy.max(stacked_beams,axis=1)
+                    top_val_indices = numpy.argsort(max_vals)[-numpy.arange(1,keep_top+1)]
+                    top_vals = max_vals[top_val_indices] #descending order
+                    top_val_beams = beam_label_list[top_val_indices]
+                    top_val_theta_ant = numpy.array([beam_dict['theta_ant'][beam_label] for beam_label in top_val_beams])
+                    #Currently don't know what to do with these values.  They will be written out as I progress but
+                    #right now I am just testing that they can be calculate without breaking the simulation.
+                    #Right now I am only storing the 3 highest values.  It is likely that I want to store every beam
+                    #that satisfies the trigger condiditon?
+                
+                if trigger_threshold_units == 'adu':
+                    if numpy.size(V_out) > 0:
+                        if numpy.any(Vd_out_sync > trigger_threshold):
+                            triggered = True
+                elif trigger_threshold_units == 'fpga':
+                    if top_vals[0] > trigger_threshold:
+                        triggered = True
+                else:
+                    print('Must use either adu or fpga trigger')
+                    return
+                
+                #Plotting
+                if triggered == True:
+                    print('Triggered on event %i'%eventid)
+                    if plot_geometry == True:
+                        origin = []
+                        for index_antenna in info[info['has_solution'] == 1]['antenna']:
+                            station_loc = numpy.array(config['stations']['positions'][index_station])
+                            antenna_loc = numpy.add(numpy.array(config['antennas']['positions'][index_antenna]),station_loc)
+                            
+                            origin.append(list(antenna_loc))
+                        
+                        neutrino_loc = [x_0, y_0, z_0]
+                        if len(info[info['has_solution'] == 1]) > 0:
+                            fig = gnosim.trace.refraction_library_beta.plotGeometry(origin,neutrino_loc,phi_0,info[numpy.logical_and(info['has_solution'] == 1,info['station'] == index_station)])
+                    
+                    if plot_signals == True:
+                        #might need to account for when signals are not present in certain detectors
+                        #print('Attempting to plot', eventid)
+                        temporary_info = numpy.zeros(config['antennas']['n'],info.dtype)      
+                        for index_antenna in range(0, config['antennas']['n']):
+                            antenna_label = config['antennas']['types'][index_antenna]
+                            antenna_cut = numpy.logical_and(info['antenna'] == index_antenna, station_cut)
+                            temporary_info[index_antenna] = info[antenna_cut][numpy.argmax(info[antenna_cut]['electric_field'])]
+                            '''
+                            for solution in numpy.unique(info['solution']):
+                                solution_cut = numpy.logical_and(info['solution'] == solution, antenna_cut)
+                                sub_info = info[solution_cut]
+                            '''
+                        fig = pylab.figure(figsize=(16.,11.2)) #my screensize
+                        
+                        n_rows = config['antennas']['n']
+                        ntables = 4 #With below lines is 5 for beamforming == True
+                        height_ratios = [2,2,n_rows+1,n_rows+1]
+                        if do_beamforming == True:
+                            ntables += 1
+                            height_ratios.append(0.9*sum(height_ratios))
+                            
+                        gs_left = gridspec.GridSpec(n_rows, 2, width_ratios=[3, 2]) #should only call left plots.  pylab.subplot(gs_left[0]),pylab.subplot(gs_left[2]),...
+                        gs_right = gridspec.GridSpec(ntables, 2, width_ratios=[3, 2], height_ratios=height_ratios) #should only call odd tables pylab.subplot(gs_right[1])
+                        if do_beamforming == True:
+                            gs_beam_forming = gridspec.GridSpec(ntables, 3, width_ratios=[3, 1,5], height_ratios=height_ratios)
+                            
+                        
+                        first_in_loop = True
+                        axis2 = []
+                        max_ax2_range = numpy.array([1e20,-1e20])
+                        for index_antenna in range(0, n_rows):
+                            antenna_label = config['antennas']['types'][index_antenna]
+                            if first_in_loop == True:
+                                first_in_loop = False
+                                ax = pylab.subplot(gs_left[2*index_antenna])
+                            
+                            ax2 = pylab.subplot(gs_left[2*index_antenna],sharex = ax,sharey = ax) #this is not perfect and can be janky with zooming.   
+                            axis2.append(ax2)   
+                            c1 = 'b'
+                            c2 = 'r'
+                            pylab.title('Event %i')
+                            ax2.plot(ud_out_sync[index_antenna,:],Vd_out_sync[index_antenna,:],label='s%ia%i'%(index_station,index_antenna),linewidth=0.4,c = c2)
+                            
+                            if ( n_rows // 2 == index_antenna):
+                                ax2.set_ylabel('adu',fontsize=12, color=c2)
+                                
+                            ax2.legend(fontsize=8,framealpha=0.0,loc='upper right')
+                            ax2.tick_params('y', colors=c2)
+                            
+                        pylab.xlabel('t-t_emit (ns)',fontsize=12)
+                        
+                        #Making Tables
+                        #TABLE 1: Making position table
+                        table_fig = pylab.subplot(gs_right[1])
+                        
+                        table_ax = pylab.gca()
+                        table_fig.patch.set_visible(False)
+                        table_ax.axis('off')
+                        table_ax.axis('tight')
+                        x_neutrino = x_0
+                        y_neutrino = y_0
+                        z_neutrino = z_0
+                        r_neutrino = numpy.sqrt(x_neutrino**2 + y_neutrino**2)
+                        phi_neutrino = phi_0
+                        df = pandas.DataFrame({'x(m)':[ x_neutrino ] , 'y(m)':[ y_neutrino ] , 'z(m)':[ z_neutrino ] , 'r(m)':[ r_neutrino ] , '$\phi_0$(deg)':[ phi_neutrino ] })
+                        table = pylab.table(cellText = df.values.round(2), colLabels = df.columns, loc = 'center')
+                        table.auto_set_font_size(False)
+                        table.set_fontsize(10)
+                        pylab.title('Event Info')
+                        
+                        #TABLE 2: Making Neutrino Energetics table 
+                        '''
+                        >>> list(reader.keys())
+                        ['a_h', 'a_v', 'd', 'electric_field', 'energy_neutrino', 'index_antenna', 
+                        'index_station', 'inelasticity', 'info', 'observation_angle', 'p_detect', 
+                        'p_earth', 'p_interact', 'phi_0', 'solution', 't', 'theta_0', 'theta_ant', 
+                        'theta_ray', 'x_0', 'y_0', 'z_0']
+                        
+                        event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, anti=False,
+                        electricFieldDomain = 'freq',include_noise = False,plot_signals=False,plot_geometry=False,summed_signals=False,
+                        trigger_threshold = 0,plot_filetype_extension = 'svg',image_path = './'):
+                        '''
+                        table_fig = pylab.subplot(gs_right[3])
+                        
+                        table_ax = pylab.gca()
+                        table_fig.patch.set_visible(False)
+                        table_ax.axis('off')
+                        table_ax.axis('tight')
+                        
+                        df = pandas.DataFrame({'E$_\\nu$ (GeV)':'%0.4g'%(energy_neutrino) , 'Inelasticity':'%0.4g'%inelasticity , 'p_interact':'%0.4g'%p_interact, 'p_earth':'%0.4g'%p_earth},index=[0])
+                        #decimals = pandas.Series([3,3,3,3],index = df.columns)
+                        table = pylab.table(cellText = df.values , colLabels = df.columns, loc = 'center')
+                        table.auto_set_font_size(False)
+                        table.set_fontsize(10)
+                        
+                        
+                        
+                        #TABLE 3: Making observed angles and attenuations table
+                        table_fig = pylab.subplot(gs_right[5])
+                        
+                        table_ax = pylab.gca()
+                        table_fig.patch.set_visible(False)
+                        table_ax.axis('off')
+                        table_ax.axis('tight')
+                        antenna =           ['%i'%i for i in temporary_info['antenna'].astype(int)]
+                        observation_angle = ['%0.4g'%i for i in temporary_info['observation_angle'].astype(float)]
+                        theta_ant =         ['%0.4g'%i for i in temporary_info['theta_ant'].astype(float)]
+                        distance =          ['%0.3g'%i for i in temporary_info['distance'].astype(float)]
+                        beam_factor =       ['%0.3g'%i for i in temporary_info['beam_pattern_factor']]
+                        df = pandas.DataFrame({'antenna':antenna , '$\\theta_\mathrm{ant}$ (deg)':theta_ant , '$\\theta_\mathrm{emit}$ (deg)':observation_angle,'d$_\mathrm{path}$ (m)':distance, 'Beam Factor':beam_factor})
+                        table = pylab.table(cellText = df.values, colLabels = df.columns, loc = 'center')
+                        table.auto_set_font_size(False)
+                        table.set_fontsize(10)
+                        
+                        
+                        #TABLE 4: Max Voltage and SNR per Antenna
+                        '''
+                        >>> list(reader.keys())
+                        ['a_h', 'a_v', 'd', 'electric_field', 'energy_neutrino', 'index_antenna', 
+                        'index_station', 'inelasticity', 'info', 'observation_angle', 'p_detect', 
+                        'p_earth', 'p_interact', 'phi_0', 'solution', 't', 'theta_0', 'theta_ant', 
+                        'theta_ray', 'x_0', 'y_0', 'z_0']
+                        
+                        event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, anti=False,
+                        electricFieldDomain = 'freq',include_noise = False,plot_signals=False,plot_geometry=False,summed_signals=False,
+                        trigger_threshold = 0,plot_filetype_extension = 'svg',image_path = './'):
+                        '''
+                        table_fig = pylab.subplot(gs_right[7])
+                        
+                        table_ax = pylab.gca()
+                        table_fig.patch.set_visible(False)
+                        table_ax.axis('off')
+                        table_ax.axis('tight')
+                        antenna =           ['%i'%i for i in temporary_info['antenna'].astype(int)]
+                        electric_field =    ['%0.3g'%i for i in temporary_info['electric_field'].astype(float)]
+                        dom_freqs =         ['%0.3g'%i for i in (temporary_info['dominant_freq']/1e6).astype(float)]
+                        SNRs =              ['%0.3g'%i for i in temporary_info['SNR'].astype(float)]
+                        df = pandas.DataFrame({'antenna':antenna , '$V_\mathrm{max}$ (V)':electric_field , 'SNR':SNRs, '$f_\mathrm{max}$ (MHz)':dom_freqs})
+                        table = pylab.table(cellText = df.values , colLabels = df.columns, loc = 'center')
+                        table.auto_set_font_size(False)
+                        table.set_fontsize(10)
+                        
+                        #TABLE 5: THE TABLE THAT'S ACTUALLY A PLOT AND ONLY SOMETIMES SHOWS UP DEPENDING ON SETTINGS :D
+                        
+                        if do_beamforming == True:
+                            
+                            colormap = pylab.cm.gist_ncar #nipy_spectral, Set1,Paired   
+                            beam_colors = [colormap(i) for i in numpy.linspace(0, 1,len(beam_dict['beams'].keys())+1)] #I put the +1 backs it was making the last beam white, hopefully if I put this then the last is still white but is never called
+            
+                            
+                            gs_beam_forming = gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=gs_right[9], wspace=0.1, hspace=0.1, width_ratios=[0.1,6,3])
+                            #table_fig = pylab.subplot(gs_beam_forming[13])
+                            table_fig = pylab.subplot(gs_beam_forming[1])
+                            #table_fig = pylab.subplot(gs_right[9])
+                            table_ax = pylab.gca()
+                            table_fig.patch.set_visible(True)
+                            
+                            for beam_index, beam_label in enumerate(beam_dict['beams'].keys()):
+                                table_ax.plot(beam_powersums[beam_label],label = '%s, $\\theta_{ant} = $ %0.2f'%(beam_label,beam_dict['theta_ant'][beam_label]),color = beam_colors[beam_index])
+                                #print(beam_powersums[beam_label])
+                            #for line_index,line in enumerate(table_ax.lines):
+                            #    line.set_color(self.beam_colors[line_index])
+                            #xlim = table_ax.get_xlim()
+                            #table_ax.set_xlim( ( xlim[0] , xlim[1]*1.5 ) )
+                            
+                            #box = table_ax.get_position()
+                            #table_ax.set_position([box.x0, box.y0, box.width * 0.7, box.height])
+                            pylab.yticks(rotation=45)
+                            table_ax.legend(loc='center left', bbox_to_anchor=(0.95, 0.5))
+                            #pylab.legend(loc='upper right', bbox_to_anchor=(1.05, 0.5))
+                            #table_ax.axis('tight')
+                            
+                        pylab.subplots_adjust(left = 0.05, bottom = 0.05, right = 0.99, top = 0.97, wspace = 0.15, hspace = 0.28)
+                        #pylab.show(block=True)
+                        '''
+                        try:
+                            pylab.savefig('%s%s-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
+                            pylab.close(fig)
+                            #print('Saved image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
+                        except:
+                            print('Failed to save image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
+                        '''
                 
                 
-                    
-                    
+            
+            
+            else:
+                print('Signals for %s station %s not found in reader'%(event_label,station_label))        
+    else:
+        print('Signals for %s not found in reader'%(event_label))
+            
+    
+    
+    
+    
+    
+    
+    
+    
+
+
+
+
+  
 if __name__ == "__main__":
     pylab.close('all')
     
     #reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_100_events_1_seed_10.h5' , 'r')
     
     #reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_1000_events_1_seed_2.h5' , 'r')
-    reader = h5py.File('./results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_100_events_1_seed_2.h5' , 'r')
+    reader = h5py.File('./results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_1000_events_1_seed_1_new_new_new.h5' , 'r')
     
     config = yaml.load(open(reader.attrs['config']))
     info = reader['info'][...]
     
     #options
     energy_neutrino = 3.e9 # GeV
-    choose_n = 100 #number of events to run code on (randomly selected from events with solutions
+    choose_n = 1 #number of events to run code on (randomly selected from events with solutions
     sampling_bits = 7
     scale_noise_to = 3
     digital_sampling_freq = 1.5 #GHz
@@ -492,13 +783,13 @@ if __name__ == "__main__":
     n_baselines = 2
     power_calculation_sum_length = 16 #How long each power sum window is
     power_calculation_interval = 8 #How frequent each power sum window begins
-    plot_threshold_units = 'fpga'
-    plot_threshold = 7000
-    multi_plot_signals = True
+    trigger_threshold_units = 'fpga'
+    trigger_threshold = 0#7000
+    multi_plot_signals = False
     plot_geometry = False
     
     single_plot_signals   = False
-    single_plot_spectrum  = True
+    single_plot_spectrum  = False
     single_plot_potential = False
     add_signals_plot = True
     remove_noise_overlap = True
@@ -507,7 +798,7 @@ if __name__ == "__main__":
     include_noise = True
     summed_signals = True
     do_beamforming = True
-    plot_first = True
+    plot_first = False
     plot_each_beam = False
     #preparations
     #'''
@@ -527,41 +818,41 @@ if __name__ == "__main__":
     eventids = numpy.unique(info[info['has_solution']==1]['eventid'])
     beam_dict = gnosim.sim.fpga.getBeams(config, n_beams, n_baselines , mean_index ,digital_sampling_period ,power_calculation_sum_length = power_calculation_sum_length, power_calculation_interval = power_calculation_interval, verbose = False)
     
-    
-    try:
-        do_events = numpy.random.choice(eventids,choose_n,replace=False)
-    except:
-        do_events = numpy.unique(numpy.random.choice(eventids,choose_n,replace=True))
-    do_events = [599]#[356,383,599,654,846]
-    for eventid in do_events:
-        print('On event %i'%eventid)
-        redoEventFromInfo(reader,eventid,energy_neutrino,n_array[eventid],input_u,h_fft,sys_fft,freqs,sampling_bits,noise_rms,scale_noise_to,digital_sampling_period,random_time_offsets[eventid],0,beam_dict,plot_threshold_units,plot_threshold,include_noise = include_noise,summed_signals = summed_signals,do_beamforming = do_beamforming, plot_geometry = plot_geometry, plot_signals = multi_plot_signals,plot_first = plot_first,single_plot_signals   = single_plot_signals,single_plot_spectrum  = single_plot_spectrum,single_plot_potential = single_plot_potential, plot_each_beam = plot_each_beam)
-   
     #'''
-    ###REPEATING  v4
-    input_u, h_fft, sys_fft, freqs = gnosim.interaction.askaryan.calculateTimes(up_sample_factor=up_sample_factor,mode = 'v4')
-    z_0 = numpy.array(list(reader['z_0']))
-    n_array = gnosim.earth.antarctic.indexOfRefraction(z_0, ice_model=config['detector_volume']['ice_model']) 
-    mean_index = numpy.mean(n_array)
-    random_time_offsets = numpy.random.uniform(-1, 1, size=len(n_array))
-    V_noiseless, u , dominant_freq, V_noise, SNR = gnosim.interaction.askaryan.quickSignalSingle( 0,1,energy_neutrino,1.8,\
-                      0,0,0,input_u,h_fft,sys_fft,freqs,\
-                      plot_signals=False,plot_spectrum=False,plot_potential = False,\
-                      include_noise = True, resistance = 50, temperature = 320)
-    noise_rms = numpy.std(V_noise)
-    print('External noise_rms: %f',noise_rms)
-    #Signal Calculations
-    eventids = numpy.unique(info[info['has_solution']==1]['eventid'])
-    beam_dict = gnosim.sim.fpga.getBeams(config, n_beams, n_baselines , mean_index ,digital_sampling_period ,power_calculation_sum_length = power_calculation_sum_length, power_calculation_interval = power_calculation_interval, verbose = False)
-    
-    
     try:
         do_events = numpy.random.choice(eventids,choose_n,replace=False)
     except:
         do_events = numpy.unique(numpy.random.choice(eventids,choose_n,replace=True))
-    do_events = [599]#[356,383,599,654,846]
+    
+    #'''
+    #do_events = [90]#[356,383,599,654,846]
+    
+    create_dataset = False
+    
+    if create_dataset == True:
+        outfile = 'test.h5'
+        file = h5py.File(outfile, 'w')
     for eventid in do_events:
-        print('On event %i'%eventid)
-        redoEventFromInfo(reader,eventid,energy_neutrino,n_array[eventid],input_u,h_fft,sys_fft,freqs,sampling_bits,noise_rms,scale_noise_to,digital_sampling_period,random_time_offsets[eventid],0,beam_dict,plot_threshold_units,plot_threshold,include_noise = include_noise,summed_signals = summed_signals,do_beamforming = do_beamforming, plot_geometry = plot_geometry, plot_signals = multi_plot_signals,plot_first = plot_first, single_plot_signals   = single_plot_signals,single_plot_spectrum  = single_plot_spectrum,single_plot_potential = single_plot_potential,plot_each_beam = plot_each_beam)
+        event_label = 'event%i'%eventid
+        print('On %s'%event_label)
+        triggered,out_data = redoEventFromInfo(reader,eventid,energy_neutrino,n_array[eventid],input_u,h_fft,sys_fft,freqs,sampling_bits,noise_rms,scale_noise_to,digital_sampling_period,random_time_offsets[eventid],0,beam_dict,trigger_threshold_units,trigger_threshold,include_noise = include_noise,summed_signals = summed_signals,do_beamforming = do_beamforming, plot_geometry = plot_geometry, plot_signals = multi_plot_signals,plot_first = plot_first,single_plot_signals   = single_plot_signals,single_plot_spectrum  = single_plot_spectrum,single_plot_potential = single_plot_potential, plot_each_beam = plot_each_beam)
+        if triggered == True:
+            if create_dataset == True:
+                file.create_group(event_label)
+                for index_station in range(config['stations']['n']):
+                    station_label = 'station%i'%index_station
+                    if create_dataset == True:
+                        file[event_label].create_dataset(station_label, numpy.shape(out_data[station_label]), dtype='f', compression='gzip', compression_opts=9, shuffle=True)  
+                        file[event_label][station_label][...] = out_data[station_label]
+    if create_dataset == True:
+        file.close()
+        out_reader = h5py.File(outfile , 'r')
+        
     
-    
+        
+        
+    plotFromReader(reader,447,trigger_threshold_units = 'fpga', trigger_threshold = 7000, do_beamforming = True,beam_dict =  beam_dict, plot_signals = True, plot_geometry = False)
+        
+        
+        
+        
