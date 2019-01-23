@@ -7,6 +7,7 @@ import scipy.interpolate
 import sys
 from matplotlib import gridspec
 from mpl_toolkits.mplot3d import Axes3D
+import pylab
 
 ############################################################
 # ORIENTATION TOOLS
@@ -128,6 +129,7 @@ def plotArrayFromConfig(config,only_station = 'all',verbose = False):
     ax.set_xlabel('Ice x',fontsize=16)
     ax.set_ylabel('Ice y',fontsize=16)
     ax.set_zlabel('Ice z',fontsize=16)
+    ax.view_init(elev = 30.0, azim = 45.0)
     pylab.legend(fancybox=True, framealpha=0.5,fontsize=12)
     return fig
 
