@@ -862,7 +862,7 @@ class Sim:
         print('Finished griddata_Event in ', time.time() - griddata_initate_time, 's')
 
     def throw(self, energy_neutrino=1.e9, 
-              theta_0=None, phi_0=None, x_0=None, y_0=None, z_0=None, 
+              theta_0=None, phi_0=None, x_0=None, y_0=None, z_0=None, phi_vertex = None, r_vertex = None,
               anti=False, n_events=10000, detector_volume_radius=6000., detector_volume_depth=3000., 
               outfile=None,seed = None,method = 'cubic',electricFieldDomain = 'freq',include_noise = False,summed_signals = False,
               plot_geometry = False, plot_signals = False, trigger_threshold = 0,trigger_threshold_units = 'V',plot_filetype_extension = 'svg',image_path = './',
@@ -890,25 +890,88 @@ class Sim:
             
         energy_neutrinos = energy_neutrino * numpy.ones(n_events)
     
-        #Randomizing direction neutrino came from (characterized by phi_0, theta_0
-        phi_0 = numpy.random.uniform(0., 360., size=n_events) # deg
-        theta_0 = numpy.degrees(numpy.arccos(numpy.random.uniform(1., -1., size=n_events))) # deg
+        #Direction neutrino came from (characterized by phi_0, theta_0)
+        if theta_0 == None:
+            theta_0 = numpy.degrees(numpy.arccos(numpy.random.uniform(1., -1., size=n_events))) # deg
+        else:
+            print('Using input theta_0')
+            if numpy.logical_or(isinstance(theta_0,list) == True,isinstance(theta_0,tuple) == True):
+                theta_0 = numpy.array(theta_0,dtype=float)
+            else:
+                theta_0 = theta_0.astype(float)
+            
+        if phi_0 == None:
+            phi_0 = numpy.random.uniform(0., 360., size=n_events) # deg
+        else:
+            print('Using input phi_0')
+            if numpy.logical_or(isinstance(phi_0,list) == True,isinstance(phi_0,tuple) == True):
+                phi_0 = numpy.array(phi_0,dtype=float)
+            else:
+                phi_0 = phi_0.astype(float)
         
-        # Producing neutrino randomly in approximate detector volume
-        # NEW CURVATURE
-        alpha_max_radians = detector_volume_radius / gnosim.utils.constants.radius_earth # radians
-        alpha = numpy.arccos(numpy.random.uniform(1., numpy.cos(alpha_max_radians), size=n_events)) # radians
-        r = gnosim.utils.constants.radius_earth * alpha # m #Seems to be using small angle formula
-        # NEW CURVATURE
-
-        phi_vertex = numpy.random.uniform(0., 360., size=n_events) # deg
-    
-        x_0 = r * numpy.cos(numpy.radians(phi_vertex))
-        y_0 = r * numpy.sin(numpy.radians(phi_vertex))
-        z_0 = numpy.random.uniform(-1. * detector_volume_depth, 0., size=n_events) # m #maybe something to double check later, make sure doesn't give solutions outside of earth
-        #TESTING FOR ERROR SCENARIO
-        z_0[0] = 1000.0
         
+        #Location of neutrino interaction (characterized by [x_0, y_0, z_0] or [phi_vertex, theta_vertex, z_0] )
+        if z_0 == None:
+            z_0 = numpy.random.uniform(-1. * detector_volume_depth, 0., size=n_events) # m #maybe something to double check later, make sure doesn't give solutions outside of earth
+        else:
+            print('Using input z_0')
+            if numpy.logical_or(isinstance(z_0,list) == True,isinstance(z_0,tuple) == True):
+                z_0 = numpy.array(z_0,dtype=float)
+            else:
+                z_0 = z_0.astype(float)
+                
+        if numpy.logical_and(phi_vertex  != None, r_vertex != None):
+            if numpy.logical_or(x_0 != None, y_0 != None):
+                print('phi_vertex and r_vertex are given and will be used')
+                print('Ignoring provide x_0, y_0 coordinates, if you want to use x_0, y_0 please ensure phi_vertex = None and r_vertex = None')
+            
+            if numpy.logical_or(isinstance(phi_vertex,list) == True,isinstance(phi_vertex,tuple) == True):
+                phi_vertex = numpy.array(phi_vertex,dtype=float)
+            else:
+                phi_vertex = phi_vertex.astype(float)
+                
+            if numpy.logical_or(isinstance(r_vertex,list) == True,isinstance(r_vertex,tuple) == True):
+                r_vertex = numpy.array(r_vertex,dtype=float)
+            else:
+                r_vertex = r_vertex.astype(float)
+                
+            x_0 = r_vertex * numpy.cos(numpy.radians(phi_vertex))
+            y_0 = r_vertex * numpy.sin(numpy.radians(phi_vertex))
+            
+        elif numpy.logical_and(x_0  != None, y_0 != None):
+            if numpy.logical_or(phi_vertex  != None, r_vertex != None):
+                print('x_0 and y_0 are given and will be used')
+                print('Ignoring provide phi_vertex, r_vertex coordinates, if you want to use phi_vertex, r_vertex please ensure x_0 = None and y_0 = None')
+            
+            if numpy.logical_or(isinstance(x_0,list) == True,isinstance(x_0,tuple) == True):
+                x_0 = numpy.array(x_0,dtype=float)
+            else:
+                x_0 = x_0.astype(float)
+                
+            if numpy.logical_or(isinstance(y_0,list) == True,isinstance(y_0,tuple) == True):
+                y_0 = numpy.array(y_0,dtype=float)
+            else:
+                y_0 = y_0.astype(float)
+        
+        else:
+            print('Using randomized phi_vertex and r_vertex to calculate x_0, y_0')
+            phi_vertex = numpy.random.uniform(0., 360., size=n_events) # deg
+            alpha_max_radians = detector_volume_radius / gnosim.utils.constants.radius_earth # radians
+            alpha = numpy.arccos(numpy.random.uniform(1., numpy.cos(alpha_max_radians), size=n_events)) # radians
+            r_vertex = gnosim.utils.constants.radius_earth * alpha
+            x_0 = r_vertex * numpy.cos(numpy.radians(phi_vertex))
+            y_0 = r_vertex * numpy.sin(numpy.radians(phi_vertex))
+        
+        len_array = numpy.array([len(x_0),len(y_0),len(z_0),len(phi_0),len(theta_0)])
+        
+        if numpy.size(numpy.unique(len_array)) != 1:
+            print('Breaking early, something went wrong dyring definitions of neutrino coordinate assigment.  The below numbers should all be the same:')
+            print('numpy.array([len(x_0),len(y_0),len(z_0),len(phi_0),len(theta_0)]) = ',len_array)
+            print('Check that n_events given matches length of all given coordinates')
+            return 0
+        
+        #Response function preparations
+                
         if electricFieldDomain == 'time':
             print('Loading Response Functions')
             self.signal_times, self.h_fft,self.sys_fft,self.freqs_response = gnosim.interaction.askaryan.calculateTimes(up_sample_factor = 20,mode='v4')
@@ -1079,6 +1142,7 @@ class Sim:
                             dc_offset = dc_offsets[ii], do_beamforming = do_beamforming, output_all_solutions = output_all_solutions)
             if numpy.logical_and(save_signals == True,triggered == True):
                 #This region I will need to be careful adjustig when/if I add multithreading per event. 
+                #Note to future self, there is a section in 'Python and HDF5' about multithreading with HDF5
                 file['signals'].create_group(event_label)
                 for index_station in range(self.config['stations']['n']):
                     station_label = 'station%i'%index_station
@@ -1283,14 +1347,16 @@ if __name__ == "__main__":
     #all of these assume time domain, as the freq domain portion of the code is not maintained. 
     
     #Used for testing: 10 adu, 10000 fpga
-    my_sim.throw(energy_neutrino, n_events=n_events, 
+    my_sim.throw(energy_neutrino, n_events=n_events,
                  detector_volume_radius=my_sim.config['detector_volume']['radius'],
                  detector_volume_depth=my_sim.config['detector_volume']['depth'],
                  outfile=outfile,seed=seed,electricFieldDomain = 'time',include_noise = True,summed_signals = True, 
-                 plot_geometry = False, plot_signals = False, trigger_threshold = 7000, trigger_threshold_units = 'fpga',
+                 plot_geometry = False, plot_signals = True, trigger_threshold = 7000, trigger_threshold_units = 'fpga',
                  plot_filetype_extension = image_extension,image_path = image_path,use_threading = True,
                  do_beamforming = True, n_beams = 15, n_baselines = 2,output_all_solutions = True,save_signals = True)
     
+    #For pulser location that Kaeli is looking at:
+    #r_vertex = numpy.array([5214.0]), phi_vertex = numpy.array([0.0]), z_0 = numpy.array([-1450.0])
     
     print('Trying to print station geometry and antenna orientations')
     try:
