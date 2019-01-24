@@ -251,12 +251,11 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                 if plot_geometry == True:
                     origin = []
                     for index_antenna in info[info['has_solution'] == 1]['antenna']:
-                        station_loc = numpy.array(config['stations']['positions'][index_station])
-                        antenna_loc = numpy.add(numpy.array(config['antennas']['positions'][index_antenna]),station_loc)
-                        
+                        station_loc = numpy.array(config['stations']['positions'][index_station],dtype=float)
+                        antenna_loc = numpy.add(numpy.array(config['antennas']['positions'][index_antenna],dtype=float),station_loc)
                         origin.append(list(antenna_loc))
                     
-                    neutrino_loc = [x_0, y_0, z_0]
+                    neutrino_loc = numpy.array([x_0, y_0, z_0],dtype=float)
                     if len(info[info['has_solution'] == 1]) > 0:
                         fig = gnosim.trace.refraction_library_beta.plotGeometry(origin,neutrino_loc,phi_0,info[numpy.logical_and(info['has_solution'] == 1,info['station'] == index_station)])
                         '''
@@ -591,13 +590,14 @@ def plotFromReader(reader,eventid,trigger_threshold_units = 'fpga', trigger_thre
                             antenna_label = config['antennas']['types'][index_antenna]
                             if first_in_loop == True:
                                 first_in_loop = False
+                                pylab.title('Event %i'%eventid)
                                 ax = pylab.subplot(gs_left[2*index_antenna])
                             
                             ax2 = pylab.subplot(gs_left[2*index_antenna],sharex = ax,sharey = ax) #this is not perfect and can be janky with zooming.   
                             axis2.append(ax2)   
                             c1 = 'b'
                             c2 = 'r'
-                            pylab.title('Event %i')
+
                             ax2.plot(ud_out_sync[index_antenna,:],Vd_out_sync[index_antenna,:],label='s%ia%i'%(index_station,index_antenna),linewidth=0.4,c = c2)
                             
                             if ( n_rows // 2 == index_antenna):
@@ -767,7 +767,8 @@ if __name__ == "__main__":
     #reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_100_events_1_seed_10.h5' , 'r')
     
     #reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_1000_events_1_seed_2.h5' , 'r')
-    reader = h5py.File('./results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_1000_events_1_seed_1_new_new_new.h5' , 'r')
+    reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_1001_events_1_seed_3.h5' , 'r')
+    #reader_kaeli = h5py.File('./results_2019_Jan_real_config_3.00e+09_GeV_1_events_1_seed_1.h5' , 'r')
     
     config = yaml.load(open(reader.attrs['config']))
     info = reader['info'][...]
@@ -785,7 +786,12 @@ if __name__ == "__main__":
     power_calculation_interval = 8 #How frequent each power sum window begins
     trigger_threshold_units = 'fpga'
     trigger_threshold = 0#7000
-    multi_plot_signals = False
+    
+    
+    use_fromReader = False
+    use_redo = True
+    
+    multi_plot_signals = True
     plot_geometry = False
     
     single_plot_signals   = False
@@ -794,7 +800,7 @@ if __name__ == "__main__":
     add_signals_plot = True
     remove_noise_overlap = True
     up_sample_factor = 20
-    signal_response_version = 'v2'
+    signal_response_version = 'v5'
     include_noise = True
     summed_signals = True
     do_beamforming = True
@@ -802,57 +808,62 @@ if __name__ == "__main__":
     plot_each_beam = False
     #preparations
     #'''
-    ###v2
-    input_u, h_fft, sys_fft, freqs = gnosim.interaction.askaryan.calculateTimes(up_sample_factor=up_sample_factor,mode = 'v2')
-    z_0 = numpy.array(list(reader['z_0']))
-    n_array = gnosim.earth.antarctic.indexOfRefraction(z_0, ice_model=config['detector_volume']['ice_model']) 
-    mean_index = numpy.mean(n_array)
-    random_time_offsets = numpy.random.uniform(-1, 1, size=len(n_array))
-    V_noiseless, u , dominant_freq, V_noise, SNR = gnosim.interaction.askaryan.quickSignalSingle( 0,1,energy_neutrino,1.8,\
-                      0,0,0,input_u,h_fft,sys_fft,freqs,\
-                      plot_signals=False,plot_spectrum=False,plot_potential = False,\
-                      include_noise = True, resistance = 50, temperature = 320)
-    noise_rms = numpy.std(V_noise)
-    print('External noise_rms: %f',noise_rms)
+    #'''
     #Signal Calculations
-    eventids = numpy.unique(info[info['has_solution']==1]['eventid'])
+    eventids = numpy.unique(info[info['triggered']==1]['eventid'])
     beam_dict = gnosim.sim.fpga.getBeams(config, n_beams, n_baselines , mean_index ,digital_sampling_period ,power_calculation_sum_length = power_calculation_sum_length, power_calculation_interval = power_calculation_interval, verbose = False)
     
-    #'''
     try:
         do_events = numpy.random.choice(eventids,choose_n,replace=False)
     except:
         do_events = numpy.unique(numpy.random.choice(eventids,choose_n,replace=True))
     
-    #'''
+    z_0 = numpy.array(list(reader['z_0']))
+    n_array = gnosim.earth.antarctic.indexOfRefraction(z_0, ice_model=config['detector_volume']['ice_model']) 
+    mean_index = numpy.mean(n_array)
+    random_time_offsets = numpy.random.uniform(-1, 1, size=len(n_array))
+    ###########################
+    input_u, h_fft, sys_fft, freqs = gnosim.interaction.askaryan.calculateTimes(up_sample_factor=up_sample_factor,mode = signal_response_version)
+    print('LENGTH OF FREQS:',len(freqs))
+    noise_signal  = numpy.array([])
+    
+    for i in range(100):
+        V_noiseless, u , dominant_freq, V_noise, SNR = gnosim.interaction.askaryan.quickSignalSingle( 0,1,energy_neutrino,1.8,\
+                      0,0,0,input_u,h_fft,sys_fft,freqs,\
+                      plot_signals=False,plot_spectrum=False,plot_potential = False,\
+                      include_noise = True, resistance = 50, temperature = 320)
+        noise_signal = numpy.append(noise_signal,V_noise)
+    noise_rms = numpy.std(noise_signal)
+    
+    print('External noise_rms: %f',noise_rms)
+    
+    
     #do_events = [90]#[356,383,599,654,846]
+    if use_redo == True:
+        create_dataset = False
+        if create_dataset == True:
+            outfile = 'test.h5'
+            file = h5py.File(outfile, 'w')
+        for eventid in do_events:
+            event_label = 'event%i'%eventid
+            print('On %s'%event_label)
+            triggered,out_data = redoEventFromInfo(reader,eventid,energy_neutrino,n_array[eventid],input_u,h_fft,sys_fft,freqs,sampling_bits,noise_rms,scale_noise_to,digital_sampling_period,random_time_offsets[eventid],0,beam_dict,trigger_threshold_units,trigger_threshold,include_noise = include_noise,summed_signals = summed_signals,do_beamforming = do_beamforming, plot_geometry = plot_geometry, plot_signals = multi_plot_signals,plot_first = plot_first,single_plot_signals   = single_plot_signals,single_plot_spectrum  = single_plot_spectrum,single_plot_potential = single_plot_potential, plot_each_beam = plot_each_beam)
+            if triggered == True:
+                if create_dataset == True:
+                    file.create_group(event_label)
+                    for index_station in range(config['stations']['n']):
+                        station_label = 'station%i'%index_station
+                        if create_dataset == True:
+                            file[event_label].create_dataset(station_label, numpy.shape(out_data[station_label]), dtype='f', compression='gzip', compression_opts=9, shuffle=True)  
+                            file[event_label][station_label][...] = out_data[station_label]
+        if create_dataset == True:
+            file.close()
+            out_reader = h5py.File(outfile , 'r')
+    if use_fromReader == True:    
+        for eventid in do_events:
+            event_label = 'event%i'%eventid
+            print('On %s'%event_label)
+            plotFromReader(reader,eventid,trigger_threshold_units = 'fpga', trigger_threshold = trigger_threshold, do_beamforming = True,beam_dict =  beam_dict, plot_signals = multi_plot_signals, plot_geometry = plot_geometry)
     
-    create_dataset = False
     
-    if create_dataset == True:
-        outfile = 'test.h5'
-        file = h5py.File(outfile, 'w')
-    for eventid in do_events:
-        event_label = 'event%i'%eventid
-        print('On %s'%event_label)
-        triggered,out_data = redoEventFromInfo(reader,eventid,energy_neutrino,n_array[eventid],input_u,h_fft,sys_fft,freqs,sampling_bits,noise_rms,scale_noise_to,digital_sampling_period,random_time_offsets[eventid],0,beam_dict,trigger_threshold_units,trigger_threshold,include_noise = include_noise,summed_signals = summed_signals,do_beamforming = do_beamforming, plot_geometry = plot_geometry, plot_signals = multi_plot_signals,plot_first = plot_first,single_plot_signals   = single_plot_signals,single_plot_spectrum  = single_plot_spectrum,single_plot_potential = single_plot_potential, plot_each_beam = plot_each_beam)
-        if triggered == True:
-            if create_dataset == True:
-                file.create_group(event_label)
-                for index_station in range(config['stations']['n']):
-                    station_label = 'station%i'%index_station
-                    if create_dataset == True:
-                        file[event_label].create_dataset(station_label, numpy.shape(out_data[station_label]), dtype='f', compression='gzip', compression_opts=9, shuffle=True)  
-                        file[event_label][station_label][...] = out_data[station_label]
-    if create_dataset == True:
-        file.close()
-        out_reader = h5py.File(outfile , 'r')
-        
     
-        
-        
-    plotFromReader(reader,447,trigger_threshold_units = 'fpga', trigger_threshold = 7000, do_beamforming = True,beam_dict =  beam_dict, plot_signals = True, plot_geometry = False)
-        
-        
-        
-        

@@ -370,7 +370,8 @@ def plotGeometry(origin,neutrino_loc,phi_0,info):
     
     '''
     if len(numpy.shape(origin)) == 1:
-        origin = [origin]
+        origin = [origin] #this is sloppy and might break
+    #might want to do some check here to make sure values are all floats
     neutrino_loc_r = numpy.sqrt(neutrino_loc[0]**2 + neutrino_loc[1]**2)
     if len(numpy.unique(info['eventid'])) == 1:
         eventid = numpy.unique(info['eventid'])[0]

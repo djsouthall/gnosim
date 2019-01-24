@@ -30,3 +30,6 @@ plt.plot(t, np.fft.fftshift(h), label="Data")
 plt.xlabel("Time [ns]")
 plt.ylabel("Voltage")
 plt.show()
+
+
+

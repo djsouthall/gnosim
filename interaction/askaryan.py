@@ -81,6 +81,10 @@ def loadSignalResponse(mode='v2'):
         print('Loading Signal Response V4')
         antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v4.npy')
         electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_v4.npy')
+    elif mode == 'v5':
+        print('Loading Signal Response V5')
+        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v5.npy')
+        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_v5.npy')
     else:
         print('Error, defaulting to loading Signal Response V2')
         antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v2.npy')
@@ -442,7 +446,7 @@ def addSignals(u_in,V_in,plot=False,V_noise_in = [], remove_noise_overlap = Fals
             
         return V_out,u_out
 
-def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode='v2'):
+def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode=None):
     '''
     Calculates the times used for signal calculations based on the response functions
     (assumed to have the same frequency step).  up_sample_factor is not exact, as the
@@ -453,8 +457,12 @@ def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode='
     '''
     #Loading in response function and setting frequency / time steps
     if any([numpy.size(h_fft) ==1,numpy.size(sys_fft)==1,numpy.size(freqs)==1]):
-        print('passing loadSignalResponse(mode=%s)'%mode)
-        h_fft,sys_fft,freqs = loadSignalResponse(mode=mode)
+        if mode == None:
+            print('No mode given to pass to loadSignalResponse, that functions default mode will be used')
+            h_fft,sys_fft,freqs = loadSignalResponse()
+        else:
+            print('Passing loadSignalResponse(mode=%s)'%mode)
+            h_fft,sys_fft,freqs = loadSignalResponse(mode=mode)
 
     if up_sample_factor <= 0:
         up_sample_factor = 1
@@ -532,7 +540,7 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
         q_fft = numpy.fft.rfft(q)
         A_fft = numpy.multiply(fp_fft,q_fft) * ( gnosim.utils.constants.mu_0 * numpy.sin(theta_obs_rad) / (4. * numpy.pi * R ) ) * ( t_step/abs(alpha) ) #the t_step already accounts for scaling required with irffting.  Might not want here?  unsure
         
-        A = numpy.fft.irfft(A_fft,n=len(u))
+        A = numpy.fft.irfft(A_fft,n=len(u)) #is this unecessary?
         A = numpy.fft.fftshift(A)
         if plot_potential == True:
             pylab.figure(figsize=(16.,11.2))

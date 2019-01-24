@@ -91,6 +91,10 @@ def loadSignalResponse(mode='v2'):
         print('Loading Signal Response V4')
         antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v4.npy')
         electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_v4.npy')
+    elif mode == 'v5':
+        print('Loading Signal Response V5')
+        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v5.npy')
+        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_v5.npy')
     else:
         print('Error, defaulting to loading Signal Response V2')
         antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v2.npy')
@@ -412,7 +416,7 @@ def addSignals(u_in,V_in,plot=False):
             pylab.legend(fontsize=14)
         return V_out,u_out
 
-def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode='v2'):
+def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode=None):
     '''
     Calculates the times used for signal calculations based on the response functions
     (assumed to have the same frequency step).  up_sample_factor is not exact, as the
@@ -423,11 +427,16 @@ def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode='
     '''
     #Loading in response function and setting frequency / time steps
     if any([numpy.size(h_fft) ==1,numpy.size(sys_fft)==1,numpy.size(freqs)==1]):
-        h_fft,sys_fft,freqs = loadSignalResponse(mode=mode)
+        if mode == None:
+            print('No mode given to pass to loadSignalResponse, that functions default mode will be used')
+            h_fft,sys_fft,freqs = loadSignalResponse()
+        else:
+            print('Passing loadSignalResponse(mode=%s)'%mode)
+            h_fft,sys_fft,freqs = loadSignalResponse(mode=mode)
 
     if up_sample_factor <= 0:
         up_sample_factor = 1
-
+    
     freqs = numpy.absolute(freqs)
     freq_step = freqs[1]-freqs[0] #1/(n_points*t_step*1e-9) #Hz
     possible_lengths = 2**numpy.arange(0,25)
@@ -436,7 +445,7 @@ def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode='
     
     h_fft = numpy.append(h_fft,numpy.zeros(n_points_freq - len(h_fft)))
     sys_fft = numpy.append(sys_fft,numpy.zeros(n_points_freq - len(sys_fft)))
-    response_fft = numpy.multiply(h_fft,sys_fft)
+    #response_fft = numpy.multiply(h_fft,sys_fft)
     
     t_step = 1/(2*max(freqs))*1e9 #ns
     u = numpy.arange(-(n_points_freq-1),(n_points_freq-1))*t_step #To increase time duration of signal I should just need to upsample?

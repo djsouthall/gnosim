@@ -463,6 +463,7 @@ class Sim:
                     print('Triggered on event %i'%eventid)
                     if plot_geometry == True:
                         origin = []
+                        
                         for index_antenna in info[info['has_solution'] == 1]['antenna']:
                             origin.append([self.stations[index_station].antennas[index_antenna].x,self.stations[index_station].antennas[index_antenna].y,self.stations[index_station].antennas[index_antenna].z])
                         
@@ -974,7 +975,7 @@ class Sim:
                 
         if electricFieldDomain == 'time':
             print('Loading Response Functions')
-            self.signal_times, self.h_fft,self.sys_fft,self.freqs_response = gnosim.interaction.askaryan.calculateTimes(up_sample_factor = 20,mode='v4')
+            self.signal_times, self.h_fft,self.sys_fft,self.freqs_response = gnosim.interaction.askaryan.calculateTimes(up_sample_factor = 20,mode='v5')
             apply_hard_cut = False
             hard_low = 130e6
             hard_high = 750e6
@@ -993,10 +994,14 @@ class Sim:
             #include_noise = False, resistance = 50, temperature = 320
             #print(self.signal_times)
             #print(len(self.signal_times))
-            noise_signal = gnosim.interaction.askaryan.quickSignalSingle( 0,1,energy_neutrino,1.8,\
+            
+            noise_signal  = numpy.array([])
+            for i in range(100):
+                noise_signal_i = gnosim.interaction.askaryan.quickSignalSingle( 0,1,energy_neutrino,1.8,\
                           0,0,0,self.signal_times,self.h_fft,self.sys_fft,self.freqs_response,\
                           plot_signals=False,plot_spectrum=False,plot_potential = False,\
                           include_noise = True, resistance = 50, temperature = 320)[3]
+                noise_signal = numpy.append(noise_signal,noise_signal_i)
             self.noise_rms = numpy.std(noise_signal)
             self.scale_noise_to = 3
             
@@ -1199,9 +1204,13 @@ def makeIndexHTML(path = './',filetype = 'svg'):
     infiles = glob.glob('%s*%s'%(path,filetype))
     
     infiles_num = []
+    
     for infile in infiles:
-        infiles_num.append(int(infile.split('-event')[-1].replace('.' + filetype,'')))
-    infiles = numpy.array(infiles)[numpy.argsort(infiles_num)]
+        if len(infile.split('-event')) > 1:
+            infiles_num.append(int(infile.split('-event')[-1].replace('.' + filetype,'')))
+        else:
+            infiles_num.append(-1) #will put all non-conforming files at front before sorted event files.
+    infiles = numpy.array(infiles)[numpy.argsort(infiles_num)] #sorts files in index by event number
         
     #I want to sort by event number here!
     image_list = ''
@@ -1351,7 +1360,7 @@ if __name__ == "__main__":
                  detector_volume_radius=my_sim.config['detector_volume']['radius'],
                  detector_volume_depth=my_sim.config['detector_volume']['depth'],
                  outfile=outfile,seed=seed,electricFieldDomain = 'time',include_noise = True,summed_signals = True, 
-                 plot_geometry = False, plot_signals = True, trigger_threshold = 7000, trigger_threshold_units = 'fpga',
+                 plot_geometry = False, plot_signals = True, trigger_threshold = 10000, trigger_threshold_units = 'fpga',
                  plot_filetype_extension = image_extension,image_path = image_path,use_threading = True,
                  do_beamforming = True, n_beams = 15, n_baselines = 2,output_all_solutions = True,save_signals = True)
     
@@ -1363,16 +1372,16 @@ if __name__ == "__main__":
         fig = gnosim.sim.detector.plotArrayFromConfig(my_sim.config,only_station = 'all',verbose = False)
         fig.savefig('%s%s_array_geometry.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),image_extension),bbox_inches='tight')
         pylab.close(fig)
-    except:
+    except Exception as e:
         print('Failed to save image %s%s_array_geometry.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),image_extension))
-
+        print(e)
     
     print('Trying to create index.html file for new images')
     try:
         makeIndexHTML(path = image_path ,filetype = image_extension)
-    except:
+    except Exception as e:
         print('Something went wrong in making index.html')
-        
+        print(e)
     
     #python /home/dsouthall/Projects/GNOSim/sim/antarcticsim.py config energy n_events index 
     #python /home/dsouthall/Projects/GNOSim/gnosim/sim/antarcticsim.py /home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_octo_-200_polar_120_rays.py 1.0e8 50000 1 

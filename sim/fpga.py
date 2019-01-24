@@ -357,11 +357,61 @@ def fpgaBeamForming(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False
             
     return formed_beam_powers, beam_powersums
 
+def getScaleSystemResponseScale(desired_noise_rms = 20.4E-3,mode = 'v4',temperature = 320, resistance = 50, save_new_response = False):
+    '''
+    The absolute scale of the system response has been hard to obtain, so we
+    have decided to just scale it such that the noise level (which is independent
+    of antenna response scale) matches experiment.  The value of noise given
+    by Eric was 1adu  6.8mV, so for a 3adu noise rms the desired_noise_rms = 20.4mV.
+    The mode selects which version of the responses you are calculating this factor
+    for.  
+    '''
+    h_fft,sys_fft,freqs = gnosim.interaction.askaryan.loadSignalResponse(mode=mode)
+    signal_times, h_fft, sys_fft, freqs_response = gnosim.interaction.askaryan.calculateTimes(up_sample_factor=20,h_fft = h_fft,sys_fft = sys_fft,freqs = freqs)
+    
+    #desired_noise_rms = 20.4E-3
+    noise_signal  = numpy.array([])
+    
+    for i in range(100):
+        noise_signal_i = gnosim.interaction.askaryan.quickSignalSingle( 0,1,0,1.8,\
+                      0,0,0,signal_times,h_fft,sys_fft,freqs_response,\
+                      plot_signals=False,plot_spectrum=False,plot_potential = False,\
+                      include_noise = True, resistance = resistance, temperature = temperature)[3]
+        noise_signal = numpy.append(noise_signal,noise_signal_i)
+    slope = desired_noise_rms/numpy.std(noise_signal)
+    
+    
+    h_fft,sys_fft,freqs = gnosim.interaction.askaryan.loadSignalResponse(mode=mode)
+    sys_fft = sys_fft*slope
+    
+    if save_new_response == True:
+        try:
+            antenna_outfile = '/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_%s.npy'%(mode+'_new')
+            system_outfile = '/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_%s.npy'%(mode+'_new')
+            if os.path.isfile(antenna_outfile):
+                print('Outfile Name %s is taken, saving in current directory and appending \'_new\' if necessary'%(antenna_outfile))
+                antenna_outfile = antenna_outfile.replace('.npy','_new.npy')
+                while os.path.isfile(antenna_outfile):
+                    antenna_outfile = antenna_outfile.replace('.npy','_new.npy')
+            if os.path.isfile(system_outfile):
+                print('Outfile Name %s is taken, saving in current directory and appending \'_new\' if necessary'%(system_outfile))
+                system_outfile = system_outfile.replace('.npy','_new.npy')
+                while os.path.isfile(system_outfile):
+                    system_outfile = system_outfile.replace('.npy','_new.npy')
+            
+            print('Saving:\n %s \n %s'%(antenna_outfile,system_outfile))
+            numpy.save(antenna_outfile, numpy.array(list(zip(freqs,h_fft))))
+            numpy.save(system_outfile, numpy.array(list(zip(freqs,sys_fft))))
+        except:
+            print('Something went wrong in saving the responses')
+    return slope, sys_fft
+
 ############################################################
 
 #
 if __name__ == "__main__":
     pylab.close('all')
+    '''
     energy_neutrino = 3.e9 # GeV
     n = 1.78
     c = gnosim.utils.constants.speed_light #m/ns
@@ -370,7 +420,7 @@ if __name__ == "__main__":
     cherenkov_angle = numpy.arccos(1./n)
     cherenkov_angle_deg = numpy.rad2deg(numpy.arccos(1./n))
     h_fft,sys_fft,freqs = gnosim.interaction.askaryan.loadSignalResponse()
-    input_u, h_fft, sys_fft, freqs = gnosim.interaction.askaryan.calculateTimes(up_sample_factor=20)
+    input_u, h_fft, sys_fft, freqs = gnosim.interaction.askaryan.calculateTimes(up_sample_factor=20,h_fft = h_fft,sys_fft = sys_fft,freqs = freqs)
     inelasticity = 0.2
     noise_rms = numpy.std(gnosim.interaction.askaryan.quickSignalSingle(0,R,inelasticity*energy_neutrino,n,R,0,0,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)[3])
     V_noiseless, u, dominant_freq, V_noise,  SNR = gnosim.interaction.askaryan.quickSignalSingle(numpy.deg2rad(50),R,inelasticity*energy_neutrino,n,2500,0.7,0.7,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)
@@ -386,6 +436,8 @@ if __name__ == "__main__":
     V_bit, sampled_times = digitizeSignal(u,V_noise,sample_times,bytes,scale_noise_from,scale_noise_to, dc_offset = dc_offset, plot = False)
     dt = sampled_times[1] - sampled_times[0]
     #################################################################
+    '''
+    '''
     config_file = '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_dipole_octo_-200_polar_120_rays.py'
     config = yaml.load(open(config_file))
     config_file2 = '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/real_config.py'
@@ -406,6 +458,7 @@ if __name__ == "__main__":
     #info_cut = info[numpy.logical_and(info['SNR'] > 1 , info['SNR'] < 10) ]
     info_cut = info[numpy.logical_and(info['SNR'] > 1 , info['SNR'] < 100) ]
     #events 15, 92
+    '''
     '''
     eventids = numpy.unique(info_cut[info_cut['has_solution']==1]['eventid'])
     choose_n = 1
@@ -441,6 +494,7 @@ if __name__ == "__main__":
     print(top_val_beams)
     print(top_val_theta_ant)
     '''
+    '''
     V_in = {}
     u_in = {}
     min_u = 1e20
@@ -472,5 +526,74 @@ if __name__ == "__main__":
     
     
     #use the above to test a trigger algorithm
+    '''
+    
+    '''
+    #This is a crude bisection method that I
+    #made when I was avoiding assuming the scaling was linear.  It is just there
+    #because I don't want to delete it.  It should produce the same scaling factor. 
+    tolerance = desired_noise_rms *  1.0/100.0 
+    tolerance_met = False
+    mult_low = 0
+    mult_high = 1000
+    count = 0
+    max_count = 50
+    multiplier_values = numpy.array([])
+    noise_rms_values = numpy.array([])
+    ######
+    noise_rms_values = numpy.array([])
+    while tolerance_met == False:
+        system_response_multiplier = ( mult_high -  mult_low ) / 2.0
+        multiplier_values = numpy.append(multiplier_values , system_response_multiplier)
+        noise_signal = numpy.array([])
+        for i in range((count+1)):
+            noise_signal_i = gnosim.interaction.askaryan.quickSignalSingle( 0,1,0,1.8,\
+                          0,0,0,signal_times,h_fft,system_response_multiplier*sys_fft,freqs_response,\
+                          plot_signals=False,plot_spectrum=False,plot_potential = False,\
+                          include_noise = True, resistance = 50, temperature = 320)[3]
+            noise_signal = numpy.append(noise_signal,noise_signal_i)
+        noise_rms = numpy.std(noise_signal)
+        noise_rms_values = numpy.append(noise_rms_values,noise_rms)
+        if numpy.abs(noise_rms - desired_noise_rms) < tolerance:
+            tolerance_met = True
+            print('Best multiplier selected after %i attempts using bisection tolerenance:'%count, best_multiplier)
+        else:
+            if noise_rms - desired_noise_rms > 0:
+                #noise_rms to big
+                mult_high = (mult_high*0.66 + system_response_multiplier*0.34) #So it doesn't jump so quickly
+            else:
+                #noise_rms to small
+                mult_low = (mult_low*0.66 + system_response_multiplier*0.34) #So it doesn't jump so quickly
+        
+        if count > max_count:
+            #Because the value is random at each step it is possible to have overshot,
+            #so as a fallback this will interpolate the values above to find a multiplier
+            try:
+                best_multiplier = scipy.interpolate.interp1d(noise_rms_values,multiplier_values,kind='cubic',bounds_error=True)(desired_noise_rms)
+                print('Best multiplier selected using cubic interpolation of values from %i attempts:'%max_count, best_multiplier)
+                break
+            except:
+                best_multiplier = multiplier_values[numpy.argmin(numpy.fabs(multiplier_values - desired_noise_rms))]
+                print('Best multiplier selected crudely from as closest occurence in %i attempts:'%max_count, best_multiplier)
+                break
+    
+        print(count, ')', noise_rms, desired_noise_rms)
+        count += 1
+    pylab.figure()
+    pylab.loglog(multiplier_values,noise_rms_values)
+    pylab.ylabel('Noise rms (V)')
+    pylab.xlabel('multiplier values')
+    pylab.scatter(best_multiplier,desired_noise_rms,color = 'r')
+    
+    '''
+    mode = 'v4'
+    h_fft,sys_fft,freqs = gnosim.interaction.askaryan.loadSignalResponse(mode = mode)
+    slope,sys_fft = getScaleSystemResponseScale(desired_noise_rms = 20.4E-3,mode = mode,save_new_response = True)
+    print('Simple method of scaling: ', slope)
+    
+    
+    
+
+    
     
 ############################################################
