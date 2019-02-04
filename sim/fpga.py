@@ -82,12 +82,12 @@ def calculateDigitalTimes(u_min,u_max,sampling_period,random_time_offset = 0):
     #sample_times = sample_times[numpy.logical_and(sample_times <= u[-1],sample_times >= u[1])] 
     return sample_times
     
-def digitizeSignal(u,V,sample_times,bytes,scale_noise_from,scale_noise_to, dc_offset = 0, plot = False):
+def digitizeSignal(u,V,sample_times,digitizer_bytes,scale_noise_from,scale_noise_to, dc_offset = 0, plot = False):
     '''
     This function is meant to act as the ADC for the simulation.  It will sample
     the signal using the provided sampling rate.  The value of
-    bytes sets the number of voltage bins, those will be distributed from 
-    -2**(bytes-1)+1 to 2**(bytes-1).  The input V will be sampled and scaled linearly
+    digitizer_bytes sets the number of voltage bins, those will be distributed from 
+    -2**(digitizer_bytes-1)+1 to 2**(digitizer_bytes-1).  The input V will be sampled and scaled linearly
     using a linear scaling with V_new = (scale_noise_to/scale_noise_from) * V_sampled
     And then V_sampled is scaled to be one of the byte values using a floor.  Everything
     outside of the max will be rounded.  
@@ -100,8 +100,8 @@ def digitizeSignal(u,V,sample_times,bytes,scale_noise_from,scale_noise_to, dc_of
     #sample_times = sample_times[numpy.logical_and(sample_times <= u[-1],sample_times >= u[1])] #otherwise interpolation error for out of bounds. 
     V_sampled = scipy.interpolate.interp1d(u,V,bounds_error = False,fill_value = 0.0)(sample_times) #sampletimes will now extend beyond the interpolated range, but here it returns 0 voltage
     
-    #byte_vals = numpy.linspace(-2**(bytes-1)+1,2**(bytes-1),2**bytes,dtype=int)
-    byte_vals = numpy.array([-2**(bytes-1)+1,2**(bytes-1)],dtype=int) #only really need endpoints
+    #byte_vals = numpy.linspace(-2**(digitizer_bytes-1)+1,2**(digitizer_bytes-1),2**digitizer_bytes,dtype=int)
+    byte_vals = numpy.array([-2**(digitizer_bytes-1)+1,2**(digitizer_bytes-1)],dtype=int) #only really need endpoints
     slope = scale_noise_to/scale_noise_from
     f = scipy.interpolate.interp1d(byte_vals/slope,byte_vals,bounds_error = False,fill_value = (byte_vals[0],byte_vals[-1]) )
     V_bit = numpy.floor(f(V_sampled)) #not sure if round or floor should be used to best approximate the actual process.
@@ -188,14 +188,16 @@ def getBeams( config, n_beams, n_baselines , n , dt ,power_calculation_sum_lengt
             #print('gnosim.utils.constants.speed_light * ms[beam_index] * dt  / ( n * baseline)',gnosim.utils.constants.speed_light * ms[beam_index] * dt  / ( n * baseline))
             #theta_elevation = 0
             theta_elevation = numpy.rad2deg(numpy.arcsin(gnosim.utils.constants.speed_light * ms[beam_index] * dt  / ( n * baseline) ))
-            theta_ant = 90-theta_elevation    
+            theta_ant = 90.0-theta_elevation
+            #time_delays = numpy.array( ms[beam_index]  * relative_antenna_depths[subbeam],dtype=int) 
+            time_delays = numpy.array( ms[beam_index]  * ((relative_antenna_depths[subbeam] - relative_antenna_depths[subbeam][0])//baseline),dtype=int) 
             beam_dict['beams'][beam_label][subbeam_label] = {'baseline'       : baseline,
-                                                    'antennas'       : subbeam,
-                                                    'depths'         : relative_antenna_depths[subbeam],
-                                                    'time_delays'    : numpy.array( ms[beam_index]  * relative_antenna_depths[subbeam],dtype=int),
-                                                    'theta_elevation': theta_elevation,
-                                                    'theta_ant': theta_ant,
-                                                    'adjusted_m' : ms[beam_index]
+                                                             'antennas'       : subbeam,
+                                                             'depths'         : relative_antenna_depths[subbeam],
+                                                             'time_delays'    : time_delays,
+                                                             'theta_elevation': theta_elevation,
+                                                             'theta_ant'      : theta_ant,
+                                                             'adjusted_m'     : ms[beam_index]
                                                     }
             theta_ant_beam += len(subbeam)*theta_ant
             total_ant += len(subbeam)
@@ -231,7 +233,7 @@ def syncSignals( u_in, V_in, min_time, max_time, u_step ):
             V_out[antenna_index,left_index:right_index] +=  V
     return V_out, u_out
 
-def fpgaBeamForming(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False, save_figs = False):
+def fpgaBeamForming(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False, save_figs = False, trim_sums = False,trim_amount = 50, cap_bytes = 5):
     '''
     This is one function which uses the code from what were the sumBeams and 
     doFPGAPowerCalcAllBeams functions, but puts them in one to avoid the extra 
@@ -249,7 +251,19 @@ def fpgaBeamForming(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False
     #Doing the beam summing portion below:
     #####
     n_antennas = config['antennas']['n']
-    signal_length = numpy.shape(V_in)[1]
+    if len(numpy.shape(V_in)) == 1:
+        signal_length = len(V_in)
+    elif len(numpy.shape(V_in)) == 2:
+        signal_length = numpy.shape(V_in)[1]
+    else:
+        signal_length = 0
+        
+    #FPGA does beamforming with only 5 bits despite signals being at 7, so they are capped here:
+    byte_vals = numpy.array([-2**(cap_bytes-1)+1,2**(cap_bytes-1)],dtype=int) #only really need endpoints
+    V_in[V_in > byte_vals[-1]] = byte_vals[-1]#upper cap
+    V_in[V_in < byte_vals[0]] = byte_vals[0]  #lower cap
+    
+    
     #below is the fastest way I could figure out of doing these sums.  Originally
     #a roll function was used, however this took too long.  I tried to reduce
     #the number of times things are redundently done by calculating them in advance
@@ -323,14 +337,25 @@ def fpgaBeamForming(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False
     
     for beam_index, beam_label in enumerate(beam_dict['beams'].keys()):
         first_subbeam = True
-        
         for subbeam_label in beam_dict['beams'][beam_label].keys():
             subbeam_powersum = numpy.sum(formed_beam_powers[beam_label][subbeam_label][indices],axis=1)
             if first_subbeam == True:
                 first_subbeam = False
                 beam_powersums[beam_label] = subbeam_powersum
+                if trim_sums == True:
+                    zero_cut = subbeam_powersum == 0
             else:
                 beam_powersums[beam_label] = numpy.add(beam_powersums[beam_label],subbeam_powersum)
+                if trim_sums == True:
+                    zero_cut = numpy.logical_or(zero_cut,subbeam_powersum == 0) 
+        if trim_sums == True:
+            #print('sum(zero_cut) == ', sum(zero_cut))
+            #print(zero_cut)
+            #print(1.0*(~zero_cut))
+            #print(beam_powersums[beam_label])
+            beam_powersums[beam_label] = numpy.multiply(beam_powersums[beam_label], 1.0*(~zero_cut))
+            #print(beam_powersums[beam_label])
+            beam_powersums[beam_label] = beam_powersums[beam_label][numpy.arange(trim_amount,len(beam_powersums[beam_label]) - trim_amount)]
         if plot2 == True:
             #getting weighted angle in crude way, angle is not a real angle anyways
             total_n = 0
@@ -426,14 +451,14 @@ if __name__ == "__main__":
     V_noiseless, u, dominant_freq, V_noise,  SNR = gnosim.interaction.askaryan.quickSignalSingle(numpy.deg2rad(50),R,inelasticity*energy_neutrino,n,2500,0.7,0.7,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)
     sampling_rate = 1.5 #GHz
     sampling_period = 1/sampling_rate
-    bytes = 7
+    digitizer_bytes = 7
     scale_noise_from = noise_rms
     scale_noise_to = 3
     
     random_time_offset = numpy.random.uniform(-5.0,5.0) #ns
     dc_offset = 0.0 #V
     sample_times=calculateDigitalTimes(u[0],u[-1],sampling_period,  random_time_offset = random_time_offset)
-    V_bit, sampled_times = digitizeSignal(u,V_noise,sample_times,bytes,scale_noise_from,scale_noise_to, dc_offset = dc_offset, plot = False)
+    V_bit, sampled_times = digitizeSignal(u,V_noise,sample_times,digitizer_bytes,scale_noise_from,scale_noise_to, dc_offset = dc_offset, plot = False)
     dt = sampled_times[1] - sampled_times[0]
     #################################################################
     '''
@@ -586,7 +611,7 @@ if __name__ == "__main__":
     pylab.scatter(best_multiplier,desired_noise_rms,color = 'r')
     
     '''
-    mode = 'v4'
+    mode = 'v7'
     h_fft,sys_fft,freqs = gnosim.interaction.askaryan.loadSignalResponse(mode = mode)
     slope,sys_fft = getScaleSystemResponseScale(desired_noise_rms = 20.4E-3,mode = mode,save_new_response = True)
     print('Simple method of scaling: ', slope)

@@ -38,7 +38,7 @@ import gnosim.sim.detector
 import gnosim.sim.fpga
 pylab.ion()
 
-def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_times,h_fft,sys_fft,freqs_response,sampling_bits,noise_rms,scale_noise_to,digital_sampling_period,random_time_offset,dc_offset,beam_dict,trigger_threshold_units, trigger_threshold,include_noise = True,summed_signals = True,do_beamforming = True, plot_geometry = True, plot_signals = True,plot_first = False,single_plot_signals   = False,single_plot_spectrum  = False,single_plot_potential = False,plot_each_beam = False):
+def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_times,h_fft,sys_fft,freqs_response,sampling_bits,noise_rms,scale_noise_to,digital_sampling_period,random_time_offset,dc_offset,beam_dict,trigger_threshold_units, trigger_threshold,include_noise = True,summed_signals = True,do_beamforming = True, plot_geometry = True, plot_signals = True,plot_first = False,single_plot_signals   = False,single_plot_spectrum  = False,single_plot_angles = False, single_plot_potential = False,plot_each_beam = False):
     '''
     '''
     event_label = 'event%i'%eventid
@@ -117,7 +117,7 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                             V_noiseless, u , dominant_freq, V_noise, SNR = gnosim.interaction.askaryan.quickSignalSingle( numpy.deg2rad(sub_info['observation_angle']),\
                               sub_info['distance'],energy_neutrino*inelasticity,index_of_refraction,\
                               sub_info['time'],sub_info['a_v'],sub_info['beam_pattern_factor'],\
-                              signal_times,h_fft,sys_fft,freqs_response,plot_signals=single_plot_signals,plot_spectrum=single_plot_spectrum,plot_potential = single_plot_potential,\
+                              signal_times,h_fft,sys_fft,freqs_response,plot_signals=single_plot_signals,plot_spectrum=single_plot_spectrum,plot_angles = single_plot_angles,plot_potential = single_plot_potential,\
                               include_noise = True, resistance = 50, temperature = 320)  #expects ovbservation_angle to be in radians (hence the deg2rad on input)
                             
                             if summed_signals == True:
@@ -128,7 +128,7 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                             V_noiseless, u , dominant_freq = gnosim.interaction.askaryan.quickSignalSingle(numpy.deg2rad(sub_info['observation_angle']),\
                               sub_info['distance'],energy_neutrino*inelasticity,index_of_refraction,\
                               sub_info['time'],sub_info['a_v'],sub_info['beam_pattern_factor'],\
-                              signal_times,h_fft,sys_fft,freqs_response,plot_signals=single_plot_signals,plot_spectrum=single_plot_spectrum,plot_potential = single_plot_potential,\
+                              signal_times,h_fft,sys_fft,freqs_response,plot_signals=single_plot_signals,plot_spectrum=single_plot_spectrum,plot_angles = single_plot_angles,plot_potential = single_plot_potential,\
                               include_noise = False, resistance = 50, temperature = 320)  #expects ovbservation_angle to be in radians (hence the deg2rad on input)
                             
                             SNR = -999.
@@ -139,6 +139,7 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                             single_plot_signals   = False
                             single_plot_spectrum  = False
                             single_plot_potential = False
+                            single_plot_angles    = False
                         V_analog[station_label][antenna_label][solution] = electric_array
                         time_analog[station_label][antenna_label][solution] = u
                     else:
@@ -393,8 +394,8 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                     table_ax.axis('off')
                     table_ax.axis('tight')
                     antenna =           ['%i'%i for i in temporary_info['antenna'].astype(int)]
-                    observation_angle = ['%0.4g'%i for i in temporary_info['observation_angle'].astype(float)]
-                    theta_ant =         ['%0.4g'%i for i in temporary_info['theta_ant'].astype(float)]
+                    observation_angle = ['%0.5g'%i for i in temporary_info['observation_angle'].astype(float)]
+                    theta_ant =         ['%0.5g'%i for i in temporary_info['theta_ant'].astype(float)]
                     distance =          ['%0.3g'%i for i in temporary_info['distance'].astype(float)]
                     beam_factor =       ['%0.3g'%i for i in temporary_info['beam_pattern_factor']]
                     df = pandas.DataFrame({'antenna':antenna , '$\\theta_\mathrm{ant}$ (deg)':theta_ant , '$\\theta_\mathrm{emit}$ (deg)':observation_angle,'d$_\mathrm{path}$ (m)':distance, 'Beam Factor':beam_factor})
@@ -662,8 +663,8 @@ def plotFromReader(reader,eventid,trigger_threshold_units = 'fpga', trigger_thre
                         table_ax.axis('off')
                         table_ax.axis('tight')
                         antenna =           ['%i'%i for i in temporary_info['antenna'].astype(int)]
-                        observation_angle = ['%0.4g'%i for i in temporary_info['observation_angle'].astype(float)]
-                        theta_ant =         ['%0.4g'%i for i in temporary_info['theta_ant'].astype(float)]
+                        observation_angle = ['%0.5g'%i for i in temporary_info['observation_angle'].astype(float)]
+                        theta_ant =         ['%0.5g'%i for i in temporary_info['theta_ant'].astype(float)]
                         distance =          ['%0.3g'%i for i in temporary_info['distance'].astype(float)]
                         beam_factor =       ['%0.3g'%i for i in temporary_info['beam_pattern_factor']]
                         df = pandas.DataFrame({'antenna':antenna , '$\\theta_\mathrm{ant}$ (deg)':theta_ant , '$\\theta_\mathrm{emit}$ (deg)':observation_angle,'d$_\mathrm{path}$ (m)':distance, 'Beam Factor':beam_factor})
@@ -762,7 +763,7 @@ def plotFromReader(reader,eventid,trigger_threshold_units = 'fpga', trigger_thre
 
   
 if __name__ == "__main__":
-    pylab.close('all')
+    #pylab.close('all')
     
     #reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_100_events_1_seed_10.h5' , 'r')
     
@@ -794,22 +795,34 @@ if __name__ == "__main__":
     multi_plot_signals = True
     plot_geometry = False
     
-    single_plot_signals   = False
-    single_plot_spectrum  = False
-    single_plot_potential = False
-    add_signals_plot = True
+    #The three single_ plots correspond to plots in gnosim.interaction.askaryan.quickSignalSingle
+    single_plot_signals   = True
+    single_plot_spectrum  = True
+    single_plot_angles  = False
+    single_plot_potential = True
+    
+    #add_signals_plot = True 
     remove_noise_overlap = True
-    up_sample_factor = 20
-    signal_response_version = 'v5'
+    signal_response_version = 'v7'
+    if int(signal_response_version.split('v')[-1]) >= 6:
+        up_sample_factor = 40
+    else:
+        up_sample_factor = 20
+    
     include_noise = True
     summed_signals = True
     do_beamforming = True
-    plot_first = False
+    plot_first = True
     plot_each_beam = False
     #preparations
     #'''
     #'''
     #Signal Calculations
+    
+    z_0 = numpy.array(list(reader['z_0']))
+    n_array = gnosim.earth.antarctic.indexOfRefraction(z_0, ice_model=config['detector_volume']['ice_model']) 
+    mean_index = numpy.mean(n_array)
+    
     eventids = numpy.unique(info[info['triggered']==1]['eventid'])
     beam_dict = gnosim.sim.fpga.getBeams(config, n_beams, n_baselines , mean_index ,digital_sampling_period ,power_calculation_sum_length = power_calculation_sum_length, power_calculation_interval = power_calculation_interval, verbose = False)
     
@@ -818,9 +831,7 @@ if __name__ == "__main__":
     except:
         do_events = numpy.unique(numpy.random.choice(eventids,choose_n,replace=True))
     
-    z_0 = numpy.array(list(reader['z_0']))
-    n_array = gnosim.earth.antarctic.indexOfRefraction(z_0, ice_model=config['detector_volume']['ice_model']) 
-    mean_index = numpy.mean(n_array)
+    
     random_time_offsets = numpy.random.uniform(-1, 1, size=len(n_array))
     ###########################
     input_u, h_fft, sys_fft, freqs = gnosim.interaction.askaryan.calculateTimes(up_sample_factor=up_sample_factor,mode = signal_response_version)
@@ -838,7 +849,7 @@ if __name__ == "__main__":
     print('External noise_rms: %f',noise_rms)
     
     
-    #do_events = [90]#[356,383,599,654,846]
+    do_events = [34]#[356,383,599,654,846]
     if use_redo == True:
         create_dataset = False
         if create_dataset == True:
@@ -847,7 +858,8 @@ if __name__ == "__main__":
         for eventid in do_events:
             event_label = 'event%i'%eventid
             print('On %s'%event_label)
-            triggered,out_data = redoEventFromInfo(reader,eventid,energy_neutrino,n_array[eventid],input_u,h_fft,sys_fft,freqs,sampling_bits,noise_rms,scale_noise_to,digital_sampling_period,random_time_offsets[eventid],0,beam_dict,trigger_threshold_units,trigger_threshold,include_noise = include_noise,summed_signals = summed_signals,do_beamforming = do_beamforming, plot_geometry = plot_geometry, plot_signals = multi_plot_signals,plot_first = plot_first,single_plot_signals   = single_plot_signals,single_plot_spectrum  = single_plot_spectrum,single_plot_potential = single_plot_potential, plot_each_beam = plot_each_beam)
+            print(info[numpy.logical_and(info['eventid'] == eventid,info['has_solution']==1)])
+            triggered,out_data = redoEventFromInfo(reader,eventid,energy_neutrino,n_array[eventid],input_u,h_fft,sys_fft,freqs,sampling_bits,noise_rms,scale_noise_to,digital_sampling_period,random_time_offsets[eventid],0,beam_dict,trigger_threshold_units,trigger_threshold,include_noise = include_noise,summed_signals = summed_signals,do_beamforming = do_beamforming, plot_geometry = plot_geometry, plot_signals = multi_plot_signals,plot_first = plot_first,single_plot_signals   = single_plot_signals,single_plot_spectrum  = single_plot_spectrum, single_plot_angles = single_plot_angles,single_plot_potential = single_plot_potential, plot_each_beam = plot_each_beam)
             if triggered == True:
                 if create_dataset == True:
                     file.create_group(event_label)
@@ -864,6 +876,6 @@ if __name__ == "__main__":
             event_label = 'event%i'%eventid
             print('On %s'%event_label)
             plotFromReader(reader,eventid,trigger_threshold_units = 'fpga', trigger_threshold = trigger_threshold, do_beamforming = True,beam_dict =  beam_dict, plot_signals = multi_plot_signals, plot_geometry = plot_geometry)
-    
+            print(info[numpy.logical_and(info['eventid'] == eventid,info['has_solution']==1)])
     
     

@@ -34,7 +34,7 @@ import gnosim.trace.refraction_library_beta
 import gnosim.interaction.askaryan
 import gnosim.sim.detector
 import gnosim.sim.fpga
-pylab.ion()
+pylab.ion() #this turns interactive mode on.  I should test with this off
 
 ############################################################
 
@@ -50,6 +50,20 @@ def profile(fnc):
     
     To use, decorate function of interest by putting @profile above
     its definition.
+    
+    Meanings:
+    ncalls  - for the number of calls.  When there are two numbers (for example 3/1), 
+              it means that the function recursed. The second value is the number 
+              of primitive calls and the former is the total number of calls. Note 
+              that when the function does not recurse, these two values are the same, 
+              and only the single figure is printed.
+    tottime - for the total time spent in the given function (and excluding time made 
+              in calls to sub-functions)
+    percall - is the quotient of tottime divided by ncalls
+    cumtime - is the cumulative time spent in this and all subfunctions (from invocation 
+              till exit). This figure is accurate even for recursive functions.
+    percall - is the quotient of cumtime divided by primitive calls
+    filename:lineno(function) - provides the respective data of each function
     """
     
     def inner(*args, **kwargs):
@@ -132,7 +146,7 @@ class Sim:
                 antenna.R = gnosim.sim.detector.eulerRotationMatrix(numpy.deg2rad(antenna.alpha_deg), numpy.deg2rad(antenna.beta_deg), numpy.deg2rad(antenna.gamma_deg))
                 antenna.R_inv = numpy.linalg.inv(antenna.R)
                 self.stations[ii].antennas.append(antenna)
-        
+    @profile 
     def event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, anti=False,
         electricFieldDomain = 'freq',include_noise = False,plot_signals=False,plot_geometry=False,summed_signals=False,
         trigger_threshold = 0,trigger_threshold_units = 'V',plot_filetype_extension = 'svg',image_path = './', 
@@ -808,7 +822,7 @@ class Sim:
                 out_flag_array[solution] = has_solution
                 
                 
-                events_per_calc = 100000
+                events_per_calc = 1000000
                 left_event = 0
                 
                 for key in self.lib[antenna_label].data[solution].keys():
@@ -872,6 +886,7 @@ class Sim:
         electricFieldDomain should be either freq or time.  The freq domain uses
         the older electric field calculation, while the 'time' uses the new one.
         '''
+        throw_start_time = time.time()
         if trigger_threshold_units == 'fpga':
             if do_beamforming == False:
                 print('WARNING!!!')
@@ -972,10 +987,15 @@ class Sim:
             return 0
         
         #Response function preparations
-                
+        response_mode = 'v7'
         if electricFieldDomain == 'time':
             print('Loading Response Functions')
-            self.signal_times, self.h_fft,self.sys_fft,self.freqs_response = gnosim.interaction.askaryan.calculateTimes(up_sample_factor = 20,mode='v5')
+            if int(response_mode.split('v')[-1]) >= 6:
+                upsample_factor = 40
+            else:
+                upsample_factor = 20
+            
+            self.signal_times, self.h_fft,self.sys_fft,self.freqs_response = gnosim.interaction.askaryan.calculateTimes(up_sample_factor = upsample_factor,mode=response_mode)
             apply_hard_cut = False
             hard_low = 130e6
             hard_high = 750e6
@@ -1063,6 +1083,8 @@ class Sim:
             file.attrs['config'] = self.config_file
             #file.attrs['ice_model'] = gnosim.earth.antarctic.ice_model_default
             file.attrs['ice_model'] = self.config['detector_volume']['ice_model']
+            file.attrs['trigger_mode'] = trigger_threshold_units
+            file.attrs['trigger_threshold'] = trigger_threshold
 
             file.create_dataset('energy_neutrino', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             file.create_dataset('inelasticity', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
@@ -1130,11 +1152,12 @@ class Sim:
         ############################################################################
         for ii in range(0, n_events):
             event_label = 'event%i'%ii
-            if (n_events//100 != 0):
-                if(ii%(n_events//100) == 0):
-                    print ('Event (%i/%i)'%(ii, n_events)) #might want to comment out these print statements to run faster and spew less
+            current_time  = time.time() - throw_start_time
+            if (n_events//1000 != 0):
+                if(ii%(n_events//1000) == 0):
+                    print ('Event (%i/%i) Time: %0.2f s ( %0.4f h)'%(ii, n_events,current_time,current_time/3600.0)) #might want to comment out these print statements to run faster and spew less
             else:
-                print ('Event (%i/%i)'%(ii, n_events))
+                print ('Event (%i/%i) Time: %0.2f s ( %0.4f h)'%(ii, n_events,current_time,current_time/3600.0))
             p_interact[ii], p_earth[ii], p_detect[ii], electric_field_max[ii], dic_max, observation_angle_max[ii], \
             solution_max[ii], index_station_max[ii], index_antenna_max[ii], info[(ii * len_info_per_event ):((ii+1) * len_info_per_event )], \
             triggered, signals_out \
@@ -1310,19 +1333,19 @@ if __name__ == "__main__":
     #detector_volume_depth = float(sys.argv[6]) # m, 500 for Ross and Minna, 3000 for subterranean
 
     #SEED FOR TESTNG:
-    seed = 1#None
+    seed = None
     config_file_fix = config_file.replace('/home/dsouthall/Projects/GNOSim/','')
     config_file_fix = config_file_fix.replace('gnosim/sim/ConfigFiles/Config_dsouthall/','')
     config_file_fix = config_file_fix.replace('./','')
     if (seed != None):
-        outfile = '/home/dsouthall/Projects/GNOSim/Output/results_2019_Jan_%s_%.2e_GeV_%i_events_%i_seed_%i.h5'%(config_file_fix.replace('.py', ''),
+        outfile = '/home/dsouthall/scratch-midway2/results_2019_Jan_%s_%.2e_GeV_%i_events_%i_seed_%i.h5'%(config_file_fix.replace('.py', ''),
                                                                     energy_neutrino,
                                                                     n_events,
                                                                     seed,
                                                                     index)
         print('\n\n!!!Using Seed!!! \n\n Seed: ', seed, '\nOutfile Name: \n', outfile)
     else:
-        outfile = '/home/dsouthall/Projects/GNOSim/Output/results_2019_Jan_%s_%.2e_GeV_%i_events_%i.h5'%(config_file_fix.replace('.py', ''),
+        outfile = '/home/dsouthall/scratch-midway2/results_2019_Jan_%s_%.2e_GeV_%i_events_%i.h5'%(config_file_fix.replace('.py', ''),
                                                                 energy_neutrino,
                                                                 n_events,
                                                                 index)
@@ -1355,14 +1378,15 @@ if __name__ == "__main__":
     #fpga uses the magnitude of a beamformed-powersummed signal.  The magnitude of this is not as intuitive as adu or V but is more like what is done at Pole.
     #all of these assume time domain, as the freq domain portion of the code is not maintained. 
     
-    #Used for testing: 10 adu, 10000 fpga
+    #Used for testing: 10 adu, 11500 fpga
     my_sim.throw(energy_neutrino, n_events=n_events,
                  detector_volume_radius=my_sim.config['detector_volume']['radius'],
                  detector_volume_depth=my_sim.config['detector_volume']['depth'],
                  outfile=outfile,seed=seed,electricFieldDomain = 'time',include_noise = True,summed_signals = True, 
-                 plot_geometry = False, plot_signals = True, trigger_threshold = 10000, trigger_threshold_units = 'fpga',
+                 plot_geometry = False, plot_signals = False, trigger_threshold = 0, trigger_threshold_units = 'fpga',
                  plot_filetype_extension = image_extension,image_path = image_path,use_threading = True,
-                 do_beamforming = True, n_beams = 15, n_baselines = 2,output_all_solutions = True,save_signals = True)
+                 do_beamforming = True, n_beams = 15, n_baselines = 2,output_all_solutions = True,save_signals = True,
+                 r_vertex = numpy.array([5214.0]), phi_vertex = numpy.array([0.0]), z_0 = numpy.array([-1450.0]))
     
     #For pulser location that Kaeli is looking at:
     #r_vertex = numpy.array([5214.0]), phi_vertex = numpy.array([0.0]), z_0 = numpy.array([-1450.0])

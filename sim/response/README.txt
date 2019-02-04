@@ -27,3 +27,26 @@ v3 and v4 are functionally the same but with different binning.  Dan Smith is
 still trying to get my a finalized version.  I will be making a tool to scale
 the system response such that the noise matches the levels seen in the
 experiement, but for the antenna response I still need Dan to get it for me.
+
+v5 has scaled system response to match expected levels of noise. 
+
+v6 Comes from Dan Smith with the Update message:
+"
+... One difference here (besides the, hopefully, correct scaling) is that I am giving 
+you the response in the number of points that the digitizer reads out 
+(512 time domain, 257 freq domain). This is just to maintain consistency on my end: 
+its easiest for me if everything stays in the unpadded state as to not accidentally 
+change the amount of power in a signal.
+"
+
+v6 appeared to produce acausal signals, Dan Smith indicated this was likely a
+result of how he was sampling.  This has been fixed in v7.  Message from Dan
+Smith describing the problem:
+"What went wrong[in v6]: I had a time-domain zero padding and I wanted to get back to
+the original length but instead of doing the smart thing of truncating the
+zeros in the time domain, I picked pts in the freq domain. I did that because
+I was accidentally cutting signal when removing zeros in the time domain
+making the signal in freq domain wonky, so I thought I could out smart it. I
+was wrong because my picking pts in the freq domain to down sample was
+acausal, so I just was more careful removing zeros in the time domain and hey
+presto works out."
