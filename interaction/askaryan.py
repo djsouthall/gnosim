@@ -147,6 +147,8 @@ def RA(Energy_GeV,t_ns):
     this model is parameterized specifically for n = 1.78
     I beliee this should return units of V s (i.e. it is disgned to output SI,
     not something in terms of ns)
+    
+    #THIS IS NOT DEPENDANT ON ANYTHING OTHER THAN ENERGY, CAN BE CALCULATED EXTERNALLY AND FED TO QUICKSIGNAL
     '''
     Energy_TeV = 0.001*Energy_GeV
     if numpy.size(t_ns) == 1:
@@ -165,7 +167,7 @@ def RA(Energy_GeV,t_ns):
         return ra
 
 
-def Q(x,a=4.85,b=0.60,loc=0,scale=1.0,random_params=False):
+def Q(x,a=4.85,b=0.60,loc=0,scale=1.0,random_params=False,random_local = None):
         '''
         b is included to make the python variant of the gamma function align with
         that defined in: 
@@ -178,8 +180,15 @@ def Q(x,a=4.85,b=0.60,loc=0,scale=1.0,random_params=False):
         
         '''
         if random_params:
-            a = numpy.random.normal(loc=4.85,scale=1.01,size=None)
-            b = numpy.random.normal(loc=0.60,scale=0.14,size=None)
+            #NOTE THIS MAY THROW OFF SEEDING.  THIS FEATURE WAS ADDED BUT NEVER USED, SO RANDOMNESS NOT REALLY ACCOUNTED FOR.
+            #With random_local this should be consistent between trigger/pretrigger events, but likely not
+            #between when using this feature and not.  Would ruin all noise etc.  Be careful if you ever implement this
+            if random_local == None:
+                a = numpy.random.normal(loc=4.85,scale=1.01,size=None)
+                b = numpy.random.normal(loc=0.60,scale=0.14,size=None)
+            else:
+                a = random_local.normal(loc=4.85,scale=1.01,size=None)
+                b = random_local.normal(loc=0.60,scale=0.14,size=None)
         return b * scipy.stats.gamma.pdf( b * x , a = a , loc = loc , scale = scale )
         
 def excessProjectedTrackLength(Q,int_min=-100.,int_max=100.,n_steps = 1000):
@@ -202,13 +211,18 @@ def F_p(Energy_GeV,t_ns,n,LQ):
     This is to be calculated at the cherenkov angle (which in the paper was for n=1.78)
     And then convolved with the charge profile Q to determine the vector potential. 
     '''
-    
+    '''
     cherenkov_angle = numpy.arccos(1./n)
     #mu_0 = gnosim.utils.constants.mu_0 # m kg s^-2 A^-2
     prefactor = 4. * numpy.pi /( gnosim.utils.constants.mu_0 * numpy.sin(cherenkov_angle))
     ra = RA(Energy_GeV,t_ns)  
     #print(ra)
     return prefactor * ra / LQ
+    '''
+    ra = RA(Energy_GeV,t_ns)  
+    fp = (4. * numpy.pi /(LQ * gnosim.utils.constants.mu_0 * math.sqrt(1-1/n**2))) * ra #note that math.sqrt(1-1/1.78**2) is a faster form of numpy.sin(cherenkov_angle) = numpy.sin(numpy.arccos(1/n))
+    fp = numpy.multiply(scipy.signal.tukey(len(fp),alpha=0.05),fp)
+    return fp
     
 def vectorPotentialTimeDomain(theta_obs_rad,R,Energy_GeV,n,u,plot = False):
     '''
@@ -527,7 +541,7 @@ def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode=N
     u = numpy.arange(-(n_points_freq-1),(n_points_freq-1))*t_step #To increase time duration of signal I should just need to upsample?
     return u, h_fft, sys_fft, freqs
 
-def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pattern_factor,u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_angles = False,plot_potential = False,include_noise = False, resistance = 50, temperature = 320):  
+def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pattern_factor,u, h_fft, sys_fft, freqs, fp_fft = None,plot_signals=False,plot_spectrum=False,plot_angles = False,plot_potential = False,include_noise = False, resistance = 50, temperature = 320,random_local = None):  
     '''
     This should do the entire calculation, mostly in the frequency domain. 
     Expects u, h_fft, sys_fft, freqs to all come straight from calculateTimes.
@@ -554,10 +568,13 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
     #calling the below was slow, so I put it just calculate it in this function
     #fp = F_p(Energy_GeV,u,n,LQ)
     #fp = numpy.multiply(scipy.signal.tukey(len(fp),alpha=0.05),fp)
-    ra = RA(Energy_GeV,u)  
-    fp = (4. * numpy.pi /(LQ * gnosim.utils.constants.mu_0 * math.sqrt(1-1/n**2))) * ra #note that math.sqrt(1-1/1.78**2) is a faster form of numpy.sin(cherenkov_angle) = numpy.sin(numpy.arccos(1/n))
-    fp = numpy.multiply(scipy.signal.tukey(len(fp),alpha=0.05),fp)
-    fp_fft = numpy.fft.rfft(fp)
+    if numpy.size(fp_fft) == 1:
+        #ra = RA(Energy_GeV,u)  
+        #fp = (4. * numpy.pi /(LQ * gnosim.utils.constants.mu_0 * math.sqrt(1-1/n**2))) * ra #note that math.sqrt(1-1/1.78**2) is a faster form of numpy.sin(cherenkov_angle) = numpy.sin(numpy.arccos(1/n))
+        #fp = numpy.multiply(scipy.signal.tukey(len(fp),alpha=0.05),fp)
+        fp = F_p(Energy_GeV,u,n,LQ)
+        fp_fft = numpy.fft.rfft(fp)
+        
     
     if abs(alpha) < 0.001:
         #print('alpha < 0.001')
@@ -583,11 +600,12 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
         
         q = 0.60 * scipy.stats.gamma.pdf( 0.60 * u/alpha , a = 4.85 ) #This seems to be rate limiting.  If you think of faster way to calculate you can save some time.
         q = numpy.multiply(scipy.signal.tukey(len(q),alpha=0.05),q)
-        q_fft = numpy.fft.rfft(q)
+        q_fft = numpy.fft.rfft(q) #should look into an analytica form of fft(gamma function) to see if there is a way to avoid this fft
         A_fft = numpy.multiply(fp_fft,q_fft) * ( gnosim.utils.constants.mu_0 * numpy.sin(theta_obs_rad) / (4. * numpy.pi * R ) ) * ( t_step/abs(alpha) ) #the t_step already accounts for scaling required with irffting.  Might not want here?  unsure
         
-        A = numpy.fft.irfft(A_fft,n=len(u)) #is this unecessary?
-        A = numpy.fft.fftshift(A)
+        if numpy.logical_or(plot_potential == True,plot_signals == True):
+            A = numpy.fft.irfft(A_fft,n=len(u))
+            A = numpy.fft.fftshift(A)
         if plot_potential == True:
             pylab.figure(figsize=(16.,11.2))
             ax = pylab.subplot(311)
@@ -619,9 +637,6 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
     V_noiseless = numpy.fft.irfft(V_fft_noiseless,n=len(u))
     
     if include_noise == True:
-        #The state is reset after this is called to avoid the random queue being shifted when using noise v.s. when not using noise
-        #rand_state = numpy.random.get_state()
-        
         #SNR Peak to Peak calculation and noiseless signal calculation
         
         V_noiseless_sorted = numpy.sort(V_noiseless)
@@ -639,7 +654,11 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
         #noise_amp = numpy.random.normal(loc = 0.0, scale = sigma , size = len(freqs)) #these might need the normalization factor of *numpy.sqrt(len(u)/2) if used at some point for some reason
         
         #Noise in Cartesian
-        noise_cartesian = numpy.sqrt(len(u)/2)*(numpy.random.normal(loc = 0.0, scale = sigma , size = len(freqs)) + 1.0j*numpy.random.normal(loc = 0.0, scale = sigma , size = len(freqs))) # the *numpy.sqrt(len(u)/2) factor is to handle some normalization issues
+        if random_local == None:
+            noise_cartesian = numpy.sqrt(len(u)/2)*(numpy.random.normal(loc = 0.0, scale = sigma , size = len(freqs)) + 1.0j*numpy.random.normal(loc = 0.0, scale = sigma , size = len(freqs))) # the *numpy.sqrt(len(u)/2) factor is to handle some normalization issues
+        else:
+            #Should be used for multithreading
+            noise_cartesian = numpy.sqrt(len(u)/2)*(random_local.normal(loc = 0.0, scale = sigma , size = len(freqs)) + 1.0j*random_local.normal(loc = 0.0, scale = sigma , size = len(freqs))) # the *numpy.sqrt(len(u)/2) factor is to handle some normalization issues
         V_fft_just_noise = numpy.multiply(noise_cartesian,sys_fft)
         #Multiplying in system noise to get V_fft
         V_fft_noise = numpy.add(V_fft_noiseless,V_fft_just_noise)
@@ -653,7 +672,7 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
             V_noise = numpy.fft.fftshift(V_noise)
     
     if include_noise == True:
-        V_rms_measured = numpy.sqrt(numpy.mean(V_noise[u < 0]**2)) #This is the 'measured' V_rms, rather than the set.  This is after system response
+        V_rms_measured = numpy.sqrt(numpy.mean((V_noise - V_noiseless)**2)) #This is the 'measured' V_rms, rather than the set.  This is after system response
         SNR = (p2p_half/V_rms_measured)**2
         #SNR_dB = 10*numpy.log10( SNR )#dB, using 10log10 because input is power ratio 
         #print('SNR', SNR)

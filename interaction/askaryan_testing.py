@@ -496,7 +496,7 @@ def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode=N
     u = numpy.arange(-(n_points_freq-1),(n_points_freq-1))*t_step #To increase time duration of signal I should just need to upsample?
     return u, h_fft, sys_fft, freqs
 
-def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pattern_factor,u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_angles = False,plot_potential = False,include_noise = False, resistance = 50, temperature = 320):  
+def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pattern_factor,u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_angles = False,plot_potential = False,include_noise = False, resistance = 50, temperature = 320,random_local = None):  
     '''
     This should do the entire calculation, mostly in the frequency domain. 
     Expects u, h_fft, sys_fft, freqs to all come straight from calculateTimes.
@@ -608,7 +608,11 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
         #noise_amp = numpy.random.normal(loc = 0.0, scale = sigma , size = len(freqs)) #these might need the normalization factor of *numpy.sqrt(len(u)/2) if used at some point for some reason
         
         #Noise in Cartesian
-        noise_cartesian = numpy.sqrt(len(u)/2)*(numpy.random.normal(loc = 0.0, scale = sigma , size = len(freqs)) + 1.0j*numpy.random.normal(loc = 0.0, scale = sigma , size = len(freqs))) # the *numpy.sqrt(len(u)/2) factor is to handle some normalization issues
+        if random_local == None:
+            noise_cartesian = numpy.sqrt(len(u)/2)*(numpy.random.normal(loc = 0.0, scale = sigma , size = len(freqs)) + 1.0j*numpy.random.normal(loc = 0.0, scale = sigma , size = len(freqs))) # the *numpy.sqrt(len(u)/2) factor is to handle some normalization issues
+        else:
+            #Should be used for multithreading
+            noise_cartesian = numpy.sqrt(len(u)/2)*(random_local.normal(loc = 0.0, scale = sigma , size = len(freqs)) + 1.0j*random_local.normal(loc = 0.0, scale = sigma , size = len(freqs))) # the *numpy.sqrt(len(u)/2) factor is to handle some normalization issues
         V_fft_just_noise = numpy.multiply(noise_cartesian,sys_fft)
         #Multiplying in system noise to get V_fft
         V_fft_noise = numpy.add(V_fft_noiseless,V_fft_just_noise)

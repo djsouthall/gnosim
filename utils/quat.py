@@ -21,31 +21,43 @@ def vecToAng(v):
 def angToVec(phi, theta):
     """
     Convert from angles [deg] to unit 3-vector.
+    If phi and thetas are arrays then each row of output
+    corresponds to a set of phi,theta
     """
     phi = numpy.radians(phi)
     theta = numpy.radians(theta)
     x = numpy.cos(phi) * numpy.sin(theta)
     y = numpy.sin(phi) * numpy.sin(theta)
     z = numpy.cos(theta)
-    return numpy.array([x, y, z])
+    return numpy.array([x, y, z]).T
 
 ############################################################
 
 def normalize(v):
     """
     Return normalized vector, works for 3-vectors or 4-vectors.
+    If v contains multiple vectors each row is expected to be
+    a vector.
     """
-    return v / numpy.sqrt(numpy.sum(v**2))
+    if len(numpy.shape(v)) > 1:
+        return v / numpy.sqrt(numpy.sum(v**2,axis = 1))[:,None]
+    else:
+        return v / numpy.sqrt(numpy.sum(v**2))
 
 ############################################################
 
 def angTwoVec(v1, v2):
     """
     Return angle [deg] between two vectors.
+    If v1 and v2 contain multiple vectors this assumes
+    each row to be a seperate vector
     """
     v1 = normalize(v1)
     v2 = normalize(v2)
-    return numpy.degrees(numpy.arccos(numpy.sum(v1 * v2)))
+    if len(numpy.shape(v1)) > 1:
+        return numpy.degrees(numpy.arccos(numpy.sum(v1 * v2,axis = 1)))
+    else:
+        return numpy.degrees(numpy.arccos(numpy.sum(v1 * v2)))
 
 ############################################################
 

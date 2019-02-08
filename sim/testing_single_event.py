@@ -55,6 +55,10 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
     p_earth = reader['p_earth'][eventid]
     signals_out = {}
     
+    if numpy.isin('seed',list(info.dtype.fields.keys())):
+        random_local = numpy.random.RandomState(seed = numpy.unique(info[info['eventid'] == eventid]['seed'])[0])
+    else:
+        random_local = numpy.random.RandomState()   
     if numpy.size(info) != 0:
     
         time_analog = {}
@@ -79,9 +83,9 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                         minimum_time = numpy.min([minimum_time,signal_times[0] + info[solution_cut]['time']])
                         maximum_time = numpy.max([maximum_time,signal_times[-1] + info[solution_cut]['time']])
         if minimum_time == 1e20:
-            minimum_time = self.signal_times[0]
+            minimum_time = signal_times[0]
         if maximum_time == -1e20:
-            maximum_time = self.signal_times[-1]
+            maximum_time = signal_times[-1]
         digital_sample_times = numpy.arange(minimum_time,maximum_time,digital_sampling_period) + random_time_offset #these
         
         for index_station in numpy.unique(info['station']):
@@ -106,30 +110,23 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                     #print(sub_info)
                     if sub_info['has_solution'] == 1:
                         if include_noise == True:
-                            '''
-                            V_noiseless, u , dominant_freq, V_noise, SNR = gnosim.interaction.askaryan.quickSignalSingle( numpy.deg2rad(observation_angle),\
-                                          self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],energy_neutrino*inelasticity,index_of_refraction,\
-                                          self.in_dic_array[station_label][antenna_label][solution]['t'][eventid],self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid],\
-                                          beam_pattern_factor,self.signal_times,self.h_fft,self.sys_fft,self.freqs_response,plot_signals=False,plot_spectrum=False,plot_potential = False,\
-                                          include_noise = True, resistance = 50, temperature = 320)  #expects ovbservation_angle to be in radians (hence the deg2rad on input)
-                            '''
                             
                             V_noiseless, u , dominant_freq, V_noise, SNR = gnosim.interaction.askaryan.quickSignalSingle( numpy.deg2rad(sub_info['observation_angle']),\
                               sub_info['distance'],energy_neutrino*inelasticity,index_of_refraction,\
                               sub_info['time'],sub_info['a_v'],sub_info['beam_pattern_factor'],\
                               signal_times,h_fft,sys_fft,freqs_response,plot_signals=single_plot_signals,plot_spectrum=single_plot_spectrum,plot_angles = single_plot_angles,plot_potential = single_plot_potential,\
-                              include_noise = True, resistance = 50, temperature = 320)  #expects ovbservation_angle to be in radians (hence the deg2rad on input)
+                              include_noise = True, resistance = 50, temperature = 320,random_local = random_local)  #expects ovbservation_angle to be in radians (hence the deg2rad on input)
                             
                             if summed_signals == True:
                                 V_just_noise[station_label][antenna_label][solution] = numpy.add(V_noise,-V_noiseless) #subtracting away raw signal from noisy signal to get just the noise
                             electric_array = V_noise
-                            #electric_array_digitized, u_digitized = gnosim.sim.fpga.digitizeSignal(u,V_noise,digital_sample_times,self.stations[index_station].antennas[index_antenna].sampling_bits,self.noise_rms,self.scale_noise_to, dc_offset = dc_offset, plot = False)
+                            #electric_array_digitized, u_digitized = gnosim.sim.fpga.digitizeSignal(u,V_noise,digital_sample_times,stations[index_station].antennas[index_antenna].sampling_bits,noise_rms,scale_noise_to, dc_offset = dc_offset, plot = False)
                         else:
                             V_noiseless, u , dominant_freq = gnosim.interaction.askaryan.quickSignalSingle(numpy.deg2rad(sub_info['observation_angle']),\
                               sub_info['distance'],energy_neutrino*inelasticity,index_of_refraction,\
                               sub_info['time'],sub_info['a_v'],sub_info['beam_pattern_factor'],\
                               signal_times,h_fft,sys_fft,freqs_response,plot_signals=single_plot_signals,plot_spectrum=single_plot_spectrum,plot_angles = single_plot_angles,plot_potential = single_plot_potential,\
-                              include_noise = False, resistance = 50, temperature = 320)  #expects ovbservation_angle to be in radians (hence the deg2rad on input)
+                              include_noise = False, resistance = 50, temperature = 320,random_local = random_local)  #expects ovbservation_angle to be in radians (hence the deg2rad on input)
                             
                             SNR = -999.
                             electric_array = V_noiseless
@@ -261,10 +258,10 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                         fig = gnosim.trace.refraction_library_beta.plotGeometry(origin,neutrino_loc,phi_0,info[numpy.logical_and(info['has_solution'] == 1,info['station'] == index_station)])
                         '''
                         try:
-                            fig.savefig('%s%s_all_antennas-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
+                            fig.savefig('%s%s_all_antennas-event%i.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
                             pylab.close(fig)
                         except:
-                            print('Failed to save image %s%s_all_antennas-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension))
+                            print('Failed to save image %s%s_all_antennas-event%i.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension))
                         '''
                 
                 
@@ -450,7 +447,7 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                             table_ax.plot(beam_powersums[beam_label],label = '%s, $\\theta_{ant} = $ %0.2f'%(beam_label,beam_dict['theta_ant'][beam_label]),color = beam_colors[beam_index])
                             #print(beam_powersums[beam_label])
                         #for line_index,line in enumerate(table_ax.lines):
-                        #    line.set_color(self.beam_colors[line_index])
+                        #    line.set_color(beam_colors[line_index])
                         #xlim = table_ax.get_xlim()
                         #table_ax.set_xlim( ( xlim[0] , xlim[1]*1.5 ) )
                         
@@ -465,11 +462,11 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                     #pylab.show(block=True)
                     '''
                     try:
-                        pylab.savefig('%s%s-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
+                        pylab.savefig('%s%s-event%i.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
                         pylab.close(fig)
-                        #print('Saved image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
+                        #print('Saved image %s%s-event%i.%s'%(image_path,outfile,eventid,plot_filetype_extension))
                     except:
-                        print('Failed to save image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
+                        print('Failed to save image %s%s-event%i.%s'%(image_path,outfile,eventid,plot_filetype_extension))
                     '''
             return triggered,signals_out
                 
@@ -719,7 +716,7 @@ def plotFromReader(reader,eventid,trigger_threshold_units = 'fpga', trigger_thre
                                 table_ax.plot(beam_powersums[beam_label],label = '%s, $\\theta_{ant} = $ %0.2f'%(beam_label,beam_dict['theta_ant'][beam_label]),color = beam_colors[beam_index])
                                 #print(beam_powersums[beam_label])
                             #for line_index,line in enumerate(table_ax.lines):
-                            #    line.set_color(self.beam_colors[line_index])
+                            #    line.set_color(beam_colors[line_index])
                             #xlim = table_ax.get_xlim()
                             #table_ax.set_xlim( ( xlim[0] , xlim[1]*1.5 ) )
                             
@@ -734,11 +731,11 @@ def plotFromReader(reader,eventid,trigger_threshold_units = 'fpga', trigger_thre
                         #pylab.show(block=True)
                         '''
                         try:
-                            pylab.savefig('%s%s-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
+                            pylab.savefig('%s%s-event%i.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
                             pylab.close(fig)
-                            #print('Saved image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
+                            #print('Saved image %s%s-event%i.%s'%(image_path,outfile,eventid,plot_filetype_extension))
                         except:
-                            print('Failed to save image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
+                            print('Failed to save image %s%s-event%i.%s'%(image_path,outfile,eventid,plot_filetype_extension))
                         '''
                 
                 
@@ -768,12 +765,15 @@ if __name__ == "__main__":
     #reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_100_events_1_seed_10.h5' , 'r')
     
     #reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_1000_events_1_seed_2.h5' , 'r')
-    reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_1001_events_1_seed_3.h5' , 'r')
+    #reader = h5py.File('' , 'r')
+    reader = h5py.File('/home/dsouthall/scratch-midway2/results_2019_Feb_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_1002_events_1_seed_1.h5' , 'r')
+    reader2 = h5py.File('./results_2019_Feb_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_1002_events_1_seed_4.h5' , 'r')
+    
     #reader_kaeli = h5py.File('./results_2019_Jan_real_config_3.00e+09_GeV_1_events_1_seed_1.h5' , 'r')
     
     config = yaml.load(open(reader.attrs['config']))
     info = reader['info'][...]
-    
+    info2 = reader2['info'][...]
     #options
     energy_neutrino = 3.e9 # GeV
     choose_n = 1 #number of events to run code on (randomly selected from events with solutions
@@ -824,13 +824,20 @@ if __name__ == "__main__":
     mean_index = numpy.mean(n_array)
     
     eventids = numpy.unique(info[info['triggered']==1]['eventid'])
+    #eventids = numpy.unique(info[info['pre_triggered'] == 1]['eventid'])
+    #eventids = info2[numpy.where(info2['triggered'])[0][numpy.isin(numpy.where(info2['triggered'])[0],numpy.where(info['triggered'])[0],invert = True)]]['eventid']
     beam_dict = gnosim.sim.fpga.getBeams(config, n_beams, n_baselines , mean_index ,digital_sampling_period ,power_calculation_sum_length = power_calculation_sum_length, power_calculation_interval = power_calculation_interval, verbose = False)
     
     try:
         do_events = numpy.random.choice(eventids,choose_n,replace=False)
     except:
-        do_events = numpy.unique(numpy.random.choice(eventids,choose_n,replace=True))
-    
+        try:
+            do_events = numpy.unique(numpy.random.choice(eventids,choose_n,replace=True))
+        except:
+            print('eventids = ',eventids)
+            print('This drew an error')
+            print('defaulting to eventids = numpy.array([])')
+            do_events = numpy.array([])
     
     random_time_offsets = numpy.random.uniform(-1, 1, size=len(n_array))
     ###########################
@@ -849,7 +856,7 @@ if __name__ == "__main__":
     print('External noise_rms: %f',noise_rms)
     
     
-    do_events = [34]#[356,383,599,654,846]
+    
     if use_redo == True:
         create_dataset = False
         if create_dataset == True:
@@ -878,4 +885,13 @@ if __name__ == "__main__":
             plotFromReader(reader,eventid,trigger_threshold_units = 'fpga', trigger_threshold = trigger_threshold, do_beamforming = True,beam_dict =  beam_dict, plot_signals = multi_plot_signals, plot_geometry = plot_geometry)
             print(info[numpy.logical_and(info['eventid'] == eventid,info['has_solution']==1)])
     
+    '''
+    info2 = info[numpy.isin(info['eventid'],eventids)]
+    info2 = info2[info2['has_solution'] == 1]
+    pylab.figure()
+    pylab.hist(info2[info2['has_solution'] == 1]['observation_angle'])
+    pylab.figure()
+    info2 = reader2['info'][...]
+    pylab.hist(info2[info2['has_solution'] == 1]['electric_field_digitized'])
+    '''
     

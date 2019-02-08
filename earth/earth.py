@@ -68,7 +68,7 @@ def probSurvival(energy_neutrino, theta, elevation=0., anti=False, plot=False):
     #if theta <= 90.:
     #    return 1.
 
-    total_cross_section = gnosim.interaction.cross_section.totalCrossSection(energy_neutrino, anti=anti) # m^2
+    total_cross_section = gnosim.interaction.cross_section.totalCrossSection(energy_neutrino, anti=anti) # m^2 #No randomness
 
     # Steps going out from the detector chord through the Earth
     # Line below was original
@@ -88,7 +88,7 @@ def probSurvival(energy_neutrino, theta, elevation=0., anti=False, plot=False):
 
     r_earth = numpy.sqrt(x_earth**2 + y_earth**2 + z_earth**2) # m
 
-    f_density = gnosim.earth.prem.prem()
+    f_density = gnosim.earth.prem.prem() #no randomness
     density = f_density(r_earth) # nucleons m^-3
 
     # OLD
