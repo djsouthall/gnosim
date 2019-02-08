@@ -228,7 +228,7 @@ class Sim:
 
         
         #Only do triggering if any pass pre_trigger
-        if numpy.any(temporary_info['pre_triggered'] == 1):
+        if numpy.any(temporary_info['pre_triggered'] == True):
             #Set event seed:
             #Seperate RandomState object used for each event to futur proof for multithreading
             #to avoid issues with reproducability with a global RandomState
@@ -271,7 +271,7 @@ class Sim:
                             #minimum_time = numpy.min([minimum_time,self.signal_times[0] + self.in_dic_array[station_label][antenna_label][solution]['t'][eventid]])
                             #maximum_time = numpy.max([maximum_time,self.signal_times[-1] + self.in_dic_array[station_label][antenna_label][solution]['t'][eventid]])
             '''
-            event_times = numpy.sort(temporary_info[temporary_info['has_solution'] == 1]['time'])
+            event_times = numpy.sort(temporary_info[temporary_info['has_solution'] == True]['time'])
             if minimum_time > self.signal_times[0] + event_times[0]:
                 minimum_time = self.signal_times[0] + event_times[0]
             if maximum_time < self.signal_times[-1] + event_times[-1]:
@@ -339,7 +339,7 @@ class Sim:
                             #theta_ant_array.append(self.in_dic_array[station_label][antenna_label][solution]['theta_ant'][eventid])
                             total_solution_index = station_wide_antenna_index * len (self.stations[index_station].antennas[index_antenna].lib.solutions) + ii
                             #if self.in_flag_array[station_label][antenna_label][solution][eventid]:
-                            if temporary_info[total_solution_index]['has_solution'] == 1:
+                            if temporary_info[total_solution_index]['has_solution'] == True:
                                 #So now it will always get to the above trigger only if ANY pass pre trigger, bit will still only calculate the ones that have solutions regardless if they were the solutions that pretriggered
                                 # Direction of outgoing ray from antenna to interaction vertex
                                 
@@ -477,7 +477,7 @@ class Sim:
                 
                 
                 #Only do triggering if any pass pre_trigger
-                if numpy.any(temporary_info[temporary_info['station'] == index_station]['pre_triggered'] == 1):
+                if numpy.any(temporary_info[temporary_info['station'] == index_station]['pre_triggered'] == True):
                     # Triggering Code below:
                     signals_out[station_label] = numpy.array([])
                     if numpy.any(info['has_solution']) == True:
@@ -582,20 +582,20 @@ class Sim:
                     
                             
                     if triggered == True:
-                        info['triggered'] = 1
-                        temporary_info['triggered'] = 1
+                        info['triggered'] = True
+                        temporary_info['triggered'] = True
                         signals_out[station_label] = numpy.vstack((Vd_out_sync, ud_out_sync[0,:]))
                         
                         print('Triggered on event %i'%eventid)
                         if plot_geometry == True:
                             origin = []
                             
-                            for index_antenna in info[info['has_solution'] == 1]['antenna']:
+                            for index_antenna in info[info['has_solution'] == True]['antenna']:
                                 origin.append([self.stations[index_station].antennas[index_antenna].x,self.stations[index_station].antennas[index_antenna].y,self.stations[index_station].antennas[index_antenna].z])
                             
                             neutrino_loc = [x_0, y_0, z_0]
-                            if len(info[info['has_solution'] == 1]) > 0:
-                                fig = gnosim.trace.refraction_library_beta.plotGeometry(origin,neutrino_loc,phi_0,temporary_info[numpy.logical_and(temporary_info['has_solution'] == 1,temporary_info['station'] == index_station)])
+                            if len(info[info['has_solution'] == True]) > 0:
+                                fig = gnosim.trace.refraction_library_beta.plotGeometry(origin,neutrino_loc,phi_0,temporary_info[numpy.logical_and(temporary_info['has_solution'] == True,temporary_info['station'] == index_station)])
                                 try:
                                     fig.savefig('%s%s_all_antennas-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
                                     pylab.close(fig)
@@ -791,8 +791,8 @@ class Sim:
                             except:
                                 print('Failed to save image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
                     else:
-                        info['triggered'] = 0
-                        temporary_info['triggered'] = 0
+                        info['triggered'] = False
+                        temporary_info['triggered'] = False
         else:
             dic_max['d'] = temporary_info[0]['distance']
             dic_max['r'] = rs[0]
@@ -1177,8 +1177,7 @@ class Sim:
             len_info_per_event = self.n_antenna
         else:
             len_info_per_event = len(self.solutions)*self.n_antenna
-        
-        self.info_dtype = numpy.dtype([('eventid','i'),('station','i'),('antenna','i'),('has_solution','i'),('pre_triggered','i'),('triggered','i'),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('observation_angle','f'),('electric_field','f'),('electric_field_digitized','f'),('dominant_freq','f'),('a_h','f'),('a_v','f'),('SNR','f'),('beam_pattern_factor','f'),('seed',numpy.uint32)])
+        self.info_dtype = numpy.dtype([('eventid','i'),('station',numpy.uint16),('antenna',numpy.uint16),('has_solution',numpy.bool_),('pre_triggered',numpy.bool_),('triggered',numpy.bool_),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('observation_angle','f'),('electric_field','f'),('electric_field_digitized','f'),('dominant_freq','f'),('a_h','f'),('a_v','f'),('SNR','f'),('beam_pattern_factor','f'),('seed',numpy.uint32)])
         p_interact = numpy.zeros(n_events)
         p_earth = numpy.zeros(n_events)
         p_detect = numpy.zeros(n_events)
