@@ -760,13 +760,13 @@ def plotFromReader(reader,eventid,trigger_threshold_units = 'fpga', trigger_thre
 
   
 if __name__ == "__main__":
-    #pylab.close('all')
+    pylab.close('all')
     
     #reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_100_events_1_seed_10.h5' , 'r')
     
     #reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_1000_events_1_seed_2.h5' , 'r')
     #reader = h5py.File('' , 'r')
-    reader = h5py.File('/home/dsouthall/scratch-midway2/results_2019_Feb_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_1002_events_1_seed_1.h5' , 'r')
+    reader = h5py.File('/home/dsouthall/scratch-midway2/results_2019_Feb_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_50000_events_1_seed_3.h5' , 'r')
     reader2 = h5py.File('./results_2019_Feb_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_1002_events_1_seed_4.h5' , 'r')
     
     #reader_kaeli = h5py.File('./results_2019_Jan_real_config_3.00e+09_GeV_1_events_1_seed_1.h5' , 'r')
@@ -776,7 +776,7 @@ if __name__ == "__main__":
     info2 = reader2['info'][...]
     #options
     energy_neutrino = 3.e9 # GeV
-    choose_n = 1 #number of events to run code on (randomly selected from events with solutions
+    choose_n = 10 #number of events to run code on (randomly selected from events with solutions
     sampling_bits = 7
     scale_noise_to = 3
     digital_sampling_freq = 1.5 #GHz
@@ -796,10 +796,10 @@ if __name__ == "__main__":
     plot_geometry = False
     
     #The three single_ plots correspond to plots in gnosim.interaction.askaryan.quickSignalSingle
-    single_plot_signals   = True
-    single_plot_spectrum  = True
+    single_plot_signals   = False
+    single_plot_spectrum  = False
     single_plot_angles  = False
-    single_plot_potential = True
+    single_plot_potential = False
     
     #add_signals_plot = True 
     remove_noise_overlap = True

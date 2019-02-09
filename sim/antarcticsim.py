@@ -22,8 +22,11 @@ import math
 from matplotlib import gridspec
 import pandas
 import time
-from concurrent.futures import ThreadPoolExecutor
+import multiprocessing
+import concurrent.futures
+
 from multiprocessing import cpu_count
+import threading
 
 sys.path.append("/home/dsouthall/Projects/GNOSim/")
 import gnosim.utils.quat
@@ -586,7 +589,7 @@ class Sim:
                         temporary_info['triggered'] = True
                         signals_out[station_label] = numpy.vstack((Vd_out_sync, ud_out_sync[0,:]))
                         
-                        print('Triggered on event %i'%eventid)
+                        print('Triggered on event %i at Time: %0.3f'%(eventid,time.time() - self.throw_start_time))
                         if plot_geometry == True:
                             origin = []
                             
@@ -595,201 +598,203 @@ class Sim:
                             
                             neutrino_loc = [x_0, y_0, z_0]
                             if len(info[info['has_solution'] == True]) > 0:
-                                fig = gnosim.trace.refraction_library_beta.plotGeometry(origin,neutrino_loc,phi_0,temporary_info[numpy.logical_and(temporary_info['has_solution'] == True,temporary_info['station'] == index_station)])
-                                try:
-                                    fig.savefig('%s%s_all_antennas-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
-                                    pylab.close(fig)
-                                except:
-                                    print('Failed to save image %s%s_all_antennas-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension))
+                                with self.lock:
+                                    fig = gnosim.trace.refraction_library_beta.plotGeometry(origin,neutrino_loc,phi_0,temporary_info[numpy.logical_and(temporary_info['has_solution'] == True,temporary_info['station'] == index_station)])
+                                    try:
+                                        fig.savefig('%s%s_all_antennas-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
+                                        pylab.close(fig)
+                                    except:
+                                        print('Failed to save image %s%s_all_antennas-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension))
 
                         
                         
                         if numpy.logical_and(electricFieldDomain == 'time',plot_signals == True):
                             #might need to account for when signals are not present in certain detectors
                             #print('Attempting to plot', eventid)
-                            fig = pylab.figure(figsize=(16.,11.2)) #my screensize
-                            
-                            n_rows = len(self.stations[index_station].antennas)
-                            ntables = 4 #With below lines is 5 for beamforming == True
-                            height_ratios = [2,2,n_rows+1,n_rows+1]
-                            if do_beamforming == True:
-                                ntables += 1
-                                height_ratios.append(0.9*sum(height_ratios))
+                            with self.lock:
+                                fig = pylab.figure(figsize=(16.,11.2)) #my screensize
                                 
-                            gs_left = gridspec.GridSpec(n_rows, 2, width_ratios=[3, 2]) #should only call left plots.  pylab.subplot(gs_left[0]),pylab.subplot(gs_left[2]),...
-                            gs_right = gridspec.GridSpec(ntables, 2, width_ratios=[3, 2], height_ratios=height_ratios) #should only call odd tables pylab.subplot(gs_right[1])
-                            #if do_beamforming == True:
-                            #    gs_beam_forming = gridspec.GridSpec(ntables, 3, width_ratios=[3, 1,5], height_ratios=height_ratios)
-                                
-                            #ax = pylab.subplot(gs_left[0])
-                            
-                            first_in_loop = True
-                            axis2 = []
-                            max_ax1_range = numpy.array([1e20,-1e20])
-                            for index_antenna in range(0, n_rows):
-                                antenna_label = self.config['antennas']['types'][index_antenna]
-                                if first_in_loop == True:
-                                    first_in_loop = False
-                                    ax = pylab.subplot(gs_left[2*index_antenna])
-                                
-                                ax1 = pylab.subplot(gs_left[2*index_antenna],sharex = ax,sharey = ax)
-                                ax2 = ax1.twinx() #this is not perfect and can be janky with zooming.   
-                                axis2.append(ax2)   
-                                c1 = 'b'
-                                c2 = 'r'
-                                #pylab.subplot(n_rows,1,index_antenna+1,sharex=ax,sharey=ax)
-                                if index_antenna == 0:
-                                    boolstring = ['False','True']
-                                    pylab.title('Event %i, summed_signals = %s'%(eventid,boolstring[int(summed_signals)])) 
-                                ax1.plot(time_analog[station_label][antenna_label],V_analog[station_label][antenna_label],label='s%ia%i'%(index_station,index_antenna),linewidth=0.6,c = c1)
-                                ax2.plot(time_digital[station_label][antenna_label],V_digital[station_label][antenna_label],label='s%ia%i'%(index_station,index_antenna),linewidth=0.4,c = c2)
-                                
-                                if ( n_rows // 2 == index_antenna):
-                                    ax1.set_ylabel('V$_{%i}$ (V)'%(eventid),fontsize=12, color=c1)
-                                    ax2.set_ylabel('adu',fontsize=12, color=c2)
+                                n_rows = len(self.stations[index_station].antennas)
+                                ntables = 4 #With below lines is 5 for beamforming == True
+                                height_ratios = [2,2,n_rows+1,n_rows+1]
+                                if do_beamforming == True:
+                                    ntables += 1
+                                    height_ratios.append(0.9*sum(height_ratios))
                                     
-                                ax1.legend(fontsize=8,framealpha=0.0,loc='upper left')
-                                ax1.tick_params('y', colors=c1)
-                                
-                                ax2.legend(fontsize=8,framealpha=0.0,loc='upper right')
-                                ax2.tick_params('y', colors=c2)
-                                ax1_ylim = numpy.array(ax1.get_ylim())
-                                
-                                if ax1_ylim[0] < max_ax1_range[0]:
-                                    max_ax1_range[0] = ax1_ylim[0]
-                                if ax1_ylim[1] > max_ax1_range[1]:
-                                    max_ax1_range[1] = ax1_ylim[1]
+                                gs_left = gridspec.GridSpec(n_rows, 2, width_ratios=[3, 2]) #should only call left plots.  pylab.subplot(gs_left[0]),pylab.subplot(gs_left[2]),...
+                                gs_right = gridspec.GridSpec(ntables, 2, width_ratios=[3, 2], height_ratios=height_ratios) #should only call odd tables pylab.subplot(gs_right[1])
+                                #if do_beamforming == True:
+                                #    gs_beam_forming = gridspec.GridSpec(ntables, 3, width_ratios=[3, 1,5], height_ratios=height_ratios)
                                     
-                            for ax2 in axis2:
-                                ax2.set_ylim(max_ax1_range * self.scale_noise_to / self.noise_rms)
+                                #ax = pylab.subplot(gs_left[0])
                                 
-                            pylab.xlabel('t-t_emit (ns)',fontsize=12)
-                            
-                            #Making Tables
-                            #TABLE 1: Making position table
-                            table_fig = pylab.subplot(gs_right[1])
-                            
-                            table_ax = pylab.gca()
-                            table_fig.patch.set_visible(False)
-                            table_ax.axis('off')
-                            table_ax.axis('tight')
-                            x_neutrino = x_0
-                            y_neutrino = y_0
-                            z_neutrino = z_0
-                            r_neutrino = numpy.sqrt(x_neutrino**2 + y_neutrino**2)
-                            phi_neutrino = phi_0
-                            df = pandas.DataFrame({'x(m)':[ x_neutrino ] , 'y(m)':[ y_neutrino ] , 'z(m)':[ z_neutrino ] , 'r(m)':[ r_neutrino ] , '$\phi_0$(deg)':[ phi_neutrino ] })
-                            table = pylab.table(cellText = df.values.round(2), colLabels = df.columns, loc = 'center')
-                            table.auto_set_font_size(False)
-                            table.set_fontsize(10)
-                            pylab.title('Event Info')
-                            
-                            #TABLE 2: Making Neutrino Energetics table 
-                            '''
-                            >>> list(reader.keys())
-                            ['a_h', 'a_v', 'd', 'electric_field', 'energy_neutrino', 'index_antenna', 
-                            'index_station', 'inelasticity', 'info', 'observation_angle', 'p_detect', 
-                            'p_earth', 'p_interact', 'phi_0', 'solution', 't', 'theta_0', 'theta_ant', 
-                            'theta_ray', 'x_0', 'y_0', 'z_0']
-                            
-                            event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, anti=False,
-                            electricFieldDomain = 'freq',include_noise = False,plot_signals=False,plot_geometry=False,summed_signals=False,
-                            trigger_threshold = 0,plot_filetype_extension = 'svg',image_path = './'):
-                            '''
-                            table_fig = pylab.subplot(gs_right[3])
-                            
-                            table_ax = pylab.gca()
-                            table_fig.patch.set_visible(False)
-                            table_ax.axis('off')
-                            table_ax.axis('tight')
-                            
-                            df = pandas.DataFrame({'E$_\\nu$ (GeV)':'%0.4g'%(effective_energy_neutrino) , 'Inelasticity':'%0.4g'%inelasticity , 'p_interact':'%0.4g'%p_interact, 'p_earth':'%0.4g'%p_earth},index=[0])
-                            #decimals = pandas.Series([3,3,3,3],index = df.columns)
-                            table = pylab.table(cellText = df.values , colLabels = df.columns, loc = 'center')
-                            table.auto_set_font_size(False)
-                            table.set_fontsize(10)
-                            
-                            
-                            
-                            #TABLE 3: Making observed angles and attenuations table
-                            table_fig = pylab.subplot(gs_right[5])
-                            
-                            table_ax = pylab.gca()
-                            table_fig.patch.set_visible(False)
-                            table_ax.axis('off')
-                            table_ax.axis('tight')
-                            antenna =           ['%i'%i for i in info['antenna'].astype(int)]
-                            observation_angle = ['%0.4g'%i for i in info['observation_angle'].astype(float)]
-                            theta_ant =         ['%0.4g'%i for i in info['theta_ant'].astype(float)]
-                            distance =          ['%0.3g'%i for i in info['distance'].astype(float)]
-                            beam_factor =       ['%0.3g'%i for i in info['beam_pattern_factor']]
-                            df = pandas.DataFrame({'antenna':antenna , '$\\theta_\mathrm{ant}$ (deg)':theta_ant , '$\\theta_\mathrm{emit}$ (deg)':observation_angle,'d$_\mathrm{path}$ (m)':distance, 'Beam Factor':beam_factor})
-                            table = pylab.table(cellText = df.values, colLabels = df.columns, loc = 'center')
-                            table.auto_set_font_size(False)
-                            table.set_fontsize(10)
-                            
-                            
-                            #TABLE 4: Max Voltage and SNR per Antenna
-                            '''
-                            >>> list(reader.keys())
-                            ['a_h', 'a_v', 'd', 'electric_field', 'energy_neutrino', 'index_antenna', 
-                            'index_station', 'inelasticity', 'info', 'observation_angle', 'p_detect', 
-                            'p_earth', 'p_interact', 'phi_0', 'solution', 't', 'theta_0', 'theta_ant', 
-                            'theta_ray', 'x_0', 'y_0', 'z_0']
-                            
-                            event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, anti=False,
-                            electricFieldDomain = 'freq',include_noise = False,plot_signals=False,plot_geometry=False,summed_signals=False,
-                            trigger_threshold = 0,plot_filetype_extension = 'svg',image_path = './'):
-                            '''
-                            table_fig = pylab.subplot(gs_right[7])
-                            
-                            table_ax = pylab.gca()
-                            table_fig.patch.set_visible(False)
-                            table_ax.axis('off')
-                            table_ax.axis('tight')
-                            antenna =           ['%i'%i for i in info['antenna'].astype(int)]
-                            electric_field =    ['%0.3g'%i for i in info['electric_field'].astype(float)]
-                            dom_freqs =         ['%0.3g'%i for i in (info['dominant_freq']/1e6).astype(float)]
-                            SNRs =              ['%0.3g'%i for i in info['SNR'].astype(float)]
-                            df = pandas.DataFrame({'antenna':antenna , '$V_\mathrm{max}$ (V)':electric_field , 'SNR':SNRs, '$f_\mathrm{max}$ (MHz)':dom_freqs})
-                            table = pylab.table(cellText = df.values , colLabels = df.columns, loc = 'center')
-                            table.auto_set_font_size(False)
-                            table.set_fontsize(10)
-                            
-                            #TABLE 5: THE TABLE THAT'S ACTUALLY A PLOT AND ONLY SOMETIMES SHOWS UP DEPENDING ON SETTINGS :D
-                            
-                            if do_beamforming == True:
+                                first_in_loop = True
+                                axis2 = []
+                                max_ax1_range = numpy.array([1e20,-1e20])
+                                for index_antenna in range(0, n_rows):
+                                    antenna_label = self.config['antennas']['types'][index_antenna]
+                                    if first_in_loop == True:
+                                        first_in_loop = False
+                                        ax = pylab.subplot(gs_left[2*index_antenna])
+                                    
+                                    ax1 = pylab.subplot(gs_left[2*index_antenna],sharex = ax,sharey = ax)
+                                    ax2 = ax1.twinx() #this is not perfect and can be janky with zooming.   
+                                    axis2.append(ax2)   
+                                    c1 = 'b'
+                                    c2 = 'r'
+                                    #pylab.subplot(n_rows,1,index_antenna+1,sharex=ax,sharey=ax)
+                                    if index_antenna == 0:
+                                        boolstring = ['False','True']
+                                        pylab.title('Event %i, summed_signals = %s'%(eventid,boolstring[int(summed_signals)])) 
+                                    ax1.plot(time_analog[station_label][antenna_label],V_analog[station_label][antenna_label],label='s%ia%i'%(index_station,index_antenna),linewidth=0.6,c = c1)
+                                    ax2.plot(time_digital[station_label][antenna_label],V_digital[station_label][antenna_label],label='s%ia%i'%(index_station,index_antenna),linewidth=0.4,c = c2)
+                                    
+                                    if ( n_rows // 2 == index_antenna):
+                                        ax1.set_ylabel('V$_{%i}$ (V)'%(eventid),fontsize=12, color=c1)
+                                        ax2.set_ylabel('adu',fontsize=12, color=c2)
+                                        
+                                    ax1.legend(fontsize=8,framealpha=0.0,loc='upper left')
+                                    ax1.tick_params('y', colors=c1)
+                                    
+                                    ax2.legend(fontsize=8,framealpha=0.0,loc='upper right')
+                                    ax2.tick_params('y', colors=c2)
+                                    ax1_ylim = numpy.array(ax1.get_ylim())
+                                    
+                                    if ax1_ylim[0] < max_ax1_range[0]:
+                                        max_ax1_range[0] = ax1_ylim[0]
+                                    if ax1_ylim[1] > max_ax1_range[1]:
+                                        max_ax1_range[1] = ax1_ylim[1]
+                                        
+                                for ax2 in axis2:
+                                    ax2.set_ylim(max_ax1_range * self.scale_noise_to / self.noise_rms)
+                                    
+                                pylab.xlabel('t-t_emit (ns)',fontsize=12)
                                 
-                                gs_beam_forming = gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=gs_right[9], wspace=0.1, hspace=0.1, width_ratios=[1,6,3])
-                                #table_fig = pylab.subplot(gs_beam_forming[13])
-                                table_fig = pylab.subplot(gs_beam_forming[1])
-                                #table_fig = pylab.subplot(gs_right[9])
+                                #Making Tables
+                                #TABLE 1: Making position table
+                                table_fig = pylab.subplot(gs_right[1])
+                                
                                 table_ax = pylab.gca()
-                                table_fig.patch.set_visible(True)
+                                table_fig.patch.set_visible(False)
+                                table_ax.axis('off')
+                                table_ax.axis('tight')
+                                x_neutrino = x_0
+                                y_neutrino = y_0
+                                z_neutrino = z_0
+                                r_neutrino = numpy.sqrt(x_neutrino**2 + y_neutrino**2)
+                                phi_neutrino = phi_0
+                                df = pandas.DataFrame({'x(m)':[ x_neutrino ] , 'y(m)':[ y_neutrino ] , 'z(m)':[ z_neutrino ] , 'r(m)':[ r_neutrino ] , '$\phi_0$(deg)':[ phi_neutrino ] })
+                                table = pylab.table(cellText = df.values.round(2), colLabels = df.columns, loc = 'center')
+                                table.auto_set_font_size(False)
+                                table.set_fontsize(10)
+                                pylab.title('Event Info')
                                 
-                                for beam_index, beam_label in enumerate(self.beam_dict['beams'].keys()):
-                                    table_ax.plot(beam_powersums[beam_label],label = '%s, $\\theta_{ant} = $ %0.2f'%(beam_label,self.beam_dict['theta_ant'][beam_label]),color = self.beam_colors[beam_index])
-                                    #print(beam_powersums[beam_label])
-                                #for line_index,line in enumerate(table_ax.lines):
-                                #    line.set_color(self.beam_colors[line_index])
-                                #xlim = table_ax.get_xlim()
-                                #table_ax.set_xlim( ( xlim[0] , xlim[1]*1.5 ) )
+                                #TABLE 2: Making Neutrino Energetics table 
+                                '''
+                                >>> list(reader.keys())
+                                ['a_h', 'a_v', 'd', 'electric_field', 'energy_neutrino', 'index_antenna', 
+                                'index_station', 'inelasticity', 'info', 'observation_angle', 'p_detect', 
+                                'p_earth', 'p_interact', 'phi_0', 'solution', 't', 'theta_0', 'theta_ant', 
+                                'theta_ray', 'x_0', 'y_0', 'z_0']
                                 
-                                #box = table_ax.get_position()
-                                #table_ax.set_position([box.x0, box.y0, box.width * 0.7, box.height])
-                                pylab.yticks(rotation=45)
-                                table_ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-                                #pylab.legend(loc='upper right', bbox_to_anchor=(1.05, 0.5))
-                                #table_ax.axis('tight')
+                                event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, anti=False,
+                                electricFieldDomain = 'freq',include_noise = False,plot_signals=False,plot_geometry=False,summed_signals=False,
+                                trigger_threshold = 0,plot_filetype_extension = 'svg',image_path = './'):
+                                '''
+                                table_fig = pylab.subplot(gs_right[3])
                                 
-                            pylab.subplots_adjust(left = 0.05, bottom = 0.05, right = 0.99, top = 0.97, wspace = 0.15, hspace = 0.28)
-                            #pylab.show(block=True)
-                            try:
-                                pylab.savefig('%s%s-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
-                                pylab.close(fig)
-                                #print('Saved image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
-                            except:
-                                print('Failed to save image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
+                                table_ax = pylab.gca()
+                                table_fig.patch.set_visible(False)
+                                table_ax.axis('off')
+                                table_ax.axis('tight')
+                                
+                                df = pandas.DataFrame({'E$_\\nu$ (GeV)':'%0.4g'%(effective_energy_neutrino) , 'Inelasticity':'%0.4g'%inelasticity , 'p_interact':'%0.4g'%p_interact, 'p_earth':'%0.4g'%p_earth},index=[0])
+                                #decimals = pandas.Series([3,3,3,3],index = df.columns)
+                                table = pylab.table(cellText = df.values , colLabels = df.columns, loc = 'center')
+                                table.auto_set_font_size(False)
+                                table.set_fontsize(10)
+                                
+                                
+                                
+                                #TABLE 3: Making observed angles and attenuations table
+                                table_fig = pylab.subplot(gs_right[5])
+                                
+                                table_ax = pylab.gca()
+                                table_fig.patch.set_visible(False)
+                                table_ax.axis('off')
+                                table_ax.axis('tight')
+                                antenna =           ['%i'%i for i in info['antenna'].astype(int)]
+                                observation_angle = ['%0.4g'%i for i in info['observation_angle'].astype(float)]
+                                theta_ant =         ['%0.4g'%i for i in info['theta_ant'].astype(float)]
+                                distance =          ['%0.3g'%i for i in info['distance'].astype(float)]
+                                beam_factor =       ['%0.3g'%i for i in info['beam_pattern_factor']]
+                                df = pandas.DataFrame({'antenna':antenna , '$\\theta_\mathrm{ant}$ (deg)':theta_ant , '$\\theta_\mathrm{emit}$ (deg)':observation_angle,'d$_\mathrm{path}$ (m)':distance, 'Beam Factor':beam_factor})
+                                table = pylab.table(cellText = df.values, colLabels = df.columns, loc = 'center')
+                                table.auto_set_font_size(False)
+                                table.set_fontsize(10)
+                                
+                                
+                                #TABLE 4: Max Voltage and SNR per Antenna
+                                '''
+                                >>> list(reader.keys())
+                                ['a_h', 'a_v', 'd', 'electric_field', 'energy_neutrino', 'index_antenna', 
+                                'index_station', 'inelasticity', 'info', 'observation_angle', 'p_detect', 
+                                'p_earth', 'p_interact', 'phi_0', 'solution', 't', 'theta_0', 'theta_ant', 
+                                'theta_ray', 'x_0', 'y_0', 'z_0']
+                                
+                                event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, anti=False,
+                                electricFieldDomain = 'freq',include_noise = False,plot_signals=False,plot_geometry=False,summed_signals=False,
+                                trigger_threshold = 0,plot_filetype_extension = 'svg',image_path = './'):
+                                '''
+                                table_fig = pylab.subplot(gs_right[7])
+                                
+                                table_ax = pylab.gca()
+                                table_fig.patch.set_visible(False)
+                                table_ax.axis('off')
+                                table_ax.axis('tight')
+                                antenna =           ['%i'%i for i in info['antenna'].astype(int)]
+                                electric_field =    ['%0.3g'%i for i in info['electric_field'].astype(float)]
+                                dom_freqs =         ['%0.3g'%i for i in (info['dominant_freq']/1e6).astype(float)]
+                                SNRs =              ['%0.3g'%i for i in info['SNR'].astype(float)]
+                                df = pandas.DataFrame({'antenna':antenna , '$V_\mathrm{max}$ (V)':electric_field , 'SNR':SNRs, '$f_\mathrm{max}$ (MHz)':dom_freqs})
+                                table = pylab.table(cellText = df.values , colLabels = df.columns, loc = 'center')
+                                table.auto_set_font_size(False)
+                                table.set_fontsize(10)
+                                
+                                #TABLE 5: THE TABLE THAT'S ACTUALLY A PLOT AND ONLY SOMETIMES SHOWS UP DEPENDING ON SETTINGS :D
+                                
+                                if do_beamforming == True:
+                                    
+                                    gs_beam_forming = gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=gs_right[9], wspace=0.1, hspace=0.1, width_ratios=[1,6,3])
+                                    #table_fig = pylab.subplot(gs_beam_forming[13])
+                                    table_fig = pylab.subplot(gs_beam_forming[1])
+                                    #table_fig = pylab.subplot(gs_right[9])
+                                    table_ax = pylab.gca()
+                                    table_fig.patch.set_visible(True)
+                                    
+                                    for beam_index, beam_label in enumerate(self.beam_dict['beams'].keys()):
+                                        table_ax.plot(beam_powersums[beam_label],label = '%s, $\\theta_{ant} = $ %0.2f'%(beam_label,self.beam_dict['theta_ant'][beam_label]),color = self.beam_colors[beam_index])
+                                        #print(beam_powersums[beam_label])
+                                    #for line_index,line in enumerate(table_ax.lines):
+                                    #    line.set_color(self.beam_colors[line_index])
+                                    #xlim = table_ax.get_xlim()
+                                    #table_ax.set_xlim( ( xlim[0] , xlim[1]*1.5 ) )
+                                    
+                                    #box = table_ax.get_position()
+                                    #table_ax.set_position([box.x0, box.y0, box.width * 0.7, box.height])
+                                    pylab.yticks(rotation=45)
+                                    table_ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+                                    #pylab.legend(loc='upper right', bbox_to_anchor=(1.05, 0.5))
+                                    #table_ax.axis('tight')
+                                    
+                                pylab.subplots_adjust(left = 0.05, bottom = 0.05, right = 0.99, top = 0.97, wspace = 0.15, hspace = 0.28)
+                                #pylab.show(block=True)
+                                try:
+                                    pylab.savefig('%s%s-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
+                                    pylab.close(fig)
+                                    #print('Saved image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
+                                except:
+                                    print('Failed to save image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
                     else:
                         info['triggered'] = False
                         temporary_info['triggered'] = False
@@ -805,7 +810,7 @@ class Sim:
         if output_all_solutions == True:
             info = temporary_info
         p_detect = numpy.any(info['has_solution'])
-        return p_interact, p_earth, p_detect, event_electric_field_max, dic_max, event_observation_angle_max, event_solution_max, event_index_station_max, event_index_antenna_max, info, triggered, signals_out
+        return eventid, p_interact, p_earth, p_detect, event_electric_field_max, dic_max, event_observation_angle_max, event_solution_max, event_index_station_max, event_index_antenna_max, info, triggered, signals_out
         #return p_interact, p_earth, p_detect, electric_field_direct, electric_field_crossover, electric_field_reflect,  dic_direct, dic_crossover, dic_reflect
     
     def griddata_Event(self, x_query, y_query , z_query, method = 'cubic'):
@@ -970,12 +975,11 @@ class Sim:
         Right now this expects r_query,z_query to be centered coordinates
         '''
         griddata_initate_time = time.time()
-        from concurrent.futures import ThreadPoolExecutor
         
         #initiate threads
         print('Submitting threads')
         thread_results = {}
-        with ThreadPoolExecutor(max_workers = n_cores) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers = n_cores) as executor:
             for index_station in range(0, len(self.stations)):
                 station_label = 'station'+str(index_station)
                 thread_results[station_label] = {}
@@ -993,22 +997,41 @@ class Sim:
             self.in_dic_array[station_label] = {}
             self.in_flag_array[station_label] = {}
             for index_antenna, antenna_label in enumerate(self.lib.keys()):
-                self.in_dic_array[station_label][antenna_label] , self.in_flag_array[station_label][antenna_label]  = thread_results[station_label][antenna_label] .result()
+                self.in_dic_array[station_label][antenna_label] , self.in_flag_array[station_label][antenna_label]  = thread_results[station_label][antenna_label].result()
             
         print('Finished griddata_Event in ', time.time() - griddata_initate_time, 's')
-
+    
+    def runEvent(self,energy_neutrino, phi_0, theta_0, x_0, y_0, z_0,eventid,inelasticity,**kwargs):
+        '''
+        This should contain the code used to run a single event in a thread
+        '''
+        if (self.n_events//1000 != 0):
+            if(eventid%(self.n_events//1000) == 0):
+                current_time  = time.time() - self.throw_start_time
+                print ('Event (%i/%i) Time: %0.2f s ( %0.4f h)'%(eventid, self.n_events,current_time,current_time/3600.0)) #might want to comment out these print statements to run faster and spew less
+        else:
+            current_time  = time.time() - self.throw_start_time
+            print ('Event (%i/%i) Time: %0.2f s ( %0.4f h)'%(eventid, self.n_events,current_time,current_time/3600.0))
+        event_label = 'event%i'%eventid
+        eventid, p_interact, p_earth, p_detect, electric_field_max, dic_max, observation_angle_max, \
+        solution_max, index_station_max, index_antenna_max, info_i, \
+        triggered, signals_out \
+            = self.event(energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, **kwargs)
+        return eventid, p_interact, p_earth, p_detect, electric_field_max, dic_max, observation_angle_max, \
+        solution_max, index_station_max, index_antenna_max, info_i, triggered, signals_out
+        
     def throw(self, energy_neutrino=1.e9, 
               theta_0=None, phi_0=None, x_0=None, y_0=None, z_0=None, phi_vertex = None, r_vertex = None,
               anti=False, n_events=10000, detector_volume_radius=6000., detector_volume_depth=3000., 
               outfile=None,seed = None,method = 'cubic',electricFieldDomain = 'freq',include_noise = False,summed_signals = False,
               plot_geometry = False, plot_signals = False, trigger_threshold = 0,trigger_threshold_units = 'V',plot_filetype_extension = 'svg',image_path = './',
-              use_threading = False, do_beamforming = False, n_beams = 15, n_baselines = 2, output_all_solutions = False,save_signals = False,
+              use_interp_threading = False,use_event_threading = False, do_beamforming = False, n_beams = 15, n_baselines = 2, output_all_solutions = False,save_signals = False,
               pre_trigger_angle = None):
         '''
         electricFieldDomain should be either freq or time.  The freq domain uses
         the older electric field calculation, while the 'time' uses the new one.
         '''
-        throw_start_time = time.time()
+        self.throw_start_time = time.time()
         if trigger_threshold_units == 'fpga':
             if do_beamforming == False:
                 print('WARNING!!!')
@@ -1022,6 +1045,10 @@ class Sim:
                 return 0
             
         self.outfile = outfile
+        self.save_signals = save_signals
+        self.n_events = n_events
+        self.n_cores = cpu_count()
+        self.lock = threading.RLock() #Hopefully fixes multithreading plotting
         #seed for testing purposes (if want replicated data)
         if (seed != None):
             numpy.random.seed(seed)
@@ -1032,12 +1059,12 @@ class Sim:
         #run then the position in the seed list is altered, because noise is generated a different number of
         #times.  This way the seed is set within each event (only if the pre_trigger is met, to save time)
         #and each event operates in the same way whether previous events were run or not. 
-        event_seeds = numpy.random.randint(numpy.iinfo(numpy.uint32).max,size=n_events)
-        energy_neutrinos = energy_neutrino * numpy.ones(n_events)
+        event_seeds = numpy.random.randint(numpy.iinfo(numpy.uint32).max,size=self.n_events)
+        energy_neutrinos = energy_neutrino * numpy.ones(self.n_events)
     
         #Direction neutrino came from (characterized by phi_0, theta_0)
         if theta_0 == None:
-            theta_0 = numpy.degrees(numpy.arccos(numpy.random.uniform(1., -1., size=n_events))) # deg
+            theta_0 = numpy.degrees(numpy.arccos(numpy.random.uniform(1., -1., size=self.n_events))) # deg
         else:
             print('Using input theta_0')
             if numpy.logical_or(isinstance(theta_0,list) == True,isinstance(theta_0,tuple) == True):
@@ -1046,7 +1073,7 @@ class Sim:
                 theta_0 = theta_0.astype(float)
             
         if phi_0 == None:
-            phi_0 = numpy.random.uniform(0., 360., size=n_events) # deg
+            phi_0 = numpy.random.uniform(0., 360., size=self.n_events) # deg
         else:
             print('Using input phi_0')
             if numpy.logical_or(isinstance(phi_0,list) == True,isinstance(phi_0,tuple) == True):
@@ -1057,7 +1084,7 @@ class Sim:
         
         #Location of neutrino interaction (characterized by [x_0, y_0, z_0] or [phi_vertex, theta_vertex, z_0] )
         if z_0 == None:
-            z_0 = numpy.random.uniform(-1. * detector_volume_depth, 0., size=n_events) # m #maybe something to double check later, make sure doesn't give solutions outside of earth
+            z_0 = numpy.random.uniform(-1. * detector_volume_depth, 0., size=self.n_events) # m #maybe something to double check later, make sure doesn't give solutions outside of earth
         else:
             print('Using input z_0')
             if numpy.logical_or(isinstance(z_0,list) == True,isinstance(z_0,tuple) == True):
@@ -1100,9 +1127,9 @@ class Sim:
         
         else:
             print('Using randomized phi_vertex and r_vertex to calculate x_0, y_0')
-            phi_vertex = numpy.random.uniform(0., 360., size=n_events) # deg
+            phi_vertex = numpy.random.uniform(0., 360., size=self.n_events) # deg
             alpha_max_radians = detector_volume_radius / gnosim.utils.constants.radius_earth # radians
-            alpha = numpy.arccos(numpy.random.uniform(1., numpy.cos(alpha_max_radians), size=n_events)) # radians
+            alpha = numpy.arccos(numpy.random.uniform(1., numpy.cos(alpha_max_radians), size=self.n_events)) # radians
             r_vertex = gnosim.utils.constants.radius_earth * alpha
             x_0 = r_vertex * numpy.cos(numpy.radians(phi_vertex))
             y_0 = r_vertex * numpy.sin(numpy.radians(phi_vertex))
@@ -1112,7 +1139,7 @@ class Sim:
         if numpy.size(numpy.unique(len_array)) != 1:
             print('Breaking early, something went wrong dyring definitions of neutrino coordinate assigment.  The below numbers should all be the same:')
             print('numpy.array([len(x_0),len(y_0),len(z_0),len(phi_0),len(theta_0)]) = ',len_array)
-            print('Check that n_events given matches length of all given coordinates')
+            print('Check that self.n_events given matches length of all given coordinates')
             return 0
         
         #Response function preparations
@@ -1135,8 +1162,8 @@ class Sim:
             print('Preparing digitization')
             #The following is for digitization.  
         
-            random_time_offsets = numpy.random.uniform(-1, 1, size=n_events)
-            dc_offsets = numpy.zeros(n_events) #Perhaps something to change later.  Added now for ease. 
+            random_time_offsets = numpy.random.uniform(-1, 1, size=self.n_events)
+            dc_offsets = numpy.zeros(self.n_events) #Perhaps something to change later.  Added now for ease. 
             
             #theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pattern_factor,u, 
             #h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential = False,
@@ -1174,80 +1201,82 @@ class Sim:
         #Preparing output arrays
         
         if output_all_solutions == False:
-            len_info_per_event = self.n_antenna
+            self.len_info_per_event = self.n_antenna
         else:
-            len_info_per_event = len(self.solutions)*self.n_antenna
+            self.len_info_per_event = len(self.solutions)*self.n_antenna
+        #For more info about the below type of dtype check out HDF5's discussion of them in 
+        #O'Reilly, Python and HDF5: Chapter 7. More About Types - Compound Types
         self.info_dtype = numpy.dtype([('eventid','i'),('station',numpy.uint16),('antenna',numpy.uint16),('has_solution',numpy.bool_),('pre_triggered',numpy.bool_),('triggered',numpy.bool_),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('observation_angle','f'),('electric_field','f'),('electric_field_digitized','f'),('dominant_freq','f'),('a_h','f'),('a_v','f'),('SNR','f'),('beam_pattern_factor','f'),('seed',numpy.uint32)])
-        p_interact = numpy.zeros(n_events)
-        p_earth = numpy.zeros(n_events)
-        p_detect = numpy.zeros(n_events)
-        #inelasticity = numpy.zeros(n_events)
+        p_interact = numpy.zeros(self.n_events)
+        p_earth = numpy.zeros(self.n_events)
+        p_detect = numpy.zeros(self.n_events)
+        #inelasticity = numpy.zeros(self.n_events)
         inelasticity = gnosim.interaction.inelasticity.inelasticityArray(energy_neutrinos, mode='cc') ## GENERALIZE THIS LATER for anti neutrino, etc. 
-        electric_field_max = numpy.zeros(n_events)
-        observation_angle_max = numpy.zeros(n_events)
-        solution_max = numpy.zeros(n_events)
-        index_station_max = numpy.zeros(n_events)
-        index_antenna_max = numpy.zeros(n_events)
-        t_max = numpy.zeros(n_events)
-        d_max = numpy.zeros(n_events)
-        theta_ray_max = numpy.zeros(n_events)
-        theta_ant_max = numpy.zeros(n_events)
-        a_v_max = numpy.zeros(n_events)
-        a_h_max = numpy.zeros(n_events)
-        info = numpy.empty(n_events * len_info_per_event , dtype = self.info_dtype)
+        electric_field_max = numpy.zeros(self.n_events)
+        observation_angle_max = numpy.zeros(self.n_events)
+        solution_max = numpy.zeros(self.n_events)
+        index_station_max = numpy.zeros(self.n_events)
+        index_antenna_max = numpy.zeros(self.n_events)
+        t_max = numpy.zeros(self.n_events)
+        d_max = numpy.zeros(self.n_events)
+        theta_ray_max = numpy.zeros(self.n_events)
+        theta_ant_max = numpy.zeros(self.n_events)
+        a_v_max = numpy.zeros(self.n_events)
+        a_h_max = numpy.zeros(self.n_events)
+        info = numpy.empty(self.n_events * self.len_info_per_event , dtype = self.info_dtype)
         
-        if outfile:
-            file = h5py.File(outfile, 'w')
+        if self.outfile:
+            self.file = h5py.File(self.outfile, 'w')
             # ORIGINAL 28 MAY 2014
-            #file.attrs['geometric_factor'] = (4. * numpy.pi) * (numpy.pi * detector_volume_radius**2 * detector_volume_depth) # m^3 sr
+            #self.file.attrs['geometric_factor'] = (4. * numpy.pi) * (numpy.pi * detector_volume_radius**2 * detector_volume_depth) # m^3 sr
             # ORIGINAL 28 MAY 2014
             # NEW CURVATURE
-            file.attrs['geometric_factor'] = (4. * numpy.pi) \
+            self.file.attrs['geometric_factor'] = (4. * numpy.pi) \
                                              * (2. * numpy.pi * gnosim.utils.constants.radius_earth**2 \
                                                 * (1. - numpy.cos(detector_volume_radius / gnosim.utils.constants.radius_earth))\
                                                 * detector_volume_depth) # m^3 sr
             # NEW CURVATURE
 
-            file.attrs['config'] = self.config_file
-            #file.attrs['ice_model'] = gnosim.earth.antarctic.ice_model_default
-            file.attrs['ice_model'] = self.config['detector_volume']['ice_model']
-            file.attrs['trigger_mode'] = trigger_threshold_units
-            file.attrs['trigger_threshold'] = trigger_threshold
+            self.file.attrs['config'] = self.config_file
+            #self.file.attrs['ice_model'] = gnosim.earth.antarctic.ice_model_default
+            self.file.attrs['ice_model'] = self.config['detector_volume']['ice_model']
+            self.file.attrs['trigger_mode'] = trigger_threshold_units
+            self.file.attrs['trigger_threshold'] = trigger_threshold
             if pre_trigger_angle == None:
-                file.attrs['pre_trigger_angle'] = 'None'
+                self.file.attrs['pre_trigger_angle'] = 'None'
             else:
-                file.attrs['pre_trigger_angle'] = pre_trigger_angle
+                self.file.attrs['pre_trigger_angle'] = pre_trigger_angle
 
-            file.create_dataset('energy_neutrino', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('inelasticity', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('x_0', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('y_0', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('z_0', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('theta_0', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('phi_0', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('energy_neutrino', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('inelasticity', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('x_0', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('y_0', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('z_0', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('theta_0', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('phi_0', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
 
-            file.create_dataset('p_interact', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('p_earth', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('p_detect', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('p_interact', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('p_earth', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('p_detect', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             
-            file.create_dataset('index_station', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('index_antenna', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('index_station', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('index_antenna', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
 
-            file.create_dataset('electric_field', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('observation_angle', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('solution', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('t', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('d', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('theta_ray', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('theta_ant', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('a_v', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('a_h', (n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('info', ( n_events * len_info_per_event , ) , dtype=self.info_dtype, compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('electric_field', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('observation_angle', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('solution', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('t', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('d', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('theta_ray', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('theta_ant', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('a_v', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('a_h', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('info', ( self.n_events * self.len_info_per_event , ) , dtype=self.info_dtype, compression='gzip', compression_opts=9, shuffle=True)
 
-            file.create_group('signals')
+            self.file.create_group('signals')
         
         
-        
+        general_prep_time = time.time() - self.throw_start_time
         #Loading Hulls (or creating if hulls have not been previously determined in the necessary folder)
         
         self.concave_hull = {}
@@ -1266,22 +1295,140 @@ class Sim:
                 self.concave_hull[lkey][dkey]['f_inner_r_bound'] = chull[dkey]['f_inner_r_bound']
                 self.concave_hull[lkey][dkey]['f_outer_r_bound'] = chull[dkey]['f_outer_r_bound']
         
+        hull_time = time.time() - self.throw_start_time
         print('About to run griddata_Event:')
         ############################################################################
         #Interpolating values from using griddata:
         ############################################################################
         
         #If memory becomes an issue this might need to be adapted to run for chunks of events 
-        if use_threading == True:
-            n_cores = cpu_count()
-            self.multiThreadGridDataEvent(x_0, y_0, z_0, method = method,n_cores = n_cores)
+        if use_interp_threading == True:
+            self.multiThreadGridDataEvent(x_0, y_0, z_0, method = method,n_cores = self.n_cores)
         else:
             self.griddata_Event(x_0, y_0, z_0, method = method)   
         print('Succesfully ran griddata_Event:')
-        
+        griddata_time = time.time() - self.throw_start_time
         ############################################################################
         #Using interpolated values for further calculations on an event/event basis:
         ############################################################################
+        if use_event_threading == True:
+            futures = []
+            #initiate threads
+            print('Submitting Event Threads')
+            with concurrent.futures.ThreadPoolExecutor(max_workers = self.n_cores) as executor:
+                for ii in range(0, self.n_events):
+                    futures.append(executor.submit(self.event, energy_neutrinos[ii], phi_0[ii], theta_0[ii], x_0[ii], y_0[ii], z_0[ii], \
+                                    ii,inelasticity[ii], anti=anti,electricFieldDomain = electricFieldDomain, \
+                                    include_noise = include_noise,plot_signals=plot_signals,plot_geometry=plot_geometry,\
+                                    summed_signals = summed_signals,trigger_threshold = trigger_threshold, trigger_threshold_units = trigger_threshold_units, \
+                                    plot_filetype_extension=plot_filetype_extension, image_path = image_path,
+                                    random_time_offset = random_time_offsets[ii],\
+                                    dc_offset = dc_offsets[ii], do_beamforming = do_beamforming, output_all_solutions = output_all_solutions,
+                                    pre_trigger_angle = pre_trigger_angle, event_seed = event_seeds[ii]))
+
+            for future in concurrent.futures.as_completed(futures):
+                #Note eventid must be first output for other outputs to use it properly
+                eventid, p_interact[eventid], p_earth[eventid], p_detect[eventid], electric_field_max[eventid], dic_max, observation_angle_max[eventid], \
+                solution_max[eventid], index_station_max[eventid], index_antenna_max[eventid], info[(eventid * self.len_info_per_event ):((eventid+1) * self.len_info_per_event )], \
+                triggered, signals_out = future.result()
+                event_label = 'event%i'%eventid
+                
+                if p_detect[ii] == 1.:
+                    t_max[ii] = dic_max['t']
+                    d_max[ii] = dic_max['d']
+                    theta_ray_max[ii] = dic_max['theta']
+                    theta_ant_max[ii] = dic_max['theta_ant']
+                    a_v_max[ii] = dic_max['a_v']
+                    a_h_max[ii] = dic_max['a_h']
+                    
+                if self.outfile: 
+                    if numpy.logical_and(self.save_signals == True,triggered == True):
+                        #This region I will need to be careful adjustig when/if I add multithreading per event. 
+                        #Note to future self, there is a section in 'Python and HDF5' about multithreading with HDF5
+                        self.file['signals'].create_group(event_label)
+                        for index_station in range(self.config['stations']['n']):
+                            station_label = 'station%i'%index_station
+                            self.file['signals'][event_label].create_dataset(station_label, numpy.shape(signals_out[station_label]), dtype='f', compression='gzip', compression_opts=9, shuffle=True)  
+                            self.file['signals'][event_label][station_label][...] = signals_out[station_label]
+                    
+        else:
+            for ii in range(0, self.n_events):
+                event_label = 'event%i'%ii
+                current_time  = time.time() - self.throw_start_time
+                if (self.n_events//1000 != 0):
+                    if(ii%(self.n_events//1000) == 0):
+                        print ('Event (%i/%i) Time: %0.2f s ( %0.4f h)'%(ii, self.n_events,current_time,current_time/3600.0)) #might want to comment out these print statements to run faster and spew less
+                else:
+                    print ('Event (%i/%i) Time: %0.2f s ( %0.4f h)'%(ii, self.n_events,current_time,current_time/3600.0))
+                
+                eventid, p_interact[ii], p_earth[ii], p_detect[ii], electric_field_max[ii], dic_max, observation_angle_max[ii], \
+                    solution_max[ii], index_station_max[ii], index_antenna_max[ii], info[(ii * self.len_info_per_event ):((ii+1) * self.len_info_per_event )], \
+                    triggered, signals_out \
+                    = self.event(energy_neutrinos[ii], phi_0[ii], theta_0[ii], x_0[ii], y_0[ii], z_0[ii], \
+                                ii,inelasticity[ii], anti=anti,electricFieldDomain = electricFieldDomain, \
+                                include_noise = include_noise,plot_signals=plot_signals,plot_geometry=plot_geometry,\
+                                summed_signals = summed_signals,trigger_threshold = trigger_threshold, trigger_threshold_units = trigger_threshold_units, \
+                                plot_filetype_extension=plot_filetype_extension, image_path = image_path,
+                                random_time_offset = random_time_offsets[ii],\
+                                dc_offset = dc_offsets[ii], do_beamforming = do_beamforming, output_all_solutions = output_all_solutions,
+                                pre_trigger_angle = pre_trigger_angle, event_seed = event_seeds[ii])
+                #print(info[(ii * self.len_info_per_event ):((ii+1) * self.len_info_per_event )])
+                if numpy.logical_and(self.save_signals == True,triggered == True):
+                    #This region I will need to be careful adjustig when/if I add multithreading per event. 
+                    #Note to future self, there is a section in 'Python and HDF5' about multithreading with HDF5
+                    self.file['signals'].create_group(event_label)
+                    for index_station in range(self.config['stations']['n']):
+                        station_label = 'station%i'%index_station
+                        self.file['signals'][event_label].create_dataset(station_label, numpy.shape(signals_out[station_label]), dtype='f', compression='gzip', compression_opts=9, shuffle=True)  
+                        self.file['signals'][event_label][station_label][...] = signals_out[station_label]
+                if p_detect[ii] == 1.:
+                    t_max[ii] = dic_max['t']
+                    d_max[ii] = dic_max['d']
+                    theta_ray_max[ii] = dic_max['theta']
+                    theta_ant_max[ii] = dic_max['theta_ant']
+                    a_v_max[ii] = dic_max['a_v']
+                    a_h_max[ii] = dic_max['a_h']
+            
+        if self.outfile:
+            current_time  = time.time() - self.throw_start_time
+            print('Writing data after %0.3f s'%current_time)
+            self.file['energy_neutrino'][...] = energy_neutrinos
+            self.file['inelasticity'][...] = inelasticity
+            self.file['x_0'][...] = x_0
+            self.file['y_0'][...] = y_0
+            self.file['z_0'][...] = z_0
+            self.file['theta_0'][...] = theta_0
+            self.file['phi_0'][...] = phi_0
+
+            self.file['p_interact'][...] = p_interact
+            self.file['p_earth'][...] = p_earth
+            self.file['p_detect'][...] = p_detect
+
+            self.file['index_station'][...] = index_station_max
+            self.file['index_antenna'][...] = index_antenna_max
+
+            self.file['electric_field'][...] = electric_field_max
+            self.file['observation_angle'][...] = observation_angle_max
+            self.file['solution'][...] = solution_max
+            self.file['t'][...] = t_max
+            self.file['d'][...] = d_max
+            self.file['theta_ray'][...] = theta_ray_max
+            self.file['theta_ant'][...] = theta_ant_max
+            self.file['a_v'][...] = a_v_max
+            self.file['a_h'][...] = a_h_max
+            self.file['info'][...] = info
+            
+            self.file.close()
+    
+            
+        current_time  = time.time() - self.throw_start_time
+        print('Throw finished after %0.3f s'%current_time)
+        print('Time Breakdown:')
+        print('Time performing general prep: %0.3f s'%(general_prep_time))
+        print('Time loading hulls: %0.3f s'%(hull_time - general_prep_time))
+        print('Time interpolating with griddata: %0.3f s'%(griddata_time- hull_time))
+        print('Time in event calculations:  %0.3f s'%(current_time - griddata_time))
+        '''
         for ii in range(0, n_events):
             event_label = 'event%i'%ii
             current_time  = time.time() - throw_start_time
@@ -1350,7 +1497,8 @@ class Sim:
             file['info'][...] = info
 
             file.close()
-
+        '''
+        
 def makeIndexHTML(path = './',filetype = 'svg'):
     '''
     Makes a crude html image browser of the created images.
@@ -1517,8 +1665,8 @@ if __name__ == "__main__":
                  detector_volume_radius=my_sim.config['detector_volume']['radius'],
                  detector_volume_depth=my_sim.config['detector_volume']['depth'],
                  outfile=outfile,seed=seed,electricFieldDomain = 'time',include_noise = True,summed_signals = True, 
-                 plot_geometry = False, plot_signals = False, trigger_threshold = 11500, trigger_threshold_units = 'fpga',
-                 plot_filetype_extension = image_extension,image_path = image_path,use_threading = True,
+                 plot_geometry = False, plot_signals = True, trigger_threshold = 11500, trigger_threshold_units = 'fpga',
+                 plot_filetype_extension = image_extension,image_path = image_path,use_interp_threading = True,use_event_threading = True,
                  do_beamforming = True, n_beams = 15, n_baselines = 2,output_all_solutions = True,save_signals = True,
                  pre_trigger_angle = 10.0)
     
