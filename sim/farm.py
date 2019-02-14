@@ -31,20 +31,24 @@ config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Con
 config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_simple_-1_polar_BW_450-750MHz.py',\
                      '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_simple_-2_polar_BW_450-750MHz.py']
 '''
+
+config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/real_config.py']
+'''
 config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/real_config.py',\
                      '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_dipole_octo_-200_polar_120_rays.py']
-
+'''
 #energy_neutrino_array = 10**numpy.arange(4., 4.4, 0.5) # GeV
 
 #energy_neutrino_array = 10**numpy.arange(7., 12.1, 0.5) # GeV
 #energy_neutrino_array = 10**numpy.array([9.]) # GeV
 #energy_neutrino_array = numpy.array([1e7,1e10])#numpy.rint(10**numpy.arange(4,10.5,0.5)) # GeV
-energy_neutrino_array =  numpy.array([1e7,1e10])#10**numpy.arange(6.5, 11.1, 0.5) # GeV
-cpu_per_task = 8
-n_events = 5000000
-n_trials = 4 # 1, 10
+energy_neutrino_array =  numpy.array([1e8])#10**numpy.arange(6.5, 11.1, 0.5) # GeV
+cpu_per_task = 16
+mem_per_cpu = 1500 #1000 = 1GB, looks like the total MaxRSS for 1M events was 13GB total, so 2000-3000 per cpu for that.  
+n_events = 1000000
+n_trials = 20 # 1, 10
 use_seed = True
-seeds = [0,1,2,3]#IF USING SEEDS THERE NEEDS TO BE n_trials DIFFERENT SEEDS SO YOU DON'T RUN THE SAME SEED MULTIPLE TIMES
+seeds = numpy.arange(n_trials)#[0,1,2,3,4]#IF USING SEEDS THERE NEEDS TO BE n_trials DIFFERENT SEEDS SO YOU DON'T RUN THE SAME SEED MULTIPLE TIMES
 jobname = 'gnosim'
 
 #sinteracsinteractive  --time=08:00:00tive --cpus-per-task=3 --time=08:00:00
@@ -57,7 +61,7 @@ for config_file in config_file_array:
             break
     for energy_neutrino in energy_neutrino_array:
         for index, index_name in enumerate(range(1, n_trials+1)):
-            batch = 'sbatch --cpus-per-task=%i --job-name=%s '%(cpu_per_task, jobname)
+            batch = 'sbatch --cpus-per-task=%i --mem-per-cpu=%i --job-name=%s '%(cpu_per_task,mem_per_cpu, jobname)
             if use_seed == True:
                 command = '/home/dsouthall/Projects/GNOSim/gnosim/sim/antarcticsim.py %s %.2e %i %i %i'%(config_file, energy_neutrino, n_events, index_name, seeds[index])
             else:

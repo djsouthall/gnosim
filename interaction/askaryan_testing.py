@@ -68,7 +68,7 @@ def profile(fnc):
     return inner
 
 
-def loadSignalResponse(mode='v2'):
+def loadSignalResponse(mode='v7'):
     '''
     Returns the fft's of the signals, and their frequencies.  
     Eventually these file locations should be part of the config file such that
@@ -138,14 +138,14 @@ def loadSignalResponse(mode='v2'):
         sys_fft = numpy.ravel(sys_fft)
         freqs =  numpy.ravel(freqs).astype(float)
     else:
-        print('Error, defaulting to loading Signal Response V2')
-        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v2.npy')
-        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_elect_response_v2.npy')
+        print('Error, defaulting to loading Signal Response V7')
+        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v7.npy')
+        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_v7.npy')
         freqs, h_fft = numpy.hsplit(antenna_response, 2)
         freqs, sys_fft = numpy.hsplit(electronic_response, 2)
         h_fft = numpy.ravel(h_fft)
         sys_fft = numpy.ravel(sys_fft)
-        freqs = freqs[:,0]
+        freqs =  numpy.ravel(freqs).astype(float)
     
     #sys_fft = numpy.ones_like(sys_fft) #to look at just one
     #h_fft = numpy.ones_like(h_fft) #to look at just one
@@ -340,7 +340,7 @@ def electricFieldTimeDomainRaw(theta_obs_rad,R,Energy_GeV,n,u,plot = False,deriv
             pylab.plot(u,R*E,label = '$R|\\vec{E}_{raw}|$ ')
     return  E , u
 
-def electricFieldTimeDomainSignal(theta_obs_rad,R,Energy_GeV,n,h_fft=None,sys_fft=None,freqs=None,plot=False,return_pos = False,mode='v2',up_sample_factor=10,deriv_mode = 'time'):  
+def electricFieldTimeDomainSignal(theta_obs_rad,R,Energy_GeV,n,h_fft=None,sys_fft=None,freqs=None,plot=False,return_pos = False,mode='v7',up_sample_factor=10,deriv_mode = 'time'):  
     '''
     Calculates the full electric field, including response function calculations.
     '''

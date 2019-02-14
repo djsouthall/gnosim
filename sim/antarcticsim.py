@@ -96,7 +96,7 @@ class Sim:
         #self.config = eval(''.join(open(config_file).readlines()))
         self.config = yaml.load(open(config_file))
         self.detector()
-        #self.info_dtype = numpy.dtype([('eventid','i'),('station','i'),('antenna','i'),('has_solution','i'),('pre_triggered','i'),('triggered','i'),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('observation_angle','f'),('electric_field','f'),('electric_field_digitized','f'),('dominant_freq','f'),('a_h','f'),('a_v','f'),('SNR','f'),('beam_pattern_factor','f'),('seed','i')])
+        #self.info_dtype = numpy.dtype([('eventid','i'),('station','i'),('antenna','i'),('has_solution','i'),('pre_triggered','i'),('triggered','i'),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('observation_angle','f'),('electric_field','f'),('electric_field_digitized','f'),('dominant_freq','f'),('a_h','f'),('a_v','f'),('SNR','f'),('beam_pattern_factor','f'),('fpga_max','i'),('seed','i')])
         # List attributes of interest
         self.keys = ['t', 'd', 'theta', 'theta_0', 'a_v', 'a_h']
         self.n_antenna = sum([len(self.stations[s].antennas) for s in range(len(self.stations))])
@@ -187,7 +187,7 @@ class Sim:
                     y_antennas[station_wide_solution_index] = self.stations[index_station].antennas[index_antenna].y
                     z_antennas[station_wide_solution_index] = self.stations[index_station].antennas[index_antenna].z
                     thetas_event_deg[station_wide_solution_index] = self.in_dic_array[station_label][antenna_label][solution]['theta'][eventid] #values that fail has_solution_array should already be filled with a -999.0 value from griddata
-                    temporary_info[station_wide_solution_index] = numpy.array([(eventid,index_station,index_antenna,has_solution_array[station_wide_solution_index],0,0,solution,self.in_dic_array[station_label][antenna_label][solution]['t'][eventid],self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],self.in_dic_array[station_label][antenna_label][solution]['theta_ant'][eventid],-999.0,-999.0,-999.0,-999.0,self.in_dic_array[station_label][antenna_label][solution]['a_h'][eventid],self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid],-999.0,-999.0,event_seed)],dtype = self.info_dtype)
+                    temporary_info[station_wide_solution_index] = numpy.array([(eventid,index_station,index_antenna,has_solution_array[station_wide_solution_index],0,0,solution,self.in_dic_array[station_label][antenna_label][solution]['t'][eventid],self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],self.in_dic_array[station_label][antenna_label][solution]['theta_ant'][eventid],-999.0,-999.0,-999.0,-999.0,self.in_dic_array[station_label][antenna_label][solution]['a_h'][eventid],self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid],-999.0,-999.0,-999,event_seed)],dtype = self.info_dtype)
                     
         index_of_refraction_at_neutrino = gnosim.earth.antarctic.indexOfRefraction(z_0, ice_model=self.config['detector_volume']['ice_model'])
         cherenkov_angle_deg = numpy.rad2deg(numpy.arccos(1./index_of_refraction_at_neutrino))
@@ -326,8 +326,8 @@ class Sim:
                     flag_array = []
                     for index_solution,solution in enumerate(self.stations[index_station].antennas[index_antenna].lib.solutions):
                         flag_array.append(self.in_flag_array[station_label][antenna_label][solution][eventid])
-                        #self.info_dtype = numpy.dtype([('eventid','i'),('station','i'),('antenna','i'),('has_solution','i'),('pre_triggered','i'),('triggered','i'),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('observation_angle','f'),('electric_field','f'),('electric_field_digitized','f'),('dominant_freq','f'),('a_h','f'),('a_v','f'),('SNR','f'),('beam_pattern_factor','f'),('seed','i')])
-                        temporary_info[station_wide_antenna_index * len (self.stations[index_station].antennas[index_antenna].lib.solutions) + index_solution] = numpy.array([(eventid,index_station,index_antenna,0,0,0,solution,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,event_seed)],dtype = self.info_dtype)
+                        #self.info_dtype = numpy.dtype([('eventid','i'),('station','i'),('antenna','i'),('has_solution','i'),('pre_triggered','i'),('triggered','i'),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('observation_angle','f'),('electric_field','f'),('electric_field_digitized','f'),('dominant_freq','f'),('a_h','f'),('a_v','f'),('SNR','f'),('beam_pattern_factor','f'),('fpga_max','i'),('seed','i')])
+                        temporary_info[station_wide_antenna_index * len (self.stations[index_station].antennas[index_antenna].lib.solutions) + index_solution] = numpy.array([(eventid,index_station,index_antenna,0,0,0,solution,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999,event_seed)],dtype = self.info_dtype)
                     '''
                     
                     #flag_array = temporary_info[ numpy.logical_and(temporary_info['station'] == index_station, temporary_info['antenna'] == index_antenna)]['has_solution']
@@ -354,7 +354,7 @@ class Sim:
                                 #print(observation_angle)
                                 #d = self.in_dic_array[station_label][antenna_label][solution]['d'][eventid] # m
                                 #self.in_dic_array[station_label][antenna_label][solution]['theta_ant'][eventid]
-                                #self.info_dtype = numpy.dtype([('eventid','i'),('station','i'),('antenna','i'),('has_solution','i'),('pre_triggered','i'),('triggered','i'),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('observation_angle','f'),('electric_field','f'),('electric_field_digitized','f'),('dominant_freq','f'),('a_h','f'),('a_v','f'),('SNR','f'),('beam_pattern_factor','f'),('seed','i')])
+                                #self.info_dtype = numpy.dtype([('eventid','i'),('station','i'),('antenna','i'),('has_solution','i'),('pre_triggered','i'),('triggered','i'),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('observation_angle','f'),('electric_field','f'),('electric_field_digitized','f'),('dominant_freq','f'),('a_h','f'),('a_v','f'),('SNR','f'),('beam_pattern_factor','f'),('fpga_max','i'),('seed','i')])
                                 
                                 d = temporary_info[ solution_cut ]['distance'] #m
                                 theta_ant_deg = temporary_info[ solution_cut ]['theta_ant'] #deg
@@ -416,7 +416,7 @@ class Sim:
                                 else:
                                     if electricFieldDomain != 'freq':
                                         print('Electric field domain selection did not fit one of the\ntwo expected values.  Defaulting to freq.')
-                                    
+                                        sys.stdout.flush()
                                     frequency = numpy.linspace(self.stations[index_station].antennas[index_antenna].frequency_low,
                                                self.stations[index_station].antennas[index_antenna].frequency_high,
                                                100) # GHz
@@ -429,9 +429,8 @@ class Sim:
                                     electric_array, electric_field, dominant_freq = self.stations[index_station].antennas[index_antenna].totalElectricField(frequency, electric_field, theta_ant_deg) # V m^-1 #THIS WAS CHANGED THETA WAS ADDED
                                     SNR = -999.
                                     electric_field_digitized = -999.
-                                #self.info_dtype = numpy.dtype([('eventid','i'),('station','i'),('antenna','i'),('has_solution','i'),('pre_triggered','i'),('triggered','i'),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('observation_angle','f'),('electric_field','f'),('electric_field_digitized','f'),('dominant_freq','f'),('a_h','f'),('a_v','f'),('SNR','f'),('beam_pattern_factor','f')]) 
-                                #temporary_info[total_solution_index] = numpy.array([(temporary_info[total_solution_index]['eventid'],temporary_info[total_solution_index]['station'],temporary_info[total_solution_index]['antenna'],temporary_info[total_solution_index]['has_solution'],temporary_info[total_solution_index]['pre_triggered'],0,solution,self.in_dic_array[station_label][antenna_label][solution]['t'][eventid],self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],theta_ant_deg,observation_angle,electric_field,electric_field_digitized,dominant_freq,self.in_dic_array[station_label][antenna_label][solution]['a_h'][eventid],self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid],SNR,beam_pattern_factor),('seed','i')],dtype = self.info_dtype)
-                                #temporary_info[station_wide_solution_index] = numpy.array([(eventid,index_station,index_antenna,has_solution_array[station_wide_solution_index],0,0,solution,self.in_dic_array[station_label][antenna_label][solution]['t'][eventid],self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],self.in_dic_array[station_label][antenna_label][solution]['theta_ant'][eventid],-999.0,-999.0,-999.0,-999.0,self.in_dic_array[station_label][antenna_label][solution]['a_h'][eventid],self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid],-999.0,-999.0,event_seed)],dtype = self.info_dtype)
+                                #temporary_info[total_solution_index] = numpy.array([(temporary_info[total_solution_index]['eventid'],temporary_info[total_solution_index]['station'],temporary_info[total_solution_index]['antenna'],temporary_info[total_solution_index]['has_solution'],temporary_info[total_solution_index]['pre_triggered'],0,solution,self.in_dic_array[station_label][antenna_label][solution]['t'][eventid],self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],theta_ant_deg,observation_angle,electric_field,electric_field_digitized,dominant_freq,self.in_dic_array[station_label][antenna_label][solution]['a_h'][eventid],self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid],SNR,beam_pattern_factor),('fpga_max','i'),('seed','i')],dtype = self.info_dtype)
+                                #temporary_info[station_wide_solution_index] = numpy.array([(eventid,index_station,index_antenna,has_solution_array[station_wide_solution_index],0,0,solution,self.in_dic_array[station_label][antenna_label][solution]['t'][eventid],self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],self.in_dic_array[station_label][antenna_label][solution]['theta_ant'][eventid],-999.0,-999.0,-999.0,-999.0,self.in_dic_array[station_label][antenna_label][solution]['a_h'][eventid],self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid],-999.0,-999.0,-999,event_seed)],dtype = self.info_dtype)
                                 
                                 temporary_info[total_solution_index]['electric_field']           = electric_field
                                 temporary_info[total_solution_index]['electric_field_digitized'] = electric_field_digitized
@@ -464,7 +463,7 @@ class Sim:
                         #This event has no solution for this antenna
                         #has_solution = 0
                         solution_type_max = self.stations[index_station].antennas[index_antenna].lib.solutions[0]
-                        #info[ sum([len(self.stations[s].antennas) for s in range(0,index_station)]) + index_antenna] = numpy.array([(eventid,index_station,index_antenna,has_solution,0,0,'',-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,event_seed)],dtype = self.info_dtype)
+                        #info[ sum([len(self.stations[s].antennas) for s in range(0,index_station)]) + index_antenna] = numpy.array([(eventid,index_station,index_antenna,has_solution,0,0,'',-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999.0,-999,event_seed)],dtype = self.info_dtype)
                     
                     #Temporary_info but only the max solution type.  Should defult to the first solution type, with values already filled out previously to be filler values
                     info[ sum([len(self.stations[s].antennas) for s in range(0,index_station)]) + index_antenna] = temporary_info[numpy.logical_and(numpy.logical_and(temporary_info['station'] == index_station,temporary_info['antenna'] == index_antenna),temporary_info['solution'] == solution_type_max.encode() )] #numpy.array(temporary_info['solution']).astype(str) == solution_type_max
@@ -561,6 +560,8 @@ class Sim:
                             #right now I am just testing that they can be calculate without breaking the simulation.
                             #Right now I am only storing the 3 highest values.  It is likely that I want to store every beam
                             #that satisfies the trigger condiditon?
+                            temporary_info['fpga_max'] = top_vals[0]
+                            info['fpga_max'] = top_vals[0]
                         
                         if trigger_threshold_units == 'adu':
                             if numpy.size(V_out) > 0:
@@ -590,6 +591,7 @@ class Sim:
                         signals_out[station_label] = numpy.vstack((Vd_out_sync, ud_out_sync[0,:]))
                         
                         print('Triggered on event %i at Time: %0.3f'%(eventid,time.time() - self.throw_start_time))
+                        sys.stdout.flush()
                         if plot_geometry == True:
                             origin = []
                             
@@ -605,7 +607,7 @@ class Sim:
                                         pylab.close(fig)
                                     except:
                                         print('Failed to save image %s%s_all_antennas-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension))
-
+                                        sys.stdout.flush()
                         
                         
                         if numpy.logical_and(electricFieldDomain == 'time',plot_signals == True):
@@ -795,6 +797,7 @@ class Sim:
                                     #print('Saved image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
                                 except:
                                     print('Failed to save image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
+                                    sys.stdout.flush()
                     else:
                         info['triggered'] = False
                         temporary_info['triggered'] = False
@@ -961,6 +964,7 @@ class Sim:
                     print('\t\t%s : %i/%i'%(solution,min(left_event+events_per_calc,len(z_query)),len(z_query)))
                     left_event += events_per_calc
             print('Done Interpolation for:', antenna_label)
+            sys.stdout.flush()
             return out_dic_array, out_flag_array
     
     def multiThreadGridDataEvent(self, x_query, y_query , z_query, method = 'cubic',n_cores = 4):
@@ -989,6 +993,7 @@ class Sim:
                     r_query = numpy.sqrt((x_query - x_antenna)**2 + (y_query - y_antenna)**2)
                     thread_results[station_label][antenna_label] = executor.submit(self.singleAntennaGridDataEvent, r_query , z_query, index_station, station_label, index_antenna, antenna_label, method = 'cubic')
         print('Weaving threads')
+        sys.stdout.flush()
         #write outputs of threads
         self.in_dic_array = {}
         self.in_flag_array = {}
@@ -1000,6 +1005,7 @@ class Sim:
                 self.in_dic_array[station_label][antenna_label] , self.in_flag_array[station_label][antenna_label]  = thread_results[station_label][antenna_label].result()
             
         print('Finished griddata_Event in ', time.time() - griddata_initate_time, 's')
+        sys.stdout.flush()
     
     def runEvent(self,energy_neutrino, phi_0, theta_0, x_0, y_0, z_0,eventid,inelasticity,**kwargs):
         '''
@@ -1037,11 +1043,13 @@ class Sim:
                 print('WARNING!!!')
                 print('THRESHOLD GIVEN IN UNITS FOR FPGA, BUT BEAMFORMING NOT ENABLED')
                 print('ENABLEING BEAMFORMING')
+                sys.stdout.flush()
                 do_beamforming = True
             if electricFieldDomain == 'freq':
                 print('WARNING!!!')
                 print('THRESHOLD GIVEN IN UNITS FOR FPGA, FREQ DOMAIN DOES NOT SUPPORT THIS')
                 print('BREAKING')
+                sys.stdout.flush()
                 return 0
             
         self.outfile = outfile
@@ -1160,6 +1168,7 @@ class Sim:
                 self.sys_fft = numpy.multiply(self.sys_fft,freqs_cut) #This forces a strong bandwidth cut which makes signals that are dominant in low frequency below the band width not be dominated by the noise in that region over the response.  
         
             print('Preparing digitization')
+            sys.stdout.flush()
             #The following is for digitization.  
         
             random_time_offsets = numpy.random.uniform(-1, 1, size=self.n_events)
@@ -1206,7 +1215,7 @@ class Sim:
             self.len_info_per_event = len(self.solutions)*self.n_antenna
         #For more info about the below type of dtype check out HDF5's discussion of them in 
         #O'Reilly, Python and HDF5: Chapter 7. More About Types - Compound Types
-        self.info_dtype = numpy.dtype([('eventid','i'),('station',numpy.uint16),('antenna',numpy.uint16),('has_solution',numpy.bool_),('pre_triggered',numpy.bool_),('triggered',numpy.bool_),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('observation_angle','f'),('electric_field','f'),('electric_field_digitized','f'),('dominant_freq','f'),('a_h','f'),('a_v','f'),('SNR','f'),('beam_pattern_factor','f'),('seed',numpy.uint32)])
+        self.info_dtype = numpy.dtype([('eventid','i'),('station',numpy.uint16),('antenna',numpy.uint16),('has_solution',numpy.bool_),('pre_triggered',numpy.bool_),('triggered',numpy.bool_),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('observation_angle','f'),('electric_field','f'),('electric_field_digitized','f'),('dominant_freq','f'),('a_h','f'),('a_v','f'),('SNR','f'),('beam_pattern_factor','f'),('fpga_max','i'),('seed',numpy.uint32)])
         p_interact = numpy.zeros(self.n_events)
         p_earth = numpy.zeros(self.n_events)
         p_detect = numpy.zeros(self.n_events)
@@ -1231,10 +1240,16 @@ class Sim:
             #self.file.attrs['geometric_factor'] = (4. * numpy.pi) * (numpy.pi * detector_volume_radius**2 * detector_volume_depth) # m^3 sr
             # ORIGINAL 28 MAY 2014
             # NEW CURVATURE
+            if (seed != None):
+                self.file.attrs['seed'] = seed
+            else:
+                self.file.attrs['seed'] = 'None'
+            
             self.file.attrs['geometric_factor'] = (4. * numpy.pi) \
                                              * (2. * numpy.pi * gnosim.utils.constants.radius_earth**2 \
                                                 * (1. - numpy.cos(detector_volume_radius / gnosim.utils.constants.radius_earth))\
-                                                * detector_volume_depth) # m^3 sr
+                                                * detector_volume_depth) # m^3 sr not that the 2 pi (1 - cos theta) is the area of a cap, that is then multiplied by a differential depth (depth of ice) to get volume, then 4 pi to get m^3 sr
+                                                
             # NEW CURVATURE
 
             self.file.attrs['config'] = self.config_file
@@ -1297,6 +1312,7 @@ class Sim:
         
         hull_time = time.time() - self.throw_start_time
         print('About to run griddata_Event:')
+        sys.stdout.flush()
         ############################################################################
         #Interpolating values from using griddata:
         ############################################################################
@@ -1315,6 +1331,7 @@ class Sim:
             futures = []
             #initiate threads
             print('Submitting Event Threads')
+            sys.stdout.flush()
             with concurrent.futures.ThreadPoolExecutor(max_workers = self.n_cores) as executor:
                 for ii in range(0, self.n_events):
                     futures.append(executor.submit(self.event, energy_neutrinos[ii], phi_0[ii], theta_0[ii], x_0[ii], y_0[ii], z_0[ii], \
@@ -1332,6 +1349,9 @@ class Sim:
                 solution_max[eventid], index_station_max[eventid], index_antenna_max[eventid], info[(eventid * self.len_info_per_event ):((eventid+1) * self.len_info_per_event )], \
                 triggered, signals_out = future.result()
                 event_label = 'event%i'%eventid
+                
+                if eventid%1000 == 0:
+                    sys.stdout.flush()
                 
                 if p_detect[ii] == 1.:
                     t_max[ii] = dic_max['t']
@@ -1352,15 +1372,18 @@ class Sim:
                             self.file['signals'][event_label][station_label][...] = signals_out[station_label]
                     
         else:
+            print('Running Events')
+            sys.stdout.flush()
             for ii in range(0, self.n_events):
                 event_label = 'event%i'%ii
                 current_time  = time.time() - self.throw_start_time
                 if (self.n_events//1000 != 0):
                     if(ii%(self.n_events//1000) == 0):
                         print ('Event (%i/%i) Time: %0.2f s ( %0.4f h)'%(ii, self.n_events,current_time,current_time/3600.0)) #might want to comment out these print statements to run faster and spew less
+                        sys.stdout.flush()
                 else:
                     print ('Event (%i/%i) Time: %0.2f s ( %0.4f h)'%(ii, self.n_events,current_time,current_time/3600.0))
-                
+                    sys.stdout.flush()
                 eventid, p_interact[ii], p_earth[ii], p_detect[ii], electric_field_max[ii], dic_max, observation_angle_max[ii], \
                     solution_max[ii], index_station_max[ii], index_antenna_max[ii], info[(ii * self.len_info_per_event ):((ii+1) * self.len_info_per_event )], \
                     triggered, signals_out \
@@ -1388,34 +1411,99 @@ class Sim:
                     theta_ant_max[ii] = dic_max['theta_ant']
                     a_v_max[ii] = dic_max['a_v']
                     a_h_max[ii] = dic_max['a_h']
-            
+        sys.stdout.flush()
+                
         if self.outfile:
-            current_time  = time.time() - self.throw_start_time
-            print('Writing data after %0.3f s'%current_time)
+            print('Writing data after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
+            
+            print('Writing energy_neutrino after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['energy_neutrino'][...] = energy_neutrinos
+            
+            print('Writing inelasticity after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['inelasticity'][...] = inelasticity
+            
+            print('Writing x_0 after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['x_0'][...] = x_0
+            
+            print('Writing y_0 after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['y_0'][...] = y_0
+            
+            print('Writing z_0 after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['z_0'][...] = z_0
+            
+            print('Writing theta_0 after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['theta_0'][...] = theta_0
+            
+            print('Writing phi_0 after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['phi_0'][...] = phi_0
+            
 
+            print('Writing p_interact after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['p_interact'][...] = p_interact
+            
+            print('Writing p_earth after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['p_earth'][...] = p_earth
+            
+            print('Writing p_detect after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['p_detect'][...] = p_detect
 
+            print('Writing index_station after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['index_station'][...] = index_station_max
+            
+            print('Writing index_antenna after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['index_antenna'][...] = index_antenna_max
 
+            print('Writing electric_field after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['electric_field'][...] = electric_field_max
+            
+            print('Writing observation_angle after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['observation_angle'][...] = observation_angle_max
+            
+            print('Writing solution types after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['solution'][...] = solution_max
+            
+            print('Writing t after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['t'][...] = t_max
+            
+            print('Writing d after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['d'][...] = d_max
+            
+            print('Writing theta_ray after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['theta_ray'][...] = theta_ray_max
+            
+            print('Writing theta_ant after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['theta_ant'][...] = theta_ant_max
+            
+            print('Writing a_v after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['a_v'][...] = a_v_max
+            
+            print('Writing a_h after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['a_h'][...] = a_h_max
+            
+            print('Writing info after %0.3f s'%(time.time() - self.throw_start_time))
+            sys.stdout.flush()
             self.file['info'][...] = info
             
             self.file.close()
@@ -1428,76 +1516,6 @@ class Sim:
         print('Time loading hulls: %0.3f s'%(hull_time - general_prep_time))
         print('Time interpolating with griddata: %0.3f s'%(griddata_time- hull_time))
         print('Time in event calculations:  %0.3f s'%(current_time - griddata_time))
-        '''
-        for ii in range(0, n_events):
-            event_label = 'event%i'%ii
-            current_time  = time.time() - throw_start_time
-            if (n_events//1000 != 0):
-                if(ii%(n_events//1000) == 0):
-                    print ('Event (%i/%i) Time: %0.2f s ( %0.4f h)'%(ii, n_events,current_time,current_time/3600.0)) #might want to comment out these print statements to run faster and spew less
-            else:
-                print ('Event (%i/%i) Time: %0.2f s ( %0.4f h)'%(ii, n_events,current_time,current_time/3600.0))
-            p_interact[ii], p_earth[ii], p_detect[ii], electric_field_max[ii], dic_max, observation_angle_max[ii], \
-            solution_max[ii], index_station_max[ii], index_antenna_max[ii], info[(ii * len_info_per_event ):((ii+1) * len_info_per_event )], \
-            triggered, signals_out \
-                = self.event(energy_neutrinos[ii], phi_0[ii], theta_0[ii], x_0[ii], y_0[ii], z_0[ii], \
-                            ii,inelasticity[ii], anti=anti,electricFieldDomain = electricFieldDomain, \
-                            include_noise = include_noise,plot_signals=plot_signals,plot_geometry=plot_geometry,\
-                            summed_signals = summed_signals,trigger_threshold = trigger_threshold, trigger_threshold_units = trigger_threshold_units, \
-                            plot_filetype_extension=plot_filetype_extension, image_path = image_path,
-                            random_time_offset = random_time_offsets[ii],\
-                            dc_offset = dc_offsets[ii], do_beamforming = do_beamforming, output_all_solutions = output_all_solutions,
-                            pre_trigger_angle = pre_trigger_angle, event_seed = event_seeds[ii])
-            #print(info[(ii * len_info_per_event ):((ii+1) * len_info_per_event )])
-            if numpy.logical_and(save_signals == True,triggered == True):
-                #This region I will need to be careful adjustig when/if I add multithreading per event. 
-                #Note to future self, there is a section in 'Python and HDF5' about multithreading with HDF5
-                file['signals'].create_group(event_label)
-                for index_station in range(self.config['stations']['n']):
-                    station_label = 'station%i'%index_station
-                    file['signals'][event_label].create_dataset(station_label, numpy.shape(signals_out[station_label]), dtype='f', compression='gzip', compression_opts=9, shuffle=True)  
-                    file['signals'][event_label][station_label][...] = signals_out[station_label]
-            if p_detect[ii] == 1.:
-                t_max[ii] = dic_max['t']
-                d_max[ii] = dic_max['d']
-                theta_ray_max[ii] = dic_max['theta']
-                theta_ant_max[ii] = dic_max['theta_ant']
-                a_v_max[ii] = dic_max['a_v']
-                a_h_max[ii] = dic_max['a_h']
-        
-        cut = (p_detect == 1.)
-        cut_inv = numpy.logical_not(cut)
-        
-        
-        if outfile:
-            file['energy_neutrino'][...] = energy_neutrinos
-            file['inelasticity'][...] = inelasticity
-            file['x_0'][...] = x_0
-            file['y_0'][...] = y_0
-            file['z_0'][...] = z_0
-            file['theta_0'][...] = theta_0
-            file['phi_0'][...] = phi_0
-
-            file['p_interact'][...] = p_interact
-            file['p_earth'][...] = p_earth
-            file['p_detect'][...] = p_detect
-
-            file['index_station'][...] = index_station_max
-            file['index_antenna'][...] = index_antenna_max
-
-            file['electric_field'][...] = electric_field_max
-            file['observation_angle'][...] = observation_angle_max
-            file['solution'][...] = solution_max
-            file['t'][...] = t_max
-            file['d'][...] = d_max
-            file['theta_ray'][...] = theta_ray_max
-            file['theta_ant'][...] = theta_ant_max
-            file['a_v'][...] = a_v_max
-            file['a_h'][...] = a_h_max
-            file['info'][...] = info
-
-            file.close()
-        '''
         
 def makeIndexHTML(path = './',filetype = 'svg'):
     '''
@@ -1613,9 +1631,17 @@ if __name__ == "__main__":
     #solutions = numpy.array(['cross'])
     #detector_volume_radius = float(sys.argv[5]) # m, 1200 for Ross surface, 51000 for Minna bluff, >6000 for subterranean
     #detector_volume_depth = float(sys.argv[6]) # m, 500 for Ross and Minna, 3000 for subterranean
-
+    if len(sys.argv) == 6:
+        seed = int(sys.argv[5])
+        print('Using seed from sys.argv[5]: ', seed)
+    else:
+        seed = None
+        if seed == None:
+            print('Using no seed')
+        else:
+            print('Using internally (antarcticsim.py) defined seed: ', seed)
     #SEED FOR TESTNG:
-    seed = 1#None
+    #seed = 1#None
     config_file_fix = config_file.replace('/home/dsouthall/Projects/GNOSim/','')
     config_file_fix = config_file_fix.replace('gnosim/sim/ConfigFiles/Config_dsouthall/','')
     config_file_fix = config_file_fix.replace('./','')
@@ -1661,15 +1687,16 @@ if __name__ == "__main__":
     #all of these assume time domain, as the freq domain portion of the code is not maintained. 
     
     #Used for testing: 10 adu, 11500 fpga, 11342 fpga for 10Hz noise triggering
+    sys.stdout.flush()
     my_sim.throw(energy_neutrino, n_events=n_events,
                  detector_volume_radius=my_sim.config['detector_volume']['radius'],
                  detector_volume_depth=my_sim.config['detector_volume']['depth'],
                  outfile=outfile,seed=seed,electricFieldDomain = 'time',include_noise = True,summed_signals = True, 
-                 plot_geometry = False, plot_signals = True, trigger_threshold = 11500, trigger_threshold_units = 'fpga',
+                 plot_geometry = False, plot_signals = False, trigger_threshold = 11500, trigger_threshold_units = 'fpga',
                  plot_filetype_extension = image_extension,image_path = image_path,use_interp_threading = True,use_event_threading = True,
-                 do_beamforming = True, n_beams = 15, n_baselines = 2,output_all_solutions = True,save_signals = True,
-                 pre_trigger_angle = 10.0)
-    
+                 do_beamforming = True, n_beams = 15, n_baselines = 2,output_all_solutions = True,save_signals = False,
+                 pre_trigger_angle = None)
+    sys.stdout.flush()
     #For pulser location that Kaeli is looking at:
     #r_vertex = numpy.array([5214.0]), phi_vertex = numpy.array([0.0]), z_0 = numpy.array([-1450.0])
     
@@ -1688,7 +1715,7 @@ if __name__ == "__main__":
     except Exception as e:
         print('Something went wrong in making index.html')
         print(e)
-    
+    sys.stdout.flush()
     #python /home/dsouthall/Projects/GNOSim/sim/antarcticsim.py config energy n_events index 
     #python /home/dsouthall/Projects/GNOSim/gnosim/sim/antarcticsim.py /home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_octo_-200_polar_120_rays.py 1.0e8 50000 1 
     #f.close()
