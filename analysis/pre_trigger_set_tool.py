@@ -20,12 +20,14 @@ pylab.ion()
 ############################################################
 
 if __name__ == "__main__":
-    load_reader = True
-    load_values = True
+    load_reader = False
+    load_values = False
+    
+    weight_by_p_earth = True
     
     plot_1 = True
     plot_2 = False
-    calculate_cuts = True
+    calculate_cuts = False
     start_time = time.time()
     if load_reader == True:
         print('(%0.2f s)'%(time.time() - start_time) + '	Loading Reader')    
@@ -41,16 +43,30 @@ if __name__ == "__main__":
         
         print('(%0.2f s)'%(time.time() - start_time) + '	Calculating ed_ratio') 
         ed_ratio = energies / info['distance']
+        if weight_by_p_earth == True:
+            p_earth = reader['p_earth'][...][info['eventid']]
     for trigger_level in numpy.array([11500]):
         print('(%0.2f s)'%(time.time() - start_time) + '	On trigger level:', trigger_level)
         bins = [1000,360]
-        w1 = numpy.ones_like(info['fpga_max'])
-        w2 = info['fpga_max'] > trigger_level
+        
+        if weight_by_p_earth == True:
+            w1 = p_earth
+            w2 = numpy.multiply(info['fpga_max'] > trigger_level,p_earth)
+            w1 = numpy.multiply(w1,w1 > 1e-2)
+            w2 = numpy.multiply(w2,w2 > 1e-2)
+        else:
+            w1 = numpy.ones_like(info['fpga_max'])
+            w2 = info['fpga_max'] > trigger_level
+        
         
         if plot_1 == True:
             hist_fig = pylab.figure(figsize=(16.,11.2))
             x = energies
-            hist_fig.suptitle('Trigger = %0.1f'%trigger_level)
+            if weight_by_p_earth == True:
+                hist_fig.suptitle('Trigger = %0.1f (Weighted by $p_\mathrm{earth}$'%trigger_level)
+            else:
+                hist_fig.suptitle('Trigger = %0.1f'%trigger_level)
+            
             ax1 = pylab.subplot(2,3,1)
             
             pylab.hist2d(x,info['observation_angle'],bins=bins,weights = w1,norm=LogNorm())
@@ -129,24 +145,42 @@ if __name__ == "__main__":
             
             angle_secondary_cut = numpy.logical_and(info['observation_angle'] > angle_range_secondary[0], info['observation_angle'] < angle_range_secondary[-1])
             ed_ratio_secondary_cut = numpy.logical_and(ed_ratio > ed_ratio_range_secondary[0], ed_ratio < ed_ratio_range_secondary[-1])
+            
             secondary_cut = numpy.logical_and(angle_secondary_cut,ed_ratio_secondary_cut)
-            secondary_cut = numpy.isin(info['eventid'],info['eventid'][secondary_cut])
+            secondary_cut = numpy.isin(info['eventid'],info['eventid'][secondary_cut]) #Any event with ANYTHING passing pretrigger passes
+            
             cone_cut = numpy.logical_and(info['observation_angle'] > angle_range_cone[0], info['observation_angle'] < angle_range_cone[-1])
-            cone_cut = numpy.isin(info['eventid'],info['eventid'][cone_cut])
+            cone_cut = numpy.isin(info['eventid'],info['eventid'][cone_cut]) #Any event with ANYTHING passing pretrigger passes
+            
             total_cut = numpy.logical_or(secondary_cut,cone_cut)
             
-            #If only high cut
-            print('With a pre trigger cut on angles between %0.2f and %0.2f degrees (cone cut) you would see:'%(angle_range_cone[0],angle_range_cone[-1]))
-            print('(cone cut) Percentage of events with solutions that would be calculated: %0.3f'%( 100 * numpy.sum(cone_cut) / len(info)))
-            print('(cone cut) Percentage of events that are calculated that would have triggered at %i: %0.3f '%(trigger_level,100 * numpy.sum(info['fpga_max'][cone_cut] > trigger_level) / numpy.sum(info['fpga_max'] > trigger_level)))
-            
-            print('With a pre trigger cut on angles between %0.2f and %0.2f degrees, as well as \na cut on the ed_ratio range from %0.3g to %0.3g (energy/distance cut) you would see:'%(angle_range_secondary[0],angle_range_secondary[-1], ed_ratio_range_secondary[0], ed_ratio_range_secondary[-1]))
-            print('(energy/distance cut) Percentage of events with solutions that would be calculated: %0.3f'%( 100 * numpy.sum(secondary_cut) / len(info)))
-            print('(energy/distance cut) Percentage of events that are calculated that would have triggered at %i: %0.3f '%(trigger_level,100 * numpy.sum(info['fpga_max'][secondary_cut] > trigger_level) / numpy.sum(info['fpga_max'] > trigger_level)))
-            
-            print('With both pre triggers applied (passes if either passes) you would see:')
-            print('Percentage of events with solutions that would be calculated: %0.3f'%( 100 * numpy.sum(total_cut) / len(info)))
-            print('Percentage of events that are calculated that would have triggered at %i: %0.3f '%(trigger_level,100 * numpy.sum(info['fpga_max'][total_cut] > trigger_level) / numpy.sum(info['fpga_max'] > trigger_level)))
+            if weight_by_p_earth == True:
+                p_earth_sum = numpy.sum(p_earth)
+                print('Calculations below made using p_earth as a weight')
+                print('With a pre trigger cut on angles between %0.2f and %0.2f degrees (cone cut) you would see:'%(angle_range_cone[0],angle_range_cone[-1]))
+                print('(cone cut) Percentage of events with solutions that would be calculated: %0.3f'%( 100 * numpy.sum(p_earth[cone_cut]) / p_earth_sum))
+                print('(cone cut) Weighted Percentage of events that are calculated that would have triggered at %i: %0.3f '%(trigger_level,100 * numpy.sum(p_earth[cone_cut][info['fpga_max'][cone_cut] > trigger_level]) / numpy.sum(p_earth[info['fpga_max'] > trigger_level])))
+                
+                print('With a pre trigger cut on angles between %0.2f and %0.2f degrees, as well as \na cut on the ed_ratio range from %0.3g to %0.3g (energy/distance cut) you would see:'%(angle_range_secondary[0],angle_range_secondary[-1], ed_ratio_range_secondary[0], ed_ratio_range_secondary[-1]))
+                print('(energy/distance cut) Percentage of events with solutions that would be calculated: %0.3f'%( 100 * numpy.sum(p_earth[secondary_cut]) / p_earth_sum))
+                print('(energy/distance cut) Weighted Percentage of events that are calculated that would have triggered at %i: %0.3f '%(trigger_level,100 * numpy.sum(p_earth[secondary_cut][info['fpga_max'][secondary_cut] > trigger_level]) / numpy.sum(p_earth[info['fpga_max'] > trigger_level])))
+                
+                print('With both pre triggers applied (passes if either passes) you would see:')
+                print('Percentage of events with solutions that would be calculated: %0.3f'%( 100 * numpy.sum(p_earth[total_cut]) / p_earth_sum))
+                print('Weighted Percentage of events that are calculated that would have triggered at %i: %0.3f '%(trigger_level,100 * numpy.sum(p_earth[total_cut][info['fpga_max'][total_cut] > trigger_level]) / numpy.sum(p_earth[info['fpga_max'] > trigger_level])))
+            else:
+                print('With a pre trigger cut on angles between %0.2f and %0.2f degrees (cone cut) you would see:'%(angle_range_cone[0],angle_range_cone[-1]))
+                print('(cone cut) Percentage of events with solutions that would be calculated: %0.3f'%( 100 * numpy.sum(cone_cut) / len(info)))
+                print('(cone cut) Percentage of events that are calculated that would have triggered at %i: %0.3f '%(trigger_level,100 * numpy.sum(info['fpga_max'][cone_cut] > trigger_level) / numpy.sum(info['fpga_max'] > trigger_level)))
+                
+                print('With a pre trigger cut on angles between %0.2f and %0.2f degrees, as well as \na cut on the ed_ratio range from %0.3g to %0.3g (energy/distance cut) you would see:'%(angle_range_secondary[0],angle_range_secondary[-1], ed_ratio_range_secondary[0], ed_ratio_range_secondary[-1]))
+                print('(energy/distance cut) Percentage of events with solutions that would be calculated: %0.3f'%( 100 * numpy.sum(secondary_cut) / len(info)))
+                print('(energy/distance cut) Percentage of events that are calculated that would have triggered at %i: %0.3f '%(trigger_level,100 * numpy.sum(info['fpga_max'][secondary_cut] > trigger_level) / numpy.sum(info['fpga_max'] > trigger_level)))
+                
+                print('With both pre triggers applied (passes if either passes) you would see:')
+                print('Percentage of events with solutions that would be calculated: %0.3f'%( 100 * numpy.sum(total_cut) / len(info)))
+                print('Percentage of events that are calculated that would have triggered at %i: %0.3f '%(trigger_level,100 * numpy.sum(info['fpga_max'][total_cut] > trigger_level) / numpy.sum(info['fpga_max'] > trigger_level)))
+                         
             
     
     

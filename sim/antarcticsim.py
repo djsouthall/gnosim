@@ -593,15 +593,16 @@ class Sim:
                         print('Triggered on event %i at Time: %0.3f'%(eventid,time.time() - self.throw_start_time))
                         sys.stdout.flush()
                         if plot_geometry == True:
+                            '''
                             origin = []
                             
                             for index_antenna in info[info['has_solution'] == True]['antenna']:
                                 origin.append([self.stations[index_station].antennas[index_antenna].x,self.stations[index_station].antennas[index_antenna].y,self.stations[index_station].antennas[index_antenna].z])
-                            
+                            '''
                             neutrino_loc = [x_0, y_0, z_0]
                             if len(info[info['has_solution'] == True]) > 0:
                                 with self.lock:
-                                    fig = gnosim.trace.refraction_library_beta.plotGeometry(origin,neutrino_loc,phi_0,temporary_info[numpy.logical_and(temporary_info['has_solution'] == True,temporary_info['station'] == index_station)])
+                                    fig = gnosim.trace.refraction_library_beta.plotGeometry(self.config,neutrino_loc,phi_0,temporary_info[numpy.logical_and(temporary_info['has_solution'] == True,temporary_info['station'] == index_station)])
                                     try:
                                         fig.savefig('%s%s_all_antennas-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
                                         pylab.close(fig)
@@ -1695,7 +1696,7 @@ if __name__ == "__main__":
                  plot_geometry = False, plot_signals = False, trigger_threshold = 11500, trigger_threshold_units = 'fpga',
                  plot_filetype_extension = image_extension,image_path = image_path,use_interp_threading = True,use_event_threading = True,
                  do_beamforming = True, n_beams = 15, n_baselines = 2,output_all_solutions = True,save_signals = False,
-                 pre_trigger_angle = None)
+                 pre_trigger_angle = 10.0)
     sys.stdout.flush()
     #For pulser location that Kaeli is looking at:
     #r_vertex = numpy.array([5214.0]), phi_vertex = numpy.array([0.0]), z_0 = numpy.array([-1450.0])

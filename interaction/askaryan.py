@@ -672,6 +672,7 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
             V_noise = numpy.fft.fftshift(V_noise)
     
     if include_noise == True:
+        #I should move this calculation to outside of the function.  Return p2p and then divide by the same rms for each event rather than calculate each time
         V_rms_measured = numpy.sqrt(numpy.mean((V_noise - V_noiseless)**2)) #This is the 'measured' V_rms, rather than the set.  This is after system response
         SNR = (p2p_half/V_rms_measured)**2
         #SNR_dB = 10*numpy.log10( SNR )#dB, using 10log10 because input is power ratio 
@@ -708,10 +709,10 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
             pylab.figure(figsize=(16.,11.2))
             ax = pylab.subplot(211)
             pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f\tt_step = %g ns'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n,t_step),fontsize=20)
-            pylab.ylabel('Noiseless Signal Voltage (V)')
-            pylab.xlabel('t (ns)')
+            pylab.ylabel('Noiseless Signal Voltage (V)',fontsize=16)
+            pylab.xlabel('t (ns)',fontsize=16)
             #pylab.scatter(u,V,s=1)
-            pylab.plot(u,V_noiseless)
+            pylab.plot(u[plot_cut],V_noiseless[plot_cut])
             
             pylab.subplot(212,sharex = ax)
             pylab.ylabel('Signal Voltage (V)')
@@ -734,15 +735,24 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
                 #pylab.scatter(u,R*E_raw,s=1)
                 pylab.plot(u,R*E_raw)
             
-            pylab.figure(figsize=(16.,11.2))
+            '''
+            fig = pylab.figure(figsize=(16.,11.2))
             pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f\tt_step = %g ns'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n,t_step),fontsize=20)
             #pylab.subplot(313,sharex = ax)
-            pylab.ylabel('Noiseless Signal Voltage (V)')
-            pylab.xlabel('t (ns)')
+            pylab.ylabel('Noiseless Signal Voltage (V)',fontsize=20)
+            pylab.xlabel('t (ns)',fontsize=20)
             #pylab.scatter(u,V,s=1)
-            pylab.plot(u,V_noiseless)
+            #plot_cut = u>0
+            #pylab.plot(u[plot_cut],V_noiseless[plot_cut],linewidth=5)
+            ax = pylab.gca()
+            ax.tick_params(axis = 'both',labelsize = 14)
+            pylab.subplots_adjust(left = 0.09, bottom = 0.06, right = 0.97, top = 0.97, wspace = 0.20, hspace = 0.20)
+            #fig.patch.set_alpha(0.)
+            #ax.patch.set_alpha(0.)
+            '''
+            
     if plot_spectrum == True:
-        pylab.figure(figsize=(16.,11.2))
+        fig_spec = pylab.figure(figsize=(16.,11.2))
         pylab.title('MAGNITUDE E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n))
         scatter = False
         
@@ -791,17 +801,18 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
             signal_gain *= 2.0 # Because the rfft is missing half the power
             signal_gain *= t_step**2
         ##
-        
+        linewidth = 5 
+        markersize = 4
         if scatter == True:
-            pylab.scatter(freqs/1e6,10.0 * numpy.log10(raw_signal_gain),label='Raw Signal (fft)', color = 'blue')
-            pylab.scatter(freqs/1e6,10.0 * numpy.log10(sys_gain),label='System Response (fft)', color = 'darkorange')
-            pylab.scatter(freqs/1e6,10.0 * numpy.log10(h_gain),label='Antenna Response (fft)', color = 'limegreen')
-            pylab.scatter(freqs/1e6,10.0 * numpy.log10(signal_gain),label='Processed Signal (fft)', color = 'red')
+            #pylab.scatter(freqs/1e6,10.0 * numpy.log10(raw_signal_gain),label='Raw Signal (fft)', color = 'blue',s = markersize)
+            pylab.scatter(freqs/1e6,10.0 * numpy.log10(sys_gain),label='System Response (fft)', color = 'darkorange',s = markersize)
+            pylab.scatter(freqs/1e6,10.0 * numpy.log10(h_gain),label='Antenna Response (fft)', color = 'limegreen',s = markersize)
+            #pylab.scatter(freqs/1e6,10.0 * numpy.log10(signal_gain),label='Processed Signal (fft)', color = 'red',s = markersize)
         else:
-            pylab.plot(freqs/1e6,10.0 * numpy.log10(raw_signal_gain),label='Raw Signal (fft)', color = 'blue')
-            pylab.plot(freqs/1e6,10.0 * numpy.log10(sys_gain),label='System Response (fft)', color = 'darkorange')
-            pylab.plot(freqs/1e6,10.0 * numpy.log10(h_gain),label='Antenna Response (fft)', color = 'limegreen')
-            pylab.plot(freqs/1e6,10.0 * numpy.log10(signal_gain),label='Processed Signal (fft)', color = 'red')
+            #pylab.plot(freqs/1e6,10.0 * numpy.log10(raw_signal_gain),label='Raw Signal (fft)', color = 'blue',linewidth = linewidth)
+            pylab.plot(freqs/1e6,10.0 * numpy.log10(sys_gain),label='System Response (fft)', color = 'darkorange',linewidth = linewidth)
+            pylab.plot(freqs/1e6,10.0 * numpy.log10(h_gain),label='Antenna Response (fft)', color = 'limegreen',linewidth = linewidth)
+            #pylab.plot(freqs/1e6,10.0 * numpy.log10(signal_gain),label='Processed Signal (fft)', color = 'red',linewidth = linewidth)
         
         pylab.ylabel("Realized Gain [dBi] (Signals in arb)",fontsize=16)
         pylab.xlabel('Freq. [MHz]',fontsize=16)
@@ -809,8 +820,13 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
         pylab.ylim(-75,75)
         pylab.xlim(0,1000)
         pylab.minorticks_on()
-        pylab.grid(which="both")
+        #pylab.grid(which="both")
         pylab.legend(fontsize=14)
+        ax = pylab.gca()
+        ax.tick_params(axis = 'both',labelsize = 16)
+        pylab.subplots_adjust(left = 0.09, bottom = 0.06, right = 0.97, top = 0.97, wspace = 0.20, hspace = 0.20)
+        #fig_spec.patch.set_alpha(0.)
+        #ax.patch.set_alpha(0.)
     if plot_angles == True:
         pylab.figure(figsize=(16.,11.2))
         ax = pylab.subplot(2,1,1)

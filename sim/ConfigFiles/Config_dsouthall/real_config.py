@@ -14,7 +14,7 @@
  'antenna_definitions': {'dipole0': {'lib': '/home/dsouthall/Projects/GNOSim/library_-173_polar_180_rays/*.h5',
                                     'frequency_low': 0.1, # GHz
                                     'frequency_high': 0.8, # GHz
-                                    'temp': 320.,#K
+                                    'temp': 320.,#K  #Temperatures need to be double checked in code to see if they are being used
                                     'resistance':50},
                         'dipole1': {'lib': '/home/dsouthall/Projects/GNOSim/library_-174_polar_180_rays/*.h5',
                                     'frequency_low': 0.1, # GHz

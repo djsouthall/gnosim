@@ -363,36 +363,62 @@ def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1., r_limit = None):
         theta_array[0: n_steps], a_v_array[0: n_steps], a_h_array[0: n_steps], \
         index_reflect_air, index_reflect_water)
 
-def plotGeometry(origin,neutrino_loc,phi_0,info):
+def plotGeometry(config,neutrino_loc,phi_0,info):
     '''
     origin shuold be of the form [[x_0, y_0, z_0],[x_1, y_1, z_1],[x_2, y_2, z_2]]
     neutrino_loc should be similar but for neutrino location but [x, y, z]
     
     '''
+    '''
     if len(numpy.shape(origin)) == 1:
         origin = [origin] #this is sloppy and might break
     #might want to do some check here to make sure values are all floats
-    neutrino_loc_r = numpy.sqrt(neutrino_loc[0]**2 + neutrino_loc[1]**2)
-    if len(numpy.unique(info['eventid'])) == 1:
-        eventid = numpy.unique(info['eventid'])[0]
-        fig = pylab.figure(figsize=(16.,11.2)) #my screensize
-        pylab.title('Event %i'%(eventid))
-        sub_info = numpy.unique(info[info['eventid'] == eventid])
-        for index_antenna,antenna in enumerate(numpy.unique(sub_info['antenna'])): 
-            origin_r = numpy.sqrt(origin[index_antenna][0]**2 + origin[index_antenna][1]**2)
-            ssub_info = sub_info[sub_info['antenna'] == antenna]
-            for index_solution, solution in enumerate(ssub_info['solution']):
-                x, y, z, t, d, phi, theta, a_v, a_h, index_reflect_air, index_reflect_water = rayTrace(origin[index_antenna], phi_0, ssub_info['theta_ant'][ssub_info['solution'] == solution], r_limit = 1.01*neutrino_loc_r)
-                r = numpy.sqrt(x**2 + y**2)
-                label = 'A%i %s'%(antenna,solution)
-                pylab.plot(r,z,label=label)
-            pylab.scatter(origin_r,origin[index_antenna][2],label='Antenna %i'%(antenna))
-        pylab.scatter(neutrino_loc_r,neutrino_loc[2],label='Neutrino Loc',marker = '*',color = 'k')
-        pylab.legend()
+    '''
+    if type(config) == dict:
+        linestyle_dict = {'direct':(0, ()),'cross':(0, (3, 1, 1, 1)),'reflect':(0, (1, 1)),'direct_2':(0, (5, 1)),'cross_2':(0, (3, 5, 1, 5)),'reflect_2':(0, (1, 5))}
+        neutrino_loc_r = numpy.sqrt(neutrino_loc[0]**2 + neutrino_loc[1]**2)
+        if len(numpy.unique(info['eventid'])) == 1:
+            eventid = numpy.unique(info['eventid'])[0]
+            fig = pylab.figure(figsize=(16.,11.2)) #my screensize
+            pylab.title('Event %i'%(eventid))
+            sub_info = numpy.unique(info[info['eventid'] == eventid])
+            for index_station in numpy.unique(sub_info['station']):
+                station_cut = sub_info['station'] == index_station
+                station_loc = numpy.array(config['stations']['positions'][index_station])
+                colormap = pylab.cm.gist_ncar #nipy_spectral, Set1,Paired   
+                antenna_colors = [colormap(i) for i in numpy.linspace(0, 1,len(numpy.unique(sub_info['antenna']))+1)]
+                for i, index_antenna in enumerate(numpy.unique(sub_info['antenna'])):
+                    antenna_cut = sub_info['antenna'] == index_antenna
+                    #cut = numpy.logical_and(station_cut,antenna_cut)
+                    antenna_loc = numpy.add(numpy.array(config['antennas']['positions'][index_antenna]),station_loc)
+                    origin_r = numpy.sqrt(antenna_loc[0]**2 + antenna_loc[1]**2)
+                    ssub_info = sub_info[numpy.logical_and(station_cut,antenna_cut)]
+                    for index_solution, solution in enumerate(ssub_info['solution']):
+                        x, y, z, t, d, phi, theta, a_v, a_h, index_reflect_air, index_reflect_water = rayTrace(antenna_loc, phi_0, ssub_info['theta_ant'][ssub_info['solution'] == solution], r_limit = 1.001*neutrino_loc_r)
+                        r = numpy.sqrt(x**2 + y**2)
+                        label = 'S%iA%i %s'%(index_station,index_antenna,solution.decode())
+                        if numpy.isin(solution.decode(),list(linestyle_dict.keys())):
+                            style = linestyle_dict[solution.decode()]
+                        else:
+                            style = '-'
+                        pylab.plot(r,z,label=label,color=antenna_colors[i],linestyle = style)
+                    pylab.scatter(origin_r,antenna_loc[2],label='Antenna %i'%(index_antenna),color=antenna_colors[i],marker = 'd',s = 100)
+            pylab.scatter(neutrino_loc_r,neutrino_loc[2],label='Neutrino Loc',marker = '*',color = 'k',s = 100)
+            pylab.legend(fontsize = 14)
+            pylab.xlabel('r(m)',fontsize=20)
+            pylab.ylabel('z(m)',fontsize=20)
+            ax = pylab.gca()
+            ax.tick_params(axis = 'both',labelsize = 14)
+            pylab.subplots_adjust(left = 0.07, bottom = 0.06, right = 0.97, top = 0.97, wspace = 0.20, hspace = 0.20)
+            #fig.patch.set_alpha(0.)
+            #ax.patch.set_alpha(0.)
+            return fig
+        else:
+            print('Info should be input with only one event, otherwise this breaks')
+            return
     else:
-        print('Info should be input with only one event, otherwise this breaks')
+        print('Input \'config\' in plotGeometry is not a dict, breaking')
         return
-    return fig
 ############################################################
 
 def makeLibrary(z_0, theta_ray_array, save=True, library_dir='library',r_limit = None):

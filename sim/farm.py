@@ -42,7 +42,7 @@ config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Con
 #energy_neutrino_array = 10**numpy.arange(7., 12.1, 0.5) # GeV
 #energy_neutrino_array = 10**numpy.array([9.]) # GeV
 #energy_neutrino_array = numpy.array([1e7,1e10])#numpy.rint(10**numpy.arange(4,10.5,0.5)) # GeV
-energy_neutrino_array =  numpy.array([1e8])#10**numpy.arange(6.5, 11.1, 0.5) # GeV
+energy_neutrino_array =  10**numpy.arange(7., 12.1, 0.5)#10**numpy.arange(6.5, 11.1, 0.5) # GeV
 cpu_per_task = 16
 mem_per_cpu = 1500 #1000 = 1GB, looks like the total MaxRSS for 1M events was 13GB total, so 2000-3000 per cpu for that.  
 n_events = 1000000

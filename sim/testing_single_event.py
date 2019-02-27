@@ -247,15 +247,17 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                 print('Triggered on event %i'%eventid)
                 signals_out[station_label] = numpy.vstack((Vd_out_sync, ud_out_sync[0,:]))
                 if plot_geometry == True:
+                    '''
                     origin = []
                     for index_antenna in info[info['has_solution'] == 1]['antenna']:
                         station_loc = numpy.array(config['stations']['positions'][index_station],dtype=float)
                         antenna_loc = numpy.add(numpy.array(config['antennas']['positions'][index_antenna],dtype=float),station_loc)
                         origin.append(list(antenna_loc))
-                    
+                    '''
                     neutrino_loc = numpy.array([x_0, y_0, z_0],dtype=float)
                     if len(info[info['has_solution'] == 1]) > 0:
-                        fig = gnosim.trace.refraction_library_beta.plotGeometry(origin,neutrino_loc,phi_0,info[numpy.logical_and(info['has_solution'] == 1,info['station'] == index_station)])
+                        fig = gnosim.trace.refraction_library_beta.plotGeometry(config,neutrino_loc,phi_0,info[numpy.logical_and(info['has_solution'] == 1,info['station'] == index_station)])
+                        #fig.savefig('./%i-geometry.svg'%eventid,bbox_inches=0,transparent=True)
                         '''
                         try:
                             fig.savefig('%s%s_all_antennas-event%i.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
@@ -268,6 +270,7 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                 if plot_signals == True:
                     #might need to account for when signals are not present in certain detectors
                     #print('Attempting to plot', eventid)
+                    clearbg = False
                     temporary_info = numpy.zeros(config['antennas']['n'],info.dtype)      
                     for index_antenna in range(0, config['antennas']['n']):
                         antenna_label = config['antennas']['types'][index_antenna]
@@ -279,8 +282,11 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                             sub_info = info[solution_cut]
                             temporary_info
                     
-                    fig = pylab.figure(figsize=(16.,11.2)) #my screensize
-                    
+                    if clearbg:
+                        fig = pylab.figure(figsize=(16.,11.2)) #my screensize
+                        fig.patch.set_alpha(0.)
+                        ax = pylab.gca()
+                        ax.patch.set_alpha(0.)
                     n_rows = config['antennas']['n']
                     ntables = 4 #With below lines is 5 for beamforming == True
                     height_ratios = [2,2,n_rows+1,n_rows+1]
@@ -315,16 +321,20 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                             pylab.title('Event %i, summed_signals = %s'%(eventid,boolstring[int(summed_signals)])) 
                         ax1.plot(time_analog[station_label][antenna_label],V_analog[station_label][antenna_label],label='s%ia%i'%(index_station,index_antenna),linewidth=0.6,c = c1)
                         ax2.plot(time_digital[station_label][antenna_label],V_digital[station_label][antenna_label],label='s%ia%i'%(index_station,index_antenna),linewidth=0.4,c = c2)
-                        
                         if ( n_rows // 2 == index_antenna):
                             ax1.set_ylabel('V$_{%i}$ (V)'%(eventid),fontsize=12, color=c1)
                             ax2.set_ylabel('adu',fontsize=12, color=c2)
                             
                         ax1.legend(fontsize=8,framealpha=0.0,loc='upper left')
                         ax1.tick_params('y', colors=c1)
+                        ax1.tick_params(axis='x', labelbottom=False)
                         
                         ax2.legend(fontsize=8,framealpha=0.0,loc='upper right')
                         ax2.tick_params('y', colors=c2)
+                        #ax2.tick_params(axis='x', labelbottom=False)
+                        if clearbg:
+                            ax1.patch.set_alpha(0.)
+                            ax2.patch.set_alpha(0.)
                         ax1_ylim = numpy.array(ax1.get_ylim())
                         
                         if ax1_ylim[0] < max_ax1_range[0]:
@@ -334,7 +344,9 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                             
                     for ax2 in axis2:
                         ax2.set_ylim(max_ax1_range * scale_noise_to / noise_rms)
-                        
+                    
+                    pylab.xlabel('t-t_emit (ns)',fontsize=12)
+                    ax1.tick_params(axis='x', labelbottom=True) #Should just be the last one
                     pylab.xlabel('t-t_emit (ns)',fontsize=12)
                     
                     #Making Tables
@@ -343,6 +355,9 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                     
                     table_ax = pylab.gca()
                     table_fig.patch.set_visible(False)
+                    if clearbg:
+                        table_fig.patch.set_alpha(0.)
+                        table_ax.patch.set_alpha(0.)
                     table_ax.axis('off')
                     table_ax.axis('tight')
                     x_neutrino = x_0
@@ -374,7 +389,9 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                     table_fig.patch.set_visible(False)
                     table_ax.axis('off')
                     table_ax.axis('tight')
-                    
+                    if clearbg:
+                        table_fig.patch.set_alpha(0.)
+                        table_ax.patch.set_alpha(0.)
                     df = pandas.DataFrame({'E$_\\nu$ (GeV)':'%0.4g'%(energy_neutrino) , 'Inelasticity':'%0.4g'%inelasticity , 'p_interact':'%0.4g'%p_interact, 'p_earth':'%0.4g'%p_earth},index=[0])
                     #decimals = pandas.Series([3,3,3,3],index = df.columns)
                     table = pylab.table(cellText = df.values , colLabels = df.columns, loc = 'center')
@@ -390,6 +407,9 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                     table_fig.patch.set_visible(False)
                     table_ax.axis('off')
                     table_ax.axis('tight')
+                    if clearbg:
+                        table_fig.patch.set_alpha(0.)
+                        table_ax.patch.set_alpha(0.)
                     antenna =           ['%i'%i for i in temporary_info['antenna'].astype(int)]
                     observation_angle = ['%0.5g'%i for i in temporary_info['observation_angle'].astype(float)]
                     theta_ant =         ['%0.5g'%i for i in temporary_info['theta_ant'].astype(float)]
@@ -419,6 +439,9 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                     table_fig.patch.set_visible(False)
                     table_ax.axis('off')
                     table_ax.axis('tight')
+                    if clearbg:
+                        table_fig.patch.set_alpha(0.)
+                        table_ax.patch.set_alpha(0.)
                     antenna =           ['%i'%i for i in temporary_info['antenna'].astype(int)]
                     electric_field =    ['%0.3g'%i for i in temporary_info['electric_field'].astype(float)]
                     dom_freqs =         ['%0.3g'%i for i in (temporary_info['dominant_freq']/1e6).astype(float)]
@@ -458,8 +481,34 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                         #pylab.legend(loc='upper right', bbox_to_anchor=(1.05, 0.5))
                         #table_ax.axis('tight')
                         
-                    pylab.subplots_adjust(left = 0.05, bottom = 0.05, right = 0.99, top = 0.97, wspace = 0.15, hspace = 0.28)
+                    pylab.subplots_adjust(left = 0.05, bottom = 0.05, right = 0.99, top = 0.97, wspace = 0.15, hspace = 0.08)
+                    plot_beams_seperately = False
+                    if clearbg:
+                        table_fig.patch.set_alpha(0.)
+                        table_ax.patch.set_alpha(0.)
+                    if plot_beams_seperately == True:
+                        table_fig2 = pylab.figure(figsize=(16.,11.2))
+                                
+                        colormap = pylab.cm.gist_ncar #nipy_spectral, Set1,Paired   
+                        beam_colors = [colormap(i) for i in numpy.linspace(0, 1,len(beam_dict['beams'].keys())+1)] #I put the +1 backs it was making the last beam white, hopefully if I put this then the last is still white but is never called
+                        
+                        table_ax = pylab.gca()
+                        table_fig2.patch.set_visible(True)
+                        if clearbg:
+                            table_fig.patch.set_alpha(0.)
+                            table_ax.patch.set_alpha(0.)
+                        for beam_index, beam_label in enumerate(beam_dict['beams'].keys()):
+                            table_ax.plot(beam_powersums[beam_label],label = '%s, $\\theta_{ant} = $ %0.2f'%(beam_label,beam_dict['theta_ant'][beam_label]),color = beam_colors[beam_index],linewidth=5)
+                        pylab.yticks(rotation=45)
+                        table_ax.legend(loc='upper left',fontsize=16)
+                        table_fig2.patch.set_alpha(0.)
+                        table_ax.patch.set_alpha(0.)
+                        table_ax.tick_params(axis = 'both',labelsize = 14)
+                        pylab.ylabel('Beam Power Sum Units (adu$^2$)',fontsize=16)
+                        pylab.xlabel('Sum Bin (arb)',fontsize=16)
+                        pylab.subplots_adjust(left = 0.09, bottom = 0.06, right = 0.97, top = 0.97, wspace = 0.20, hspace = 0.08)
                     #pylab.show(block=True)
+                    #fig.savefig('./%i-signals.svg'%eventid,bbox_inches=0,transparent=True)
                     '''
                     try:
                         pylab.savefig('%s%s-event%i.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
@@ -551,7 +600,7 @@ def plotFromReader(reader,eventid,trigger_threshold_units = 'fpga', trigger_thre
                         
                         neutrino_loc = [x_0, y_0, z_0]
                         if len(info[info['has_solution'] == 1]) > 0:
-                            fig = gnosim.trace.refraction_library_beta.plotGeometry(origin,neutrino_loc,phi_0,info[numpy.logical_and(info['has_solution'] == 1,info['station'] == index_station)])
+                            fig = gnosim.trace.refraction_library_beta.plotGeometry(config,neutrino_loc,phi_0,info[numpy.logical_and(info['has_solution'] == 1,info['station'] == index_station)])
                     
                     if plot_signals == True:
                         #might need to account for when signals are not present in certain detectors
@@ -728,7 +777,21 @@ def plotFromReader(reader,eventid,trigger_threshold_units = 'fpga', trigger_thre
                             #table_ax.axis('tight')
                             
                         pylab.subplots_adjust(left = 0.05, bottom = 0.05, right = 0.99, top = 0.97, wspace = 0.15, hspace = 0.28)
-                        #pylab.show(block=True)
+                        
+                        
+                        
+                        table_fig2 = pylab.figure()
+                            
+                        colormap = pylab.cm.gist_ncar #nipy_spectral, Set1,Paired   
+                        beam_colors = [colormap(i) for i in numpy.linspace(0, 1,len(beam_dict['beams'].keys())+1)] #I put the +1 backs it was making the last beam white, hopefully if I put this then the last is still white but is never called
+                        
+                        table_ax = pylab.gca()
+                        table_fig2.patch.set_visible(True)
+                        
+                        for beam_index, beam_label in enumerate(beam_dict['beams'].keys()):
+                            table_ax.plot(beam_powersums[beam_label],label = '%s, $\\theta_{ant} = $ %0.2f'%(beam_label,beam_dict['theta_ant'][beam_label]),color = beam_colors[beam_index])
+                        pylab.yticks(rotation=45)
+                        table_ax.legend(loc='center left', bbox_to_anchor=(0.95, 0.5))
                         '''
                         try:
                             pylab.savefig('%s%s-event%i.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
@@ -762,12 +825,7 @@ def plotFromReader(reader,eventid,trigger_threshold_units = 'fpga', trigger_thre
 if __name__ == "__main__":
     pylab.close('all')
     
-    #reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_100_events_1_seed_10.h5' , 'r')
-    
-    #reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_1000_events_1_seed_2.h5' , 'r')
-    #reader = h5py.File('' , 'r')
-    #reader = h5py.File('/home/dsouthall/scratch-midway2/results_2019_Feb_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_50000_events_1_seed_3.h5' , 'r')
-    reader = h5py.File('/home/dsouthall/scratch-midway2/results_2019_Feb_real_config_1.00e+07_GeV_1000000_events_4_seed_5.h5' , 'r')
+    reader = h5py.File('/home/dsouthall/scratch-midway2/feb_testing_real_config_108/raw/results_2019_Feb_real_config_1.00e+08_GeV_1000000_events_0_seed_1.h5' , 'r')
     #reader2 = h5py.File('./results_2019_Feb_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_1002_events_1_seed_4.h5' , 'r')
     
     #reader_kaeli = h5py.File('./results_2019_Jan_real_config_3.00e+09_GeV_1_events_1_seed_1.h5' , 'r')
@@ -794,11 +852,11 @@ if __name__ == "__main__":
     use_redo = True
     
     multi_plot_signals = True
-    plot_geometry = True
+    plot_geometry = False
     
     #The three single_ plots correspond to plots in gnosim.interaction.askaryan.quickSignalSingle
-    single_plot_signals   = False
-    single_plot_spectrum  = False
+    single_plot_signals   = True
+    single_plot_spectrum  = True
     single_plot_angles  = False
     single_plot_potential = False
     
@@ -839,7 +897,7 @@ if __name__ == "__main__":
             print('This drew an error')
             print('defaulting to eventids = numpy.array([])')
             do_events = numpy.array([])
-    
+    do_events = numpy.array([641654])
     random_time_offsets = numpy.random.uniform(-1, 1, size=len(n_array))
     ###########################
     input_u, h_fft, sys_fft, freqs = gnosim.interaction.askaryan.calculateTimes(up_sample_factor=up_sample_factor,mode = signal_response_version)

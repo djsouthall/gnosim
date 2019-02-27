@@ -187,7 +187,7 @@ def getBeams( config, n_beams, n_baselines , n , dt ,power_calculation_sum_lengt
                 
             #print('gnosim.utils.constants.speed_light * ms[beam_index] * dt  / ( n * baseline)',gnosim.utils.constants.speed_light * ms[beam_index] * dt  / ( n * baseline))
             #theta_elevation = 0
-            theta_elevation = numpy.rad2deg(numpy.arcsin(gnosim.utils.constants.speed_light * ms[beam_index] * dt  / ( n * baseline) ))
+            theta_elevation = numpy.rad2deg(numpy.arcsin(gnosim.utils.constants.speed_light * ms[beam_index] * dt  / ( n * baseline) ))  #Double check this calculation!
             theta_ant = 90.0-theta_elevation
             #time_delays = numpy.array( ms[beam_index]  * relative_antenna_depths[subbeam],dtype=int) 
             time_delays = numpy.array( ms[beam_index]  * ((relative_antenna_depths[subbeam] - relative_antenna_depths[subbeam][0])//baseline),dtype=int) 
