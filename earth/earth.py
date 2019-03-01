@@ -9,6 +9,7 @@ import pylab
 import gnosim.earth.prem
 import gnosim.interaction.cross_section
 import gnosim.utils.constants
+import gnosim.earth.ice
 
 pylab.ion()
 
@@ -55,11 +56,11 @@ def interactionLength(density_input, energy_neutrino_array, plot=False):
 
 ############################################################
 
-def probSurvival(energy_neutrino, theta, elevation=0., anti=False, plot=False):
+def probSurvival(energy_neutrino, theta, ice, elevation=0., anti=False, plot=False):
     """
     energy_neutrino = neutrino energy (GeV)
     theta = zenith angle (deg)
-
+    ice should be an Ice object from the gnosim.earth.ice file.
     Returns:
     Survival probability of neutrino passing through the Earth
     """
@@ -88,7 +89,7 @@ def probSurvival(energy_neutrino, theta, elevation=0., anti=False, plot=False):
 
     r_earth = numpy.sqrt(x_earth**2 + y_earth**2 + z_earth**2) # m
 
-    f_density = gnosim.earth.prem.prem() #no randomness
+    f_density = gnosim.earth.prem.prem(ice) #no randomness
     density = f_density(r_earth) # nucleons m^-3
 
     # OLD
@@ -277,22 +278,22 @@ def plotSampling(detector_volume_radius, n_events=1000000, detector_volume_depth
 
 ############################################################
 
-def probInteract(energy_neutrino, elevation, anti=False):
+def probInteract(energy_neutrino, density, anti=False):
     """
     energy_neutrino = neutrino energy (GeV)
-    elevation = elevation of neutrino interaction (m)
+    density = density at elevation of neutrino interaction in nucleons m^-3
     anti = True -> anti-neutrino
 
-    Returns:
+    Returns: 
     probability to interact in a sphere containing a cubic meter of ice
     """
-    volume_sphere = 1. # m^3
+    volume_sphere = 1. # m^3 
     radius_sphere = (3. * volume_sphere / (4. * numpy.pi))**(1. / 3.)
     characteristic_length = (4. / 3.) * radius_sphere
 
     total_cross_section = gnosim.interaction.cross_section.totalCrossSection(energy_neutrino, anti=anti) # m^2
-    density = gnosim.earth.greenland.density(elevation) # nucleons m^-3
-    return 1. - numpy.exp(-1. * characteristic_length * density * total_cross_section)
+    #Look into python 1- exponential function, because this has large error 
+    return 1. - numpy.exp(-1. * characteristic_length * density * total_cross_section) 
 
 ############################################################
 
@@ -301,14 +302,15 @@ if __name__ == "__main__":
     #theta_array = numpy.linspace(0, 180 + 1.e-10, 1000)
     cos_theta_array = numpy.linspace(1., -1., 1000)
     theta_array = numpy.degrees(numpy.arccos(cos_theta_array))
-
+    ice_model = 'antarctica'
+    ice = gnosim.earth.ice.Ice(ice_model)
     pylab.figure()
     survival_array = []
     for energy_neutrino in energy_neutrino_array:
         print ('Energy neutrino = %e'%(energy_neutrino))
         survival_array.append([])
         for theta in theta_array:
-            survival_array[-1].append(probSurvival(energy_neutrino, theta))
+            survival_array[-1].append(probSurvival(energy_neutrino, theta,ice))
         pylab.plot(cos_theta_array, survival_array[-1], c='blue')
     pylab.title('Neutrinos')
     pylab.xlabel('Cos(Zenith Angle)')
@@ -320,7 +322,7 @@ if __name__ == "__main__":
         print ('Energy neutrino = %e'%(energy_neutrino))
         survival_anti_array.append([])
         for theta in theta_array:
-            survival_anti_array[-1].append(probSurvival(energy_neutrino, theta, anti=True))
+            survival_anti_array[-1].append(probSurvival(energy_neutrino, theta, ice, anti=True))
         pylab.plot(cos_theta_array, survival_anti_array[-1], c='blue')
     pylab.title('Anti-Neutrinos')
     pylab.xlabel('Cos(Zenith Angle)')

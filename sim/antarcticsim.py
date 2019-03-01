@@ -31,7 +31,7 @@ import threading
 sys.path.append("/home/dsouthall/Projects/GNOSim/")
 import gnosim.utils.quat
 import gnosim.earth.earth
-import gnosim.earth.antarctic
+import gnosim.earth.ice
 import gnosim.trace.refraction_library_beta
 #from gnosim.trace.refraction_library_beta import *
 import gnosim.interaction.askaryan
@@ -95,6 +95,7 @@ class Sim:
         self.pre_split = pre_split
         #self.config = eval(''.join(open(config_file).readlines()))
         self.config = yaml.load(open(config_file))
+        self.ice = gnosim.earth.ice.Ice(self.config['detector_volume']['ice_model'])
         self.detector()
         #self.info_dtype = numpy.dtype([('eventid','i'),('station','i'),('antenna','i'),('has_solution','i'),('pre_triggered','i'),('triggered','i'),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('observation_angle','f'),('electric_field','f'),('electric_field_digitized','f'),('dominant_freq','f'),('a_h','f'),('a_v','f'),('SNR','f'),('beam_pattern_factor','f'),('fpga_max','i'),('seed','i')])
         # List attributes of interest
@@ -189,7 +190,7 @@ class Sim:
                     thetas_event_deg[station_wide_solution_index] = self.in_dic_array[station_label][antenna_label][solution]['theta'][eventid] #values that fail has_solution_array should already be filled with a -999.0 value from griddata
                     temporary_info[station_wide_solution_index] = numpy.array([(eventid,index_station,index_antenna,has_solution_array[station_wide_solution_index],0,0,solution,self.in_dic_array[station_label][antenna_label][solution]['t'][eventid],self.in_dic_array[station_label][antenna_label][solution]['d'][eventid],self.in_dic_array[station_label][antenna_label][solution]['theta_ant'][eventid],-999.0,-999.0,-999.0,-999.0,self.in_dic_array[station_label][antenna_label][solution]['a_h'][eventid],self.in_dic_array[station_label][antenna_label][solution]['a_v'][eventid],-999.0,-999.0,-999,event_seed)],dtype = self.info_dtype)
                     
-        index_of_refraction_at_neutrino = gnosim.earth.antarctic.indexOfRefraction(z_0, ice_model=self.config['detector_volume']['ice_model'])
+        index_of_refraction_at_neutrino = self.ice.indexOfRefraction(z_0)
         cherenkov_angle_deg = numpy.rad2deg(numpy.arccos(1./index_of_refraction_at_neutrino))
         rs = numpy.sqrt((x_0 - x_antennas)**2 + (y_0 - y_antennas)**2)
         phi_rays = numpy.degrees(numpy.arctan2(y_0 - y_antennas, x_0 - x_antennas)) % 360. # deg
@@ -223,11 +224,11 @@ class Sim:
         SNR_max = -999.
         signals_out = {}
         #Note p_interact has no random component
-        p_interact = gnosim.earth.earth.probInteract(energy_neutrino, z_0, anti=anti) #Should not use effective_energy_neutrino, as that only becomes effective AFTER interaction, these test if there is an interaction at all
+        p_interact = gnosim.earth.earth.probInteract(energy_neutrino, self.ice.density(z_0), anti=anti) #Should not use effective_energy_neutrino, as that only becomes effective AFTER interaction, these test if there is an interaction at all
         
         # Probability for neutrino to make it through the Earth
         #note p_earth has no random components
-        p_earth = gnosim.earth.earth.probSurvival(energy_neutrino, theta_0, elevation=z_0, anti=anti) #Should not use effective_energy_neutrino, as that only becomes effective AFTER interaction, these test if there is an interaction at all
+        p_earth = gnosim.earth.earth.probSurvival(energy_neutrino, theta_0,self.ice, elevation=z_0, anti=anti) #Should not use effective_energy_neutrino, as that only becomes effective AFTER interaction, these test if there is an interaction at all
 
         
         #Only do triggering if any pass pre_trigger
@@ -257,23 +258,7 @@ class Sim:
             #Calculating the times to digitize the signal in advance, should be done after a pretrigger
             minimum_time = 1e20
             maximum_time = -1e20
-            #can probably be done quicker from temporary_info['time'][temporary_info['has_solution'] == 1]
-            # Loop over stations
-            '''
-            for index_station in range(0, len(self.stations)):
-                # Loop over station antennas
-                station_label = 'station'+str(index_station)
-                for index_antenna in range(0, len(self.stations[index_station].antennas)):
-                    antenna_label = self.config['antennas']['types'][index_antenna]
-                    for solution in self.stations[index_station].antennas[index_antenna].lib.solutions:
-                        if self.in_flag_array[station_label][antenna_label][solution][eventid]:
-                            if minimum_time > self.signal_times[0] + self.in_dic_array[station_label][antenna_label][solution]['t'][eventid]:
-                                minimum_time = self.signal_times[0] + self.in_dic_array[station_label][antenna_label][solution]['t'][eventid]
-                            if maximum_time < self.signal_times[-1] + self.in_dic_array[station_label][antenna_label][solution]['t'][eventid]:
-                                maximum_time = self.signal_times[-1] + self.in_dic_array[station_label][antenna_label][solution]['t'][eventid]
-                            #minimum_time = numpy.min([minimum_time,self.signal_times[0] + self.in_dic_array[station_label][antenna_label][solution]['t'][eventid]])
-                            #maximum_time = numpy.max([maximum_time,self.signal_times[-1] + self.in_dic_array[station_label][antenna_label][solution]['t'][eventid]])
-            '''
+
             event_times = numpy.sort(temporary_info[temporary_info['has_solution'] == True]['time'])
             if minimum_time > self.signal_times[0] + event_times[0]:
                 minimum_time = self.signal_times[0] + event_times[0]
@@ -334,7 +319,7 @@ class Sim:
                     flag_array = temporary_info[ numpy.logical_and(temporary_info['station'] == index_station, temporary_info['antenna'] == index_antenna)]['has_solution']
                     if numpy.any(flag_array):
                         has_solution = 1
-                        #index_of_refraction = gnosim.earth.antarctic.indexOfRefraction(z_0, ice_model=self.config['detector_volume']['ice_model'])
+                        #index_of_refraction = self.ice.indexOfRefraction(z_0)
                         #vector_neutrino = gnosim.utils.quat.angToVec(phi_0, theta_0) # Direction neutrino came from
                         #phi_ray = numpy.degrees(numpy.arctan2(y_0 - y_antenna, x_0 - x_antenna)) % 360. # deg
                         #theta_ant_array = []
@@ -602,7 +587,7 @@ class Sim:
                             neutrino_loc = [x_0, y_0, z_0]
                             if len(info[info['has_solution'] == True]) > 0:
                                 with self.lock:
-                                    fig = gnosim.trace.refraction_library_beta.plotGeometry(self.config,neutrino_loc,phi_0,temporary_info[numpy.logical_and(temporary_info['has_solution'] == True,temporary_info['station'] == index_station)])
+                                    fig = gnosim.trace.refraction_library_beta.plotGeometry(self.config,neutrino_loc,phi_0,temporary_info[numpy.logical_and(temporary_info['has_solution'] == True,temporary_info['station'] == index_station)],self.ice)
                                     try:
                                         fig.savefig('%s%s_all_antennas-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
                                         pylab.close(fig)
@@ -1193,18 +1178,19 @@ class Sim:
             
             #The following is for the beamfoforming
             if do_beamforming == True:
+                print('Prepaing for beamforming')
                 power_calculation_sum_length = 16 #How long each power sum window is
                 power_calculation_interval = 8 #How frequent each power sum window begins
-                 
+                print('Using:\npower_calculation_sum_length = %i\npower_calculation_interval = %i\nn_baselines = %i'%(power_calculation_sum_length,power_calculation_interval,n_baselines))
                 z_array = []
                 for sz in self.config['stations']['positions']:
                     for az in self.config['antennas']['positions']:
                         z_array.append(sz[2] + az[2])
                 z_array = numpy.array(z_array)
-                index_refraction_array = gnosim.earth.antarctic.indexOfRefraction(z_array, ice_model=self.config['detector_volume']['ice_model']) 
+                index_refraction_array = self.ice.indexOfRefraction(z_array) 
                 mean_index = numpy.mean(index_refraction_array)
                 self.beam_dict = gnosim.sim.fpga.getBeams(self.config, n_beams, n_baselines , mean_index , self.digital_sampling_period ,power_calculation_sum_length = power_calculation_sum_length, power_calculation_interval = power_calculation_interval, verbose = False)
-                print(self.beam_dict)
+                #print(self.beam_dict)
                 colormap = pylab.cm.gist_ncar #nipy_spectral, Set1,Paired   
                 self.beam_colors = [colormap(i) for i in numpy.linspace(0, 1,n_beams+1)] #I put the +1 backs it was making the last beam white, hopefully if I put this then the last is still white but is never called
         
@@ -1254,8 +1240,7 @@ class Sim:
             # NEW CURVATURE
 
             self.file.attrs['config'] = self.config_file
-            #self.file.attrs['ice_model'] = gnosim.earth.antarctic.ice_model_default
-            self.file.attrs['ice_model'] = self.config['detector_volume']['ice_model']
+            self.file.attrs['ice_model'] = self.ice.ice_model
             self.file.attrs['trigger_mode'] = trigger_threshold_units
             self.file.attrs['trigger_threshold'] = trigger_threshold
             if pre_trigger_angle == None:
@@ -1677,6 +1662,7 @@ if __name__ == "__main__":
     os.makedirs(image_path) 
     image_path = image_path + '/'
     print('Images will be saved to ', image_path)
+    
     
     
     #Creating Sim and throwing events

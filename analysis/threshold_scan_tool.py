@@ -1,3 +1,4 @@
+
 import numpy
 import pylab
 import sys
@@ -23,11 +24,11 @@ import gnosim.utils.constants
 import gnosim.interaction.inelasticity
 import gnosim.utils.quat
 import gnosim.earth.earth
-import gnosim.earth.antarctic
 import gnosim.trace.refraction_library_beta
 from gnosim.trace.refraction_library_beta import *
 import gnosim.interaction.askaryan
 import gnosim.sim.detector
+import gnosim.earth.ice
 pylab.ion()
 ############################################################
 
@@ -36,6 +37,7 @@ if __name__ == "__main__":
     
     #Paremeters
     signal_response_version = 'v7'
+    ice_model = 'antarctic'
     #config = yaml.load(open('/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/real_config.py'))
     #config = yaml.load(open('/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/real_config_reduced2.py'))
     config = yaml.load(open('/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_dipole_octo_-200_polar_120_rays.py'))
@@ -85,6 +87,8 @@ if __name__ == "__main__":
     #######################
     
     #######################
+
+    ice = gnosim.earth.ice.Ice(ice_model,suppress_fun=True)
     
     #Get index of refraction at array
     z_array = []
@@ -92,7 +96,7 @@ if __name__ == "__main__":
         for az in config['antennas']['positions']:
             z_array.append(sz[2] + az[2])
     z_array = numpy.array(z_array)
-    index_refraction_array = gnosim.earth.antarctic.indexOfRefraction(z_array, ice_model=config['detector_volume']['ice_model']) 
+    index_refraction_array = ice.indexOfRefraction(z_array) 
     mean_index = numpy.mean(index_refraction_array)
     #Create the beams
     beam_dict = gnosim.sim.fpga.getBeams( config, n_beams, n_baselines , mean_index , digital_sampling_period, verbose = False )

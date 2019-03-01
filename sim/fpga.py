@@ -28,7 +28,6 @@ import gnosim.utils.constants
 import gnosim.interaction.inelasticity
 import gnosim.utils.quat
 import gnosim.earth.earth
-import gnosim.earth.antarctic
 import gnosim.trace.refraction_library_beta
 from gnosim.trace.refraction_library_beta import *
 import gnosim.interaction.askaryan

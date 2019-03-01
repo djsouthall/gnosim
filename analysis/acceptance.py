@@ -4,7 +4,7 @@ import h5py
 import gnosim.utils.constants
 import gnosim.utils.bayesian_efficiency
 import gnosim.earth.earth
-import gnosim.earth.greenland
+import gnosim.earth.ice
 
 ############################################################
 
@@ -36,7 +36,7 @@ def acceptance(infile, cos_theta_bins=None, electric_field_threshold=1.e-4, eart
     n_volume = numpy.zeros(n_bins)
 
     ice_model = reader.attrs['ice_model']
-
+    ice = gnosim.earth.ice.Ice(ice_model,suppress_fun = True)
     for ii in range(0, n_bins):
 
         theta_min = numpy.degrees(numpy.arccos(cos_theta_bins[ii]))
@@ -126,7 +126,7 @@ def acceptance(infile, cos_theta_bins=None, electric_field_threshold=1.e-4, eart
                                                   * cut_mode_reflections \
                                                   * (reader['theta_0'][...] >= theta_min) \
                                                   * (reader['theta_0'][...] <= theta_max) \
-                                                  * (gnosim.earth.greenland.density(reader['z_0'][...], ice_model=ice_model) / gnosim.utils.constants.density_water) \
+                                                  * (ice.density(reader['z_0'][...]) / gnosim.utils.constants.density_water) \
                                                   * (reader['electric_field'][...] > electric_field_threshold)) \
                 * (reader.attrs['geometric_factor'] / (n_total * n_bins)) * gnosim.utils.constants.km_to_m**-3 # km^3 sr
         else:
@@ -134,7 +134,7 @@ def acceptance(infile, cos_theta_bins=None, electric_field_threshold=1.e-4, eart
             volumetric_acceptance[ii] = numpy.sum(cut_mode_reflections \
                                                   * (reader['theta_0'][...] >= theta_min) \
                                                   * (reader['theta_0'][...] <= theta_max) \
-                                                  * (gnosim.earth.greenland.density(reader['z_0'][...], ice_model=ice_model) / gnosim.utils.constants.density_water) \
+                                                  * (ice.density(reader['z_0'][...]) / gnosim.utils.constants.density_water) \
                                                   * (reader['electric_field'][...] > electric_field_threshold)) \
                     * (reader.attrs['geometric_factor'] / (n_total * n_bins)) * gnosim.utils.constants.km_to_m**-3 # km^3 sr
 

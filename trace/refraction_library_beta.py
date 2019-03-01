@@ -15,7 +15,7 @@ import gnosim.utils.constants
 import gnosim.utils.rf
 import gnosim.utils.plane
 import gnosim.earth.earth
-import gnosim.earth.antarctic
+import gnosim.earth.ice
 
 pylab.ion()
 
@@ -125,7 +125,7 @@ def testFresnel(n_low=1., n_high=1.5):
 
 
 
-def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1., r_limit = None): # t_max=40000, t_max=1000 (testing)
+def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = None): # t_max=40000, t_max=1000 (testing)
     """
     z_0 = initial elevation (m)
     t_max = max time (ns)
@@ -173,7 +173,7 @@ def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1., r_limit = None):
     max_ii = None
     #Finding surfaces:
     z_locate = numpy.linspace(1000,-10000,10000000)
-    dndz = numpy.divide(numpy.diff(gnosim.earth.antarctic.indexOfRefraction(z_locate)),numpy.diff(z_locate))
+    dndz = numpy.divide(numpy.diff(ice.indexOfRefraction(z_locate)),numpy.diff(z_locate))
     z_upward_surface = ((z_locate[1:] + z_locate[:-1]) / 2.0)[numpy.equal(dndz,numpy.amin(dndz))]
     z_downward_surface = ((z_locate[1:] + z_locate[:-1]) / 2.0)[numpy.equal(dndz,numpy.amax(dndz))]
     dndz = None
@@ -182,7 +182,7 @@ def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1., r_limit = None):
     for ii in range(0, n_steps):
         #print('On Event',ii)
         # Dynamic time step depending on how fast the index of refraction is changing
-        if gnosim.earth.antarctic.deltaIndexOfRefraction(z_array[ii]) > 1.e-4 or z_array[ii] >= 0.:
+        if ice.deltaIndexOfRefraction(z_array[ii]) > 1.e-4 or z_array[ii] >= 0.:
             t_step = 1.*t_step_in
             #print(t_step)
         else:
@@ -192,7 +192,7 @@ def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1., r_limit = None):
         
         
         potential_z_step = (t_step * gnosim.utils.constants.speed_light * numpy.cos(numpy.radians(theta_array[ii])) \
-                      / gnosim.earth.antarctic.indexOfRefraction(z_array[ii]))
+                      / ice.indexOfRefraction(z_array[ii]))
         if numpy.logical_or( (numpy.fabs(z_array[ii] - z_upward_surface) < 5.0),(numpy.fabs(z_array[ii] - z_downward_surface) < 5.0)):
             
             if (numpy.logical_or( (z_array[ii] + potential_z_step) > z_upward_surface , (z_array[ii] + potential_z_step) < z_downward_surface)):
@@ -205,7 +205,7 @@ def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1., r_limit = None):
             while (numpy.logical_or( (z_array[ii] + potential_z_step) > z_upward_surface , (z_array[ii] + potential_z_step) < z_downward_surface)):
                 t_step = t_step/2.0
                 potential_z_step = (t_step * gnosim.utils.constants.speed_light * numpy.cos(numpy.radians(theta_array[ii])) \
-                                   / gnosim.earth.antarctic.indexOfRefraction(z_array[ii]))
+                                   / ice.indexOfRefraction(z_array[ii]))
             #if print_new:
             #    print('t_step changed to' , t_step)
             
@@ -219,7 +219,7 @@ def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1., r_limit = None):
             # THIS VERSION WORKS, BUT DOES NOT FULLY TAKE INTO ACCOUNT EARTH CURVATURE
             r = (z_array[ii] + 0.01) * numpy.tan(numpy.radians(theta_array[ii])) # 0.01 meter into ground (i.e., below surface)
             d = numpy.sqrt(r**2 + z_array[ii]**2)
-            t = d * gnosim.earth.antarctic.indexOfRefraction(z_array[ii]) / gnosim.utils.constants.speed_light
+            t = d * ice.indexOfRefraction(z_array[ii]) / gnosim.utils.constants.speed_light
 
             t_array[1:] += (t - t_step)
             x_step = d * numpy.sin(numpy.radians(theta_array[ii])) * numpy.cos(numpy.radians(phi_array[ii]))
@@ -236,7 +236,7 @@ def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1., r_limit = None):
             z_step = -1. * (z_array[ii] + 0.01) # Go 0.01 m into ground (i.e., below surface)
 
             # Correct time
-            t = distance_with_curvature * gnosim.earth.antarctic.indexOfRefraction(z_array[ii]) / gnosim.utils.constants.speed_light
+            t = distance_with_curvature * ice.indexOfRefraction(z_array[ii]) / gnosim.utils.constants.speed_light
             #t_array[1:] += (t - t_step)
             t_array[ii + 1] = t_array[ii] + t
 
@@ -251,23 +251,23 @@ def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1., r_limit = None):
             d_step = distance_with_curvature
         else:
             x_step = (t_step * gnosim.utils.constants.speed_light * numpy.sin(numpy.radians(theta_array[ii])) * numpy.cos(numpy.radians(phi_array[ii])) \
-                      / gnosim.earth.antarctic.indexOfRefraction(z_array[ii]))
+                      / ice.indexOfRefraction(z_array[ii]))
             y_step = (t_step * gnosim.utils.constants.speed_light * numpy.sin(numpy.radians(theta_array[ii])) * numpy.sin(numpy.radians(phi_array[ii])) \
-                      / gnosim.earth.antarctic.indexOfRefraction(z_array[ii]))
+                      / ice.indexOfRefraction(z_array[ii]))
             z_step = (t_step * gnosim.utils.constants.speed_light * numpy.cos(numpy.radians(theta_array[ii])) \
-                      / gnosim.earth.antarctic.indexOfRefraction(z_array[ii]))
+                      / ice.indexOfRefraction(z_array[ii]))
             
             d_step = numpy.sqrt(x_step**2 + y_step**2 + z_step**2) # Distance traveled during step
         
         d_array[ii + 1] = d_step
         
-        attenuation_length = gnosim.earth.antarctic.attenuationLength(z_array[ii], 0.3) # m, Transmission
+        attenuation_length = ice.attenuationLength(z_array[ii], 0.3) # m, Transmission
         if attenuation_length > 1.e10:
             a_v_array[ii + 1] = 1.
             a_h_array[ii + 1] = 1.
         else:
-            a_v_array[ii + 1] = numpy.exp(-1. * d_array[ii + 1] / gnosim.earth.antarctic.attenuationLength(z_array[ii], 0.3)) # Transmission 
-            a_h_array[ii + 1] = numpy.exp(-1. * d_array[ii + 1] / gnosim.earth.antarctic.attenuationLength(z_array[ii], 0.3)) # Transmission
+            a_v_array[ii + 1] = numpy.exp(-1. * d_array[ii + 1] / ice.attenuationLength(z_array[ii], 0.3)) # Transmission 
+            a_h_array[ii + 1] = numpy.exp(-1. * d_array[ii + 1] / ice.attenuationLength(z_array[ii], 0.3)) # Transmission
 
         x_array[ii + 1] = x_array[ii] + x_step
         y_array[ii + 1] = y_array[ii] + y_step
@@ -278,11 +278,11 @@ def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1., r_limit = None):
                 break
 
         # Test whether the ray is refracted from upward going to downward going
-        value = (gnosim.earth.antarctic.indexOfRefraction(z_array[ii]) / gnosim.earth.antarctic.indexOfRefraction(z_array[ii + 1])) \
+        value = (ice.indexOfRefraction(z_array[ii]) / ice.indexOfRefraction(z_array[ii + 1])) \
                     * numpy.sin(numpy.radians(theta_array[ii]))
         
         # Hit ice-air interface at surface?
-        delta_index_of_refraction = gnosim.earth.antarctic.indexOfRefraction(z_array[ii + 1]) - gnosim.earth.antarctic.indexOfRefraction(z_array[ii])
+        delta_index_of_refraction = ice.indexOfRefraction(z_array[ii + 1]) - ice.indexOfRefraction(z_array[ii])
         
         if ii == index_reflect and ii > 0:
             #print ('SKIP', ii)
@@ -292,8 +292,8 @@ def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1., r_limit = None):
             # Ray going from ice to air (for a ray going backwards from antenna to interaction vertex)
             # Compute reflection coefficients (power which is reflected)
             incidence_angle = theta_array[ii]
-            r_s, r_p = fresnel(gnosim.earth.antarctic.indexOfRefraction(z_array[ii]),
-                               gnosim.earth.antarctic.indexOfRefraction(z_array[ii + 1]),
+            r_s, r_p = fresnel(ice.indexOfRefraction(z_array[ii]),
+                               ice.indexOfRefraction(z_array[ii + 1]),
                                incidence_angle, mode='reflection')
             a_v_array[ii + 1] *= numpy.sqrt(r_p)
             a_h_array[ii + 1] *= numpy.sqrt(r_s)
@@ -308,8 +308,8 @@ def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1., r_limit = None):
             # Compute reflection coefficients (power which is transmitted)
             theta_array[ii + 1] = 180. - numpy.degrees(numpy.arcsin(value))
             incidence_angle = 180. - theta_array[ii + 1]
-            t_s, t_p = fresnel(gnosim.earth.antarctic.indexOfRefraction(z_array[ii + 1]),
-                               gnosim.earth.antarctic.indexOfRefraction(z_array[ii]),
+            t_s, t_p = fresnel(ice.indexOfRefraction(z_array[ii + 1]),
+                               ice.indexOfRefraction(z_array[ii]),
                                incidence_angle, mode='transmission')
             a_v_array[ii + 1] *= numpy.sqrt(t_p)
             a_h_array[ii + 1] *= numpy.sqrt(t_s)
@@ -319,8 +319,8 @@ def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1., r_limit = None):
             # Compute reflection coefficients (power which is reflected)
             incidence_angle = 180. - theta_array[ii]
             r_s, r_p = 1., 1. # Water is conductor, so complete reflection
-            #r_s, r_p = fresnel(gnosim.earth.antarctic.indexOfRefraction(z_array[ii]),
-            #                   gnosim.earth.antarctic.indexOfRefraction(z_array[ii + 1]),
+            #r_s, r_p = fresnel(ice.indexOfRefraction(z_array[ii]),
+            #                   ice.indexOfRefraction(z_array[ii + 1]),
             #                   incidence_angle, mode='reflection')
             a_v_array[ii + 1] *= numpy.sqrt(r_p)
             a_h_array[ii + 1] *= numpy.sqrt(r_s)
@@ -363,7 +363,7 @@ def rayTrace(origin, phi_0, theta_ant, t_max=50000., t_step=1., r_limit = None):
         theta_array[0: n_steps], a_v_array[0: n_steps], a_h_array[0: n_steps], \
         index_reflect_air, index_reflect_water)
 
-def plotGeometry(config,neutrino_loc,phi_0,info):
+def plotGeometry(config,neutrino_loc,phi_0,info,ice):
     '''
     origin shuold be of the form [[x_0, y_0, z_0],[x_1, y_1, z_1],[x_2, y_2, z_2]]
     neutrino_loc should be similar but for neutrino location but [x, y, z]
@@ -394,7 +394,7 @@ def plotGeometry(config,neutrino_loc,phi_0,info):
                     origin_r = numpy.sqrt(antenna_loc[0]**2 + antenna_loc[1]**2)
                     ssub_info = sub_info[numpy.logical_and(station_cut,antenna_cut)]
                     for index_solution, solution in enumerate(ssub_info['solution']):
-                        x, y, z, t, d, phi, theta, a_v, a_h, index_reflect_air, index_reflect_water = rayTrace(antenna_loc, phi_0, ssub_info['theta_ant'][ssub_info['solution'] == solution], r_limit = 1.001*neutrino_loc_r)
+                        x, y, z, t, d, phi, theta, a_v, a_h, index_reflect_air, index_reflect_water = rayTrace(antenna_loc, phi_0, ssub_info['theta_ant'][ssub_info['solution'] == solution],ice, r_limit = 1.001*neutrino_loc_r)
                         r = numpy.sqrt(x**2 + y**2)
                         label = 'S%iA%i %s'%(index_station,index_antenna,solution.decode())
                         if numpy.isin(solution.decode(),list(linestyle_dict.keys())):
@@ -421,7 +421,7 @@ def plotGeometry(config,neutrino_loc,phi_0,info):
         return
 ############################################################
 
-def makeLibrary(z_0, theta_ray_array, save=True, library_dir='library',r_limit = None):
+def makeLibrary(z_0, theta_ray_array, ice_model, save=True, library_dir='library',r_limit = None):
     x_0 = 0.
     y_0 = 0.
     phi_0 = 0.
@@ -439,9 +439,11 @@ def makeLibrary(z_0, theta_ray_array, save=True, library_dir='library',r_limit =
     
     theta_ant_array = []
 
+    ice = gnosim.earth.ice.Ice(ice_model)
+
     for ii in range(0, len(theta_ray_array)):
         print ('(%i/%i) theta_ant = %.4f'%(ii, len(theta_ray_array), theta_ray_array[ii]))
-        x, y, z, t, d, phi, theta, a_v, a_h, index_reflect_air, index_reflect_water = rayTrace([x_0, y_0, z_0], phi_0, theta_ray_array[ii])
+        x, y, z, t, d, phi, theta, a_v, a_h, index_reflect_air, index_reflect_water = rayTrace([x_0, y_0, z_0], phi_0, theta_ray_array[ii],ice)
         x_array.append(x)
         y_array.append(y)
         z_array.append(z)
@@ -461,7 +463,7 @@ def makeLibrary(z_0, theta_ray_array, save=True, library_dir='library',r_limit =
             file.attrs['index_reflect_water'] = index_reflect_water
             file.attrs['z_0'] = z_0
             file.attrs['theta_ant'] = theta_ray_array[ii]
-            file.attrs['ice_model'] = gnosim.earth.antarctic.ice_model_default
+            file.attrs['ice_model'] = ice.ice_model
 
             file.create_dataset('r', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             file.create_dataset('z', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
@@ -545,12 +547,18 @@ class RefractionLibrary:
                 print (infile)
                 reader = h5py.File(infile, 'r')
                 n = len(reader['t'])
+                current_model = reader.attrs['ice_model']
+                if current_model == 'arthern':
+                    current_model = 'greenland'
+                elif current_model == 'polar':
+                    current_model = 'antarctica'
+
                 if self.ice_model is None:
-                    self.ice_model = reader.attrs['ice_model']
+                    self.ice_model = current_model
                 else:
-                    if self.ice_model != reader.attrs['ice_model']:
+                    if self.ice_model != current_model:
                         print ('WARNING: Ice models used in ray-tracing libraries do not match, e.g., %s != %s'%(self.ice_model, 
-                                                                                                                reader.attrs['ice_model']))
+                                                                                                                current_model))
 
                 if reader.attrs['index_reflect_air'] > 0:
                     # Rays with reflections off ice-air interface
@@ -888,24 +896,33 @@ class RefractionLibrary:
 ############################################################
 
 if __name__ == '__main__':
-    make_library = False
+    make_library = True
     split_library = True
     plot_library = True
     save_envelope = True
     plot_envelope = True
-    z_array = [-173,-174]#[-175,-176,-177,-178,-179,-181,-183]#[-200.,-201.,-202.,-203.,-204.,-205.,-206.,-207.]
-    n_rays = 180
+    z_array = [-100]#[-175,-176,-177,-178,-179,-181,-183]#[-200.,-201.,-202.,-203.,-204.,-205.,-206.,-207.]
+    n_rays = 18
     r_limit = None #Note if this is NOT None, then all thrown rays will quit once they read this particular radius.  Use with care.  If you want a simulation with r = 6300m, it might be advisable to make r_limit = 7000 so the boundaries of hulls are still well defined
-    for z_0 in z_array:
-        library_dir = 'library_%i_polar_%i_rays'%(int(z_0),n_rays)
+    ice_model = 'antarctica'
 
+    ############################################
+
+
+    ice_model = gnosim.earth.ice.checkIceModel(ice_model) #Checks if ice model exists and replaces as necessary.
+    for z_0 in z_array:
+        library_dir = 'library_%i_%s_%i_rays'%(int(z_0),ice_model,n_rays)
+        if os.path.isdir(library_dir):
+            print('Output directory Name %s is taken, saving in current directory and appending \'_new\' if necessary'%(library_dir))
+            while os.path.isdir(library_dir):
+                library_dir = library_dir + '_new'
         print ('library dir = %s'%(library_dir))
         print ('z_0 = %.2f'%(z_0))
-        print ('ice model = %s'%(gnosim.earth.antarctic.ice_model_default))
+        #print ('ice model = %s'%(ice_model))
        
         theta_array = numpy.linspace(0., 180., n_rays) # 60, Trying double the density
         #Below is an attemopt to enure more rays are thrown in the region surrounding the reflect/cross hull partition.
-        #theta_reflect = numpy.rad2deg(numpy.arcsin(gnosim.earth.antarctic.indexOfRefraction(-0.01,ice_model=gnosim.earth.antarctic.ice_model_default)/gnosim.earth.antarctic.indexOfRefraction(z_0,ice_model=gnosim.earth.antarctic.ice_model_default)))
+        #theta_reflect = numpy.rad2deg(numpy.arcsin(ice.indexOfRefraction(-0.01)/ice.indexOfRefraction(z_0)))
         #theta_array = numpy.append(theta_array,0.99*theta_reflect)
         #theta_array = numpy.append(theta_array,1.01*theta_reflect)
         
@@ -913,7 +930,7 @@ if __name__ == '__main__':
         solution_list = numpy.array(['direct','cross','reflect'])
         if make_library == True:
             os.mkdir(library_dir)
-            makeLibrary(z_0, theta_array, save=True, library_dir=library_dir,r_limit = r_limit)
+            makeLibrary(z_0, theta_array,ice_model, save=True, library_dir=library_dir,r_limit = r_limit)
             
         if numpy.any([plot_library == True,split_library == True,save_envelope == True]):
             print('\n'+library_dir+'/*.h5\n')

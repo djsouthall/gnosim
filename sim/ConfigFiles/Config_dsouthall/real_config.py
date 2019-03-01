@@ -1,5 +1,5 @@
 #This is done with surface jitter on the order of a few mm
-{'detector_volume': {'ice_model': 'polar',
+{'detector_volume': {'ice_model': 'antarctica',
                      'radius': 6200.,
                      'depth': 2950.},#making volume slightly smaller than throw valume to avoid edge effects of interpolation
  'DAQ': {   'sampling_rate_GHz': 1.5,

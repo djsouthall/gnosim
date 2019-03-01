@@ -21,7 +21,7 @@ from matplotlib.colors import LogNorm
 sys.path.append('/home/dsouthall/Projects/GNOSim/')
 import gnosim.utils.constants
 import gnosim.utils.bayesian_efficiency
-import gnosim.earth.antarctic
+import gnosim.earth.ice
 import gnosim.trace.refraction_library
 from matplotlib.colors import LogNorm
 pylab.ion()
@@ -68,8 +68,8 @@ def volumetricAcceptance(reader,verbose = True):
     
     if verbose == True:
         print('Calculating VA_sum')
-    
-    VA_sum = numpy.sum(p_earth * (gnosim.earth.antarctic.density(z_0) / gnosim.utils.constants.density_water) * (info['triggered']) )
+    ice = gnosim.earth.ice.Ice(reader.attrs['ice_model'],suppress_fun = True)
+    VA_sum = numpy.sum(p_earth * (ice.density(z_0) / gnosim.utils.constants.density_water) * (info['triggered']) )
     VA  = ((geometric_factor / gnosim.utils.constants.km_to_m**3)/n_events) * VA_sum # km^3 sr
     error = VA/numpy.sqrt(VA_sum)
     energy_neutrino = reader['energy_neutrino'][0]

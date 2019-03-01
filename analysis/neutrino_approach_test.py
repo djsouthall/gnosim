@@ -26,7 +26,7 @@ from matplotlib.colors import LogNorm
 sys.path.append('/home/dsouthall/Projects/StationConfigurationTesting/')
 import gnosim.utils.constants
 import gnosim.utils.bayesian_efficiency
-import gnosim.earth.greenland
+import gnosim.earth.ice
 import gnosim.trace.refraction_library
 from matplotlib.colors import LogNorm
 pylab.ion()
@@ -69,10 +69,10 @@ def getInfo(reader,snr,gain,frequency, verbose = True,hist_bins = 180,hist_range
             print('Mean Trigger frequency:',numpy.mean(frequency[frequency > 0])*1000,'MHz')
         print('Neutrio Energy:',energy_neutrino,'GeV')
         print('Number of events:',len(reader['t'][...]))
-    
+    ice = gnosim.earth.ice.Ice(reader.attrs['ice_model'],suppress_fun = True)
     thresh = electricFieldThreshold( snr , gain, config['antenna_definitions']['simple']['temp'], config['antenna_definitions']['simple']['frequency_high'] - config['antenna_definitions']['simple']['frequency_low'], frequency,verbose = verbose)
     arrived = reader['p_earth'][...]
-    density_factor = (gnosim.earth.greenland.density(reader['z_0'][...]) / gnosim.utils.constants.density_water)
+    density_factor = (ice.density(reader['z_0'][...]) / gnosim.utils.constants.density_water)
     detected = reader['electric_field'][...] > thresh
     theta_weight = numpy.multiply(numpy.multiply(arrived,detected),density_factor)
     theta_ant = reader['theta_ant'][...]

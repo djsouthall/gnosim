@@ -10,7 +10,7 @@ import scipy.interpolate
 import pylab
 
 import gnosim.utils.constants
-import gnosim.earth.greenland
+import gnosim.earth.ice
 
 pylab.ion()
 
@@ -90,7 +90,7 @@ prem_string = """#http://geophysics.ou.edu/solid_earth/prem.html
 ############################################################
 
 #def prem(infile='prem.dat', plot=False):
-def prem(overlay_ice=True):
+def prem(ice):
     """
     Returns:
     Function for density of Earth (nucleons m^-3) as a function of radius (m), technically a scipy.interpolate.interp1d object
@@ -113,13 +113,12 @@ def prem(overlay_ice=True):
     radius = numpy.array(radius) * gnosim.utils.constants.km_to_m # convert from km to m
     density = numpy.array(density) / gnosim.utils.constants.mass_proton # convert from kg m^-3 to nucleons m^-3
     
-    if overlay_ice:
-        # Overlay ice on the model for the Earth density profile 
-        z = numpy.linspace(-1. * gnosim.utils.constants.depth_ice, 0., 100.) # m
-        radius_ice = gnosim.utils.constants.radius_earth + z # m
-        density_ice = gnosim.earth.greenland.density(z) # nucleons m^-3
-        radius = numpy.concatenate([radius, radius_ice]) # Now merge
-        density = numpy.concatenate([density, density_ice])
+    # Overlay ice on the model for the Earth density profile 
+    z = numpy.linspace(-1. * ice.ice_thickness, 0., 100.) # m
+    radius_ice = gnosim.utils.constants.radius_earth + z # m
+    density_ice = ice.density(z) # nucleons m^-3  
+    radius = numpy.concatenate([radius, radius_ice]) # Now merge
+    density = numpy.concatenate([density, density_ice])
 
     f = scipy.interpolate.interp1d(radius, density, bounds_error=False, fill_value=0.)
     return f
@@ -127,7 +126,9 @@ def prem(overlay_ice=True):
 ############################################################
 
 if __name__ == "__main__":
-    f = prem() # Earth density interpolation function object
+    ice_model = 'antarctica'
+    ice = gnosim.earth.ice.Ice(antarctica)
+    f = prem(ice) # Earth density interpolation function object
     r = numpy.linspace(0., gnosim.utils.constants.radius_earth, 100000) # Array of radii values (m) 
 
     pylab.figure()

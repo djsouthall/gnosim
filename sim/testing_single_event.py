@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 '''
 This is meant to run a simulation of the siulation for a single event.
 I.e. it will use an output file to get the necessary info to mostly reproduce
@@ -29,7 +30,7 @@ from multiprocessing import cpu_count
 sys.path.append("/home/dsouthall/Projects/GNOSim/")
 import gnosim.utils.quat
 import gnosim.earth.earth
-import gnosim.earth.antarctic
+import gnosim.earth.ice
 import gnosim.trace.refraction_library_beta
 #from gnosim.trace.refraction_library_beta import *
 import gnosim.interaction.askaryan
@@ -54,7 +55,7 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
     p_interact = reader['p_interact'][eventid]
     p_earth = reader['p_earth'][eventid]
     signals_out = {}
-    
+    ice = gnosim.earth.ice.Ice(reader.attrs['ice_model'])
     if numpy.isin('seed',list(info.dtype.fields.keys())):
         random_local = numpy.random.RandomState(seed = numpy.unique(info[info['eventid'] == eventid]['seed'])[0])
     else:
@@ -256,7 +257,7 @@ def redoEventFromInfo(reader,eventid,energy_neutrino,index_of_refraction,signal_
                     '''
                     neutrino_loc = numpy.array([x_0, y_0, z_0],dtype=float)
                     if len(info[info['has_solution'] == 1]) > 0:
-                        fig = gnosim.trace.refraction_library_beta.plotGeometry(config,neutrino_loc,phi_0,info[numpy.logical_and(info['has_solution'] == 1,info['station'] == index_station)])
+                        fig = gnosim.trace.refraction_library_beta.plotGeometry(config,neutrino_loc,phi_0,info[numpy.logical_and(info['has_solution'] == 1,info['station'] == index_station)],ice)
                         #fig.savefig('./%i-geometry.svg'%eventid,bbox_inches=0,transparent=True)
                         '''
                         try:
@@ -547,6 +548,10 @@ def plotFromReader(reader,eventid,trigger_threshold_units = 'fpga', trigger_thre
     phi_0 = reader['phi_0'][eventid]
     p_interact = reader['p_interact'][eventid]
     p_earth = reader['p_earth'][eventid]
+
+
+    ice = gnosim.earth.ice.Ice(reader.attrs['ice_model'])
+
     if numpy.isin('signals',numpy.array(list(reader.keys()))):
         for index_station in range(config['stations']['n']):
             station_label = 'station%i'%index_station
@@ -600,7 +605,7 @@ def plotFromReader(reader,eventid,trigger_threshold_units = 'fpga', trigger_thre
                         
                         neutrino_loc = [x_0, y_0, z_0]
                         if len(info[info['has_solution'] == 1]) > 0:
-                            fig = gnosim.trace.refraction_library_beta.plotGeometry(config,neutrino_loc,phi_0,info[numpy.logical_and(info['has_solution'] == 1,info['station'] == index_station)])
+                            fig = gnosim.trace.refraction_library_beta.plotGeometry(config,neutrino_loc,phi_0,info[numpy.logical_and(info['has_solution'] == 1,info['station'] == index_station)],ice)
                     
                     if plot_signals == True:
                         #might need to account for when signals are not present in certain detectors
@@ -879,7 +884,8 @@ if __name__ == "__main__":
     #Signal Calculations
     
     z_0 = numpy.array(list(reader['z_0']))
-    n_array = gnosim.earth.antarctic.indexOfRefraction(z_0, ice_model=config['detector_volume']['ice_model']) 
+    ice = gnosim.earth.ice.Ice(reader.attrs['ice_model'])
+    n_array = ice.indexOfRefraction(z_0) 
     mean_index = numpy.mean(n_array)
     
     eventids = numpy.unique(info[info['triggered']==1]['eventid'])

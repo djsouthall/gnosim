@@ -7,7 +7,7 @@ import pylab
 sys.path.append("/home/dsouthall/Projects/GNOSim/")
 import gnosim.utils.constants
 import gnosim.utils.bayesian_efficiency
-import gnosim.earth.greenland
+import gnosim.earth.ice
 
 pylab.ion()
 
@@ -664,9 +664,9 @@ efficiency, (efficiency_low, efficiency_high) \
                                                           numpy.sum(reader['electric_field'][...] > electric_field_threshold))
 
 
-
+ice = gnosim.earth.ice.Ice(reader.attrs['ice_model'],suppress_fun = True)
 volumetric_acceptance = numpy.sum(reader['p_earth'][...] \
-                                  * (gnosim.earth.greenland.density(reader['z_0'][...]) / gnosim.utils.constants.density_water)
+                                  * (ice.density(reader['z_0'][...]) / gnosim.utils.constants.density_water)
                                   * (reader['electric_field'][...] > electric_field_threshold) \
     * reader.attrs['geometric_factor']) / float(reader['p_interact'].shape[0]) * gnosim.utils.constants.km_to_m**-3 # km^3 sr
 
