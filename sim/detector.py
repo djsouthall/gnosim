@@ -152,7 +152,8 @@ class Station:
 ############################################################
 
 class Antenna:
-    
+    #Currently this class is drastically underutilized.  Should transition to having this contain antenna orientations, etc. 
+    #Most antenna information is currently carried through the config file which is clunky. 
 
     def __init__(self, x, y, z, lib, frequency_low, frequency_high, config_file):
         """
@@ -169,7 +170,7 @@ class Antenna:
 
         self.frequency_low = frequency_low
         self.frequency_high = frequency_high
-        self.config_file = sys.argv[1] #DS:  Shouldn't this be the config_file input? That input is never used...  I know that argv[1] is the config from running in command line from antarctic sim, but it seems weird to call that here and not the input
+        self.config_file = config_file
 
         #print(self.config_file['antenna_type'][antenna_type])
         # Bandwidth
