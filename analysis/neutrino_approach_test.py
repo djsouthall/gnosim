@@ -31,14 +31,14 @@ import gnosim.trace.refraction_library
 from matplotlib.colors import LogNorm
 pylab.ion()
                                   
-def electricFieldThreshold( snr , gain, temperature, bandwidth, frequency, verbose = True):
+def electricFieldThreshold( snr , gain, noise_temperature, bandwidth, frequency, verbose = True):
     '''
     Resistance assumed to be 50 Ohms
-    Temperature (K)
+    noise_temperature (K)
     Bandwidth (GHz)
     Gain (dBi)
     frequency (GHz)
-    Calculates the electric field threshold using the temperature, resistacne, and BW
+    Calculates the electric field threshold using the noise_temperature, resistacne, and BW
     to determine a V_RMS, and the signal to noise, gain, and frequency to calculate
     the electric field using the antenna factor formula.
 
@@ -47,7 +47,7 @@ def electricFieldThreshold( snr , gain, temperature, bandwidth, frequency, verbo
     correspondng thresholds.  This would be helpful if the threshold should be event
     by evet depending on the dominant E field frequency. 
     '''
-    V_rms = numpy.sqrt(gnosim.utils.constants.boltzmann * temperature * 50.0 * bandwidth * gnosim.utils.constants.GHz_to_Hz)
+    V_rms = numpy.sqrt(gnosim.utils.constants.boltzmann * noise_temperature * 50.0 * bandwidth * gnosim.utils.constants.GHz_to_Hz)
     if verbose == True:
         print('V_rms = ', V_rms*1000000,'uV')
         print('Bandwidth = %.2f MHz'%(bandwidth*1000))

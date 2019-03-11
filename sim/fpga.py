@@ -24,15 +24,7 @@ sys.path.append("/home/dsouthall/Projects/GNOSim/")
 from matplotlib import gridspec
 import pandas
 
-import gnosim.utils.constants
-import gnosim.interaction.inelasticity
-import gnosim.utils.quat
-import gnosim.earth.earth
-import gnosim.trace.refraction_library_beta
-from gnosim.trace.refraction_library_beta import *
-import gnosim.interaction.askaryan
-import gnosim.sim.detector
-import gnosim.interaction.askaryan_testing
+import gnosim.sim.antarcticsim
 pylab.ion()
 ############################################################
 
@@ -92,6 +84,8 @@ def digitizeSignal(u,V,sample_times,digitizer_bytes,scale_noise_from,scale_noise
     outside of the max will be rounded.  
     
     Sampleing rate should be in GHz
+
+
     '''
     V = V + dc_offset
     #sampling_period = 1.0 / sampling_rate #ns
@@ -120,99 +114,6 @@ def digitizeSignal(u,V,sample_times,digitizer_bytes,scale_noise_from,scale_noise
         pylab.stem(sample_times,V_bit,bottom = dc_offset*slope, linefmt='r-', markerfmt='rs', basefmt='r-',label='Interp Sampled at %0.2f GSPS'%sampling_rate)
     return V_bit, sample_times
 
-def getBeams( config, n_beams, n_baselines , n , dt ,power_calculation_sum_length = 16, power_calculation_interval = 8, verbose = False):
-    '''
-    The goal of this function is to determine the beam and subbeam time delays 
-    semiautomatically given a config file.
-    
-    Currently the minimum time shift is assigned to the smallest baseline.  Thus
-    every other timeshift resulting from larger baselines must be a multiple of the
-    minimum baseline. i.e. all subbeam baselines must be in integer multiples of 
-    the minimum baseline.  
-    Currently requires all other baselines to be an integer multiple of the minimum baseline
-    
-    n should be average index of refraction of array (used for angle estimates)
-    dt should be in nanoseconds (used for angle estimates)
-    '''
-    n_antennas = config['antennas']['n']
-    min_antennas_per_subbeam =  2#numpy.round(n_antennas/3) #if the number of antennas satisfying a baseline is less than this that beam won't be counted
-    relative_antenna_depths = numpy.array(config['antennas']['positions'])[:,2]
-    #relative_antenna_depths = relative_antenna_depths - relative_antenna_depths[len(relative_antenna_depths)//2] #shifts the timings to be relative to the centerish antenna
-    
-    baselines = []
-    for ii in relative_antenna_depths:
-        for jj in relative_antenna_depths:
-            baselines.append(numpy.abs(ii - jj))
-    baselines = numpy.sort(numpy.unique(baselines))
-    baselines = baselines[baselines!= 0][range(n_baselines)]
-    
-    antenna_list = numpy.arange(n_antennas)
-    beam_dict = {'attrs' :  {'power_calculation_sum_length' : power_calculation_sum_length,
-                             'power_calculation_interval'   : power_calculation_interval},
-                 'beams':{}}
-    #Both power_calculation_sum_length and power_calculation_interval can probably be made into input parameters if needed
-    subbeam_list = [] 
-    min_baseline = min(baselines)
-    shifted_beam_index = {}             
-    for baseline_index, baseline in enumerate(baselines):
-        use_in_subbeam = numpy.zeros_like(relative_antenna_depths)
-        for antenna_index, initial_depth in enumerate(relative_antenna_depths):
-            if numpy.all(use_in_subbeam) == True:
-                break
-            subbeam_antenna_cut = numpy.arange(antenna_index,len(relative_antenna_depths))
-            subbeam_antenna_list = antenna_list[subbeam_antenna_cut]
-            subbeam_depth_list = relative_antenna_depths[subbeam_antenna_cut]
-            subbeam_cut = (((subbeam_depth_list - initial_depth) % baseline) == 0 )
-            use_in_subbeam[subbeam_antenna_cut] = numpy.logical_or(use_in_subbeam[subbeam_antenna_cut],subbeam_cut)
-            if sum(subbeam_cut) >= min_antennas_per_subbeam:
-                subbeam_list.append(numpy.array(subbeam_antenna_list[subbeam_cut]))
-    
-    if verbose == True:
-        print(subbeam_list) 
-    
-    all_time_delays = numpy.array([])
-    beam_dict['theta_ant'] = {}
-    for beam_index in range(n_beams):
-        beam_label = 'beam%i'%beam_index
-        beam_dict['beams'][beam_label] = {}
-        theta_ant_beam = 0
-        total_ant = 0
-        for subbeam_index, subbeam in enumerate(subbeam_list):
-            subbeam_label = 'subbeam%i'%subbeam_index
-            baseline = min(numpy.unique(numpy.abs(numpy.diff(relative_antenna_depths[subbeam]))))
-            ms = numpy.arange(-n_beams/(2/baseline),n_beams/(2/baseline),baseline,dtype=int) #it is sort of sloppy to calculate this each time (only needs ot be done once per baseline) but this function is only done once so whatever.
-            if baseline % min_baseline != 0:
-                continue
-                
-            #print('gnosim.utils.constants.speed_light * ms[beam_index] * dt  / ( n * baseline)',gnosim.utils.constants.speed_light * ms[beam_index] * dt  / ( n * baseline))
-            #theta_elevation = 0
-            theta_elevation = numpy.rad2deg(numpy.arcsin(gnosim.utils.constants.speed_light * ms[beam_index] * dt  / ( n * baseline) ))  #Double check this calculation!
-            theta_ant = 90.0-theta_elevation
-            #time_delays = numpy.array( ms[beam_index]  * relative_antenna_depths[subbeam],dtype=int) 
-            time_delays = numpy.array( ms[beam_index]  * ((relative_antenna_depths[subbeam] - relative_antenna_depths[subbeam][0])//baseline),dtype=int) 
-            beam_dict['beams'][beam_label][subbeam_label] = {'baseline'       : baseline,
-                                                             'antennas'       : subbeam,
-                                                             'depths'         : relative_antenna_depths[subbeam],
-                                                             'time_delays'    : time_delays,
-                                                             'theta_elevation': theta_elevation,
-                                                             'theta_ant'      : theta_ant,
-                                                             'adjusted_m'     : ms[beam_index]
-                                                    }
-            theta_ant_beam += len(subbeam)*theta_ant
-            total_ant += len(subbeam)
-            all_time_delays = numpy.append(all_time_delays,beam_dict['beams'][beam_label][subbeam_label]['time_delays'])
-        beam_dict['theta_ant'][beam_label] = theta_ant_beam/total_ant
-    beam_dict['attrs']['unique_delays'] = numpy.array(numpy.sort(numpy.unique(all_time_delays)),dtype=int)
-    if verbose == True:
-        for k in beam_dict['beams'].keys():
-            print('\n',k)
-            if 'beam' in k:
-                for key in beam_dict['beams'][k].keys():
-                    print(key)
-                    print(beam_dict['beams'][k][key])
-
-    return beam_dict
-
 def syncSignals( u_in, V_in, min_time, max_time, u_step ):
     '''
     Given a dictionary with an array (or empty array) for each antenna, This 
@@ -232,7 +133,7 @@ def syncSignals( u_in, V_in, min_time, max_time, u_step ):
             V_out[antenna_index,left_index:right_index] +=  V
     return V_out, u_out
 
-def fpgaBeamForming(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False, save_figs = False, trim_sums = False,trim_amount = 50, cap_bytes = 5):
+def fpgaBeamForming(u_in, V_in, beam_dict , plot1 = False, plot2 = False, save_figs = False, trim_sums = False,trim_amount = 50, cap_bytes = 5):
     '''
     This is one function which uses the code from what were the sumBeams and 
     doFPGAPowerCalcAllBeams functions, but puts them in one to avoid the extra 
@@ -249,7 +150,6 @@ def fpgaBeamForming(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False
     #####
     #Doing the beam summing portion below:
     #####
-    n_antennas = config['antennas']['n']
     if len(numpy.shape(V_in)) == 1:
         signal_length = len(V_in)
     elif len(numpy.shape(V_in)) == 2:
@@ -381,7 +281,7 @@ def fpgaBeamForming(u_in, V_in, beam_dict , config, plot1 = False, plot2 = False
             
     return formed_beam_powers, beam_powersums
 
-def getScaleSystemResponseScale(desired_noise_rms = 20.4E-3,mode = 'v4',temperature = 320, resistance = 50, save_new_response = False):
+def getScaleSystemResponseScale(station, desired_noise_rms = 20.4E-3, save_new_response = False):
     '''
     The absolute scale of the system response has been hard to obtain, so we
     have decided to just scale it such that the noise level (which is independent
@@ -390,44 +290,38 @@ def getScaleSystemResponseScale(desired_noise_rms = 20.4E-3,mode = 'v4',temperat
     The mode selects which version of the responses you are calculating this factor
     for.  
     '''
-    h_fft,sys_fft,freqs = gnosim.interaction.askaryan.loadSignalResponse(mode=mode)
-    signal_times, h_fft, sys_fft, freqs_response = gnosim.interaction.askaryan.calculateTimes(up_sample_factor=20,h_fft = h_fft,sys_fft = sys_fft,freqs = freqs)
-    
-    #desired_noise_rms = 20.4E-3
-    noise_signal  = numpy.array([])
-    
-    for i in range(100):
-        noise_signal_i = gnosim.interaction.askaryan.quickSignalSingle( 0,1,0,1.8,\
-                      0,0,0,signal_times,h_fft,sys_fft,freqs_response,\
-                      plot_signals=False,plot_spectrum=False,plot_potential = False,\
-                      include_noise = True, resistance = resistance, temperature = temperature)[3]
-        noise_signal = numpy.append(noise_signal,noise_signal_i)
-    slope = desired_noise_rms/numpy.std(noise_signal)
-    
-    
-    h_fft,sys_fft,freqs = gnosim.interaction.askaryan.loadSignalResponse(mode=mode)
-    sys_fft = sys_fft*slope
-    
-    if save_new_response == True:
-        try:
-            antenna_outfile = '/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_%s.npy'%(mode+'_new')
-            system_outfile = '/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_%s.npy'%(mode+'_new')
-            if os.path.isfile(antenna_outfile):
-                print('Outfile Name %s is taken, saving in current directory and appending \'_new\' if necessary'%(antenna_outfile))
-                antenna_outfile = antenna_outfile.replace('.npy','_new.npy')
-                while os.path.isfile(antenna_outfile):
+
+    for index_antenna, antenna in enumerate(station.antennas):
+        signal_times = antenna.signal_times
+        h_fft = antenna.h_fft
+        sys_fft = antenna.sys_fft
+        freqs_response = antenna.freqs_response
+
+        slope = desired_noise_rms/antenna.noise_rms
+        print('Antenna %i Simple method of scaling: '%(index_antenna), slope)
+        sys_fft = sys_fft*slope
+        
+        if save_new_response == True:
+            try:
+                antenna_outfile = antenna.antenna_response_dir.replace('.npy','_new.npy')
+                system_outfile = antenna.system_response_dir.replace('.npy','_new.npy')
+                if os.path.isfile(antenna_outfile):
+                    print('Outfile Name %s is taken, saving in current directory and appending \'_new\' if necessary'%(antenna_outfile))
                     antenna_outfile = antenna_outfile.replace('.npy','_new.npy')
-            if os.path.isfile(system_outfile):
-                print('Outfile Name %s is taken, saving in current directory and appending \'_new\' if necessary'%(system_outfile))
-                system_outfile = system_outfile.replace('.npy','_new.npy')
-                while os.path.isfile(system_outfile):
+                    while os.path.isfile(antenna_outfile):
+                        antenna_outfile = antenna_outfile.replace('.npy','_new.npy')
+                if os.path.isfile(system_outfile):
+                    print('Outfile Name %s is taken, saving in current directory and appending \'_new\' if necessary'%(system_outfile))
                     system_outfile = system_outfile.replace('.npy','_new.npy')
-            
-            print('Saving:\n %s \n %s'%(antenna_outfile,system_outfile))
-            numpy.save(antenna_outfile, numpy.array(list(zip(freqs,h_fft))))
-            numpy.save(system_outfile, numpy.array(list(zip(freqs,sys_fft))))
-        except:
-            print('Something went wrong in saving the responses')
+                    while os.path.isfile(system_outfile):
+                        system_outfile = system_outfile.replace('.npy','_new.npy')
+                
+                print('Saving:\n %s \n %s'%(antenna_outfile,system_outfile))
+                numpy.save(antenna_outfile, numpy.array(list(zip(freqs_response,h_fft))))
+                numpy.save(system_outfile, numpy.array(list(zip(freqs_response,sys_fft))))
+            except Exception as e:
+                print('Something went wrong in saving the responses')
+                print(e)
     return slope, sys_fft
 
 ############################################################
@@ -435,189 +329,11 @@ def getScaleSystemResponseScale(desired_noise_rms = 20.4E-3,mode = 'v4',temperat
 #
 if __name__ == "__main__":
     pylab.close('all')
-    '''
-    energy_neutrino = 3.e9 # GeV
-    n = 1.78
-    c = gnosim.utils.constants.speed_light #m/ns
-    
-    R = 1000. #m
-    cherenkov_angle = numpy.arccos(1./n)
-    cherenkov_angle_deg = numpy.rad2deg(numpy.arccos(1./n))
-    h_fft,sys_fft,freqs = gnosim.interaction.askaryan.loadSignalResponse()
-    input_u, h_fft, sys_fft, freqs = gnosim.interaction.askaryan.calculateTimes(up_sample_factor=20,h_fft = h_fft,sys_fft = sys_fft,freqs = freqs)
-    inelasticity = 0.2
-    noise_rms = numpy.std(gnosim.interaction.askaryan.quickSignalSingle(0,R,inelasticity*energy_neutrino,n,R,0,0,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)[3])
-    V_noiseless, u, dominant_freq, V_noise,  SNR = gnosim.interaction.askaryan.quickSignalSingle(numpy.deg2rad(50),R,inelasticity*energy_neutrino,n,2500,0.7,0.7,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)
-    sampling_rate = 1.5 #GHz
-    sampling_period = 1/sampling_rate
-    digitizer_bytes = 7
-    scale_noise_from = noise_rms
-    scale_noise_to = 3
-    
-    random_time_offset = numpy.random.uniform(-5.0,5.0) #ns
-    dc_offset = 0.0 #V
-    sample_times=calculateDigitalTimes(u[0],u[-1],sampling_period,  random_time_offset = random_time_offset)
-    V_bit, sampled_times = digitizeSignal(u,V_noise,sample_times,digitizer_bytes,scale_noise_from,scale_noise_to, dc_offset = dc_offset, plot = False)
-    dt = sampled_times[1] - sampled_times[0]
-    #################################################################
-    '''
-    '''
-    config_file = '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_dipole_octo_-200_polar_120_rays.py'
-    config = yaml.load(open(config_file))
-    config_file2 = '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/real_config.py'
-    config2 = yaml.load(open(config_file2))
-    
-    n_beams = 15
-    n_baselines = 2
-    
-    beam_dict = getBeams( config, n_beams, n_baselines , n , dt, verbose = False )
-    #beam_dict = getBeams( config2, n_beams, n_baselines , n , dt, verbose = False )
-    
-    from gnosim.trace.refraction_library_beta import *
-    reader = h5py.File('./results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_100_events_1_seed_4_new_new_new_new_new_new.h5' , 'r')
-    #reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.10e+09_GeV_100_events_1_seed_3.h5' , 'r')
-    
-    
-    info = reader['info'][...]
-    #info_cut = info[numpy.logical_and(info['SNR'] > 1 , info['SNR'] < 10) ]
-    info_cut = info[numpy.logical_and(info['SNR'] > 1 , info['SNR'] < 100) ]
-    #events 15, 92
-    '''
-    '''
-    eventids = numpy.unique(info_cut[info_cut['has_solution']==1]['eventid'])
-    choose_n = 1
-    try:
-        do_events = numpy.random.choice(eventids,choose_n,replace=False)
-    except:
-        do_events = numpy.unique(numpy.random.choice(eventids,choose_n,replace=True))
-    plot_beams = False
-    plot_sums = False
-    for eventid in do_events:
-        print('On event %i'%eventid)
-        V, u, Vd, ud = gnosim.interaction.askaryan_testing.signalsFromInfo(eventid,reader,input_u,n,h_fft,sys_fft,freqs,include_noise = True,resistance = 50, temperature = 320)
-        sub_info = info[info['eventid'] == eventid]
-        Vd2, ud2 = syncSignals(ud,Vd)
-        print('Mean angle for event %i is %0.2f'%(eventid, numpy.mean(info[info['eventid'] == eventid]['theta_ant'])))
-        print(beam_dict['beams']['beam0']['subbeam0'])
-        beam_powersums = testingBeamCalculations(ud, Vd, beam_dict , config, plot1 = plot_beams, plot2 = plot_sums)
-        print(beam_dict['beams']['beam0']['subbeam0'])
-    
-    beam_label_list = numpy.array(list(beam_powersums.keys()))
-    stacked_beams = numpy.zeros((len(beam_label_list),len(beam_powersums[beam_label_list[0]])))
-    for beam_index, beam_label in enumerate(beam_label_list):
-        stacked_beams[beam_index,:] = beam_powersums[beam_label]
-    max_vals = numpy.max(stacked_beams,axis=1)
-    
-    keep_top = 3
-    top_val_indices = numpy.argsort(max_vals)[-numpy.arange(1,keep_top+1)]
-    top_vals = max_vals[top_val_indices]
-    top_val_beams = beam_label_list[top_val_indices]
-    top_val_theta_ant = numpy.array([beam_dict['theta_ant'][beam_label] for beam_label in top_val_beams]) 
-    print(max_vals)
-    print(top_vals)
-    print(top_val_beams)
-    print(top_val_theta_ant)
-    '''
-    '''
-    V_in = {}
-    u_in = {}
-    min_u = 1e20
-    max_u = -1e20
-    solutions = ['direct','cross','reflect']
-    
-    do_solutions = False
-    for station_index in numpy.arange(1):
-        station_label = 'station%i'%station_index
-        V_in[station_label] = {}
-        u_in[station_label] = {}
-        for antenna_index in numpy.arange(8):
-            antenna_label = 'antenna%i'%antenna_index
-            V_in[station_label][antenna_label] = {}
-            u_in[station_label][antenna_label] = {}
-            if do_solutions == True:
-                for solution in solutions:
-                    V_in[station_label][antenna_label][solution] = numpy.random.rand(100)
-                    u_in[station_label][antenna_label][solution] = numpy.arange(100)+antenna_index+numpy.random.randint(low=-10,high=10)
-                    min_u = numpy.min([min_u,u_in[station_label][antenna_label][solution][0]])
-                    max_u = numpy.max([max_u,u_in[station_label][antenna_label][solution][-1]])
-            else:
-                V_in[station_label][antenna_label] = numpy.random.rand(100)
-                u_in[station_label][antenna_label] = numpy.arange(100)+antenna_index+numpy.random.randint(low=-10,high=10)
-                min_u = numpy.min([min_u,u_in[station_label][antenna_label][0]])
-                max_u = numpy.max([max_u,u_in[station_label][antenna_label][-1]])
-    dt = 1
-    V_out,u_out = syncSignals( u_in['station0'], V_in['station0'], min_u, max_u, dt )
-    
-    
-    #use the above to test a trigger algorithm
-    '''
-    
-    '''
-    #This is a crude bisection method that I
-    #made when I was avoiding assuming the scaling was linear.  It is just there
-    #because I don't want to delete it.  It should produce the same scaling factor. 
-    tolerance = desired_noise_rms *  1.0/100.0 
-    tolerance_met = False
-    mult_low = 0
-    mult_high = 1000
-    count = 0
-    max_count = 50
-    multiplier_values = numpy.array([])
-    noise_rms_values = numpy.array([])
-    ######
-    noise_rms_values = numpy.array([])
-    while tolerance_met == False:
-        system_response_multiplier = ( mult_high -  mult_low ) / 2.0
-        multiplier_values = numpy.append(multiplier_values , system_response_multiplier)
-        noise_signal = numpy.array([])
-        for i in range((count+1)):
-            noise_signal_i = gnosim.interaction.askaryan.quickSignalSingle( 0,1,0,1.8,\
-                          0,0,0,signal_times,h_fft,system_response_multiplier*sys_fft,freqs_response,\
-                          plot_signals=False,plot_spectrum=False,plot_potential = False,\
-                          include_noise = True, resistance = 50, temperature = 320)[3]
-            noise_signal = numpy.append(noise_signal,noise_signal_i)
-        noise_rms = numpy.std(noise_signal)
-        noise_rms_values = numpy.append(noise_rms_values,noise_rms)
-        if numpy.abs(noise_rms - desired_noise_rms) < tolerance:
-            tolerance_met = True
-            print('Best multiplier selected after %i attempts using bisection tolerenance:'%count, best_multiplier)
-        else:
-            if noise_rms - desired_noise_rms > 0:
-                #noise_rms to big
-                mult_high = (mult_high*0.66 + system_response_multiplier*0.34) #So it doesn't jump so quickly
-            else:
-                #noise_rms to small
-                mult_low = (mult_low*0.66 + system_response_multiplier*0.34) #So it doesn't jump so quickly
-        
-        if count > max_count:
-            #Because the value is random at each step it is possible to have overshot,
-            #so as a fallback this will interpolate the values above to find a multiplier
-            try:
-                best_multiplier = scipy.interpolate.interp1d(noise_rms_values,multiplier_values,kind='cubic',bounds_error=True)(desired_noise_rms)
-                print('Best multiplier selected using cubic interpolation of values from %i attempts:'%max_count, best_multiplier)
-                break
-            except:
-                best_multiplier = multiplier_values[numpy.argmin(numpy.fabs(multiplier_values - desired_noise_rms))]
-                print('Best multiplier selected crudely from as closest occurence in %i attempts:'%max_count, best_multiplier)
-                break
-    
-        print(count, ')', noise_rms, desired_noise_rms)
-        count += 1
-    pylab.figure()
-    pylab.loglog(multiplier_values,noise_rms_values)
-    pylab.ylabel('Noise rms (V)')
-    pylab.xlabel('multiplier values')
-    pylab.scatter(best_multiplier,desired_noise_rms,color = 'r')
-    
-    '''
-    mode = 'v7'
-    h_fft,sys_fft,freqs = gnosim.interaction.askaryan.loadSignalResponse(mode = mode)
-    slope,sys_fft = getScaleSystemResponseScale(desired_noise_rms = 20.4E-3,mode = mode,save_new_response = True)
-    print('Simple method of scaling: ', slope)
-    
-    
-    
 
-    
+    config_file = '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_dipole_octo_-200_polar_120_rays.py'
+    testSim = gnosim.sim.antarcticsim.Sim(config_file,electricFieldDomain = 'time',do_beamforming = True)
+
+    slope,sys_fft = getScaleSystemResponseScale(testSim.stations[0],desired_noise_rms = 20.4E-3,save_new_response = True)
+    print('Simple method of scaling: ', slope)
     
 ############################################################

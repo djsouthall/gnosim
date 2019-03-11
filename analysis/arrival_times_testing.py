@@ -1089,14 +1089,14 @@ def flaggedSolutionLocation(reader,flagged_events,index_antenna,title = ''):
         pylab.xlim(-10,6310)
     pylab.legend(fontsize=20)
     
-def electricFieldThreshold( snr , gain, temperature, bandwidth, frequency, verbose = True):
+def electricFieldThreshold( snr , gain, noise_temperature, bandwidth, frequency, verbose = True):
     '''
     Resistance assumed to be 50 Ohms
-    Temperature (K)
+    noise_temperature (K)
     Bandwidth (GHz)
     Gain (dBi)
     frequency (GHz)
-    Calculates the electric field threshold using the temperature, resistance, and BW
+    Calculates the electric field threshold using the noise_temperature, resistance, and BW
     to determine a V_RMS, and the signal to noise, gain, and frequency to calculate
     the electric field using the antenna factor formula.
 
@@ -1105,7 +1105,7 @@ def electricFieldThreshold( snr , gain, temperature, bandwidth, frequency, verbo
     correspondng thresholds.  This would be helpful if the threshold should be event
     by event depending on the dominant E field frequency. 
     '''
-    V_rms = numpy.sqrt(gnosim.utils.constants.boltzmann * temperature * 50.0 * bandwidth * gnosim.utils.constants.GHz_to_Hz)
+    V_rms = numpy.sqrt(gnosim.utils.constants.boltzmann * noise_temperature * 50.0 * bandwidth * gnosim.utils.constants.GHz_to_Hz)
     thresh = snr * V_rms * 9.73 * frequency / (gnosim.utils.constants.speed_light * gnosim.utils.rf.amplitude(gain))  #f/c gives 1/m because f (GHz) and c (m/ns)
     if verbose == True:
         print('V_rms = ', V_rms*1000000,'uV')
@@ -1322,7 +1322,7 @@ if p9:
 hist_range = [[0,9000],[-2,2]]
 ylim = [-0.5,0.75]
 histbins = [1000,2000]
-#ethresh = electricFieldThreshold( snr , gain, temperature, bandwidth, frequency, verbose = True)
+#ethresh = electricFieldThreshold( snr , gain, noise_temperature, bandwidth, frequency, verbose = True)
 ethresh = electricFieldThreshold( 1.0 , 2.0, 320.0, 0.7, 0.2, verbose = True)
 #ethresh = None
 info,info1,info2, residual, flagged_events, timediffs = timeDiffAtAngle(reader, 0 , index_antenna_1,index_antenna_2, electricThresh = ethresh, theta_ant_bounds = [0.0,180.0], histbins = histbins, config = config, threshold_time = 2, hist_range = hist_range, match_solution_type = True,  solution = 'direct', title = None,xlim = None, ylim = ylim, refraction_index = refraction_index)

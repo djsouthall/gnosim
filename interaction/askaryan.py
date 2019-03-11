@@ -58,87 +58,31 @@ Practical and Accurate Calculations of Askaryan Radiation
 Source: Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283
 '''
 
-def loadSignalResponse(mode='v7'):
+def loadSignalResponse(mode='vpol'):
     '''
     Returns the fft's of the signals, and their frequencies.  
     Eventually these file locations should be part of the config file such that
     individual response functions could be input per antenna.  
     '''
-    if mode == 'v1':
-        print('Loading Signal Response V1')
-        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response.npy')
-        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_elect_response.npy')
-        freqs, h_fft = numpy.hsplit(antenna_response, 2)
-        freqs, sys_fft = numpy.hsplit(electronic_response, 2)
-        h_fft = numpy.ravel(h_fft)
-        sys_fft = numpy.ravel(sys_fft)
-        freqs = freqs[:,0]
-    elif mode == 'v2':
-        print('Loading Signal Response V2')
-        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v2.npy')
-        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_elect_response_v2.npy')
-        freqs, h_fft = numpy.hsplit(antenna_response, 2)
-        freqs, sys_fft = numpy.hsplit(electronic_response, 2)
-        h_fft = numpy.ravel(h_fft)
-        sys_fft = numpy.ravel(sys_fft)
-        freqs = freqs[:,0]
-    elif mode == 'v3':
-        print('Loading Signal Response V3')
-        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v3.npy')
-        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_v3.npy')
-        freqs, h_fft = numpy.hsplit(antenna_response, 2)
-        freqs, sys_fft = numpy.hsplit(electronic_response, 2)
-        h_fft = numpy.ravel(h_fft)
-        sys_fft = numpy.ravel(sys_fft)
-        freqs = freqs[:,0]
-    elif mode == 'v4':
-        print('Loading Signal Response V4')
-        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v4.npy')
-        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_v4.npy')
-        freqs, h_fft = numpy.hsplit(antenna_response, 2)
-        freqs, sys_fft = numpy.hsplit(electronic_response, 2)
-        h_fft = numpy.ravel(h_fft)
-        sys_fft = numpy.ravel(sys_fft)
-        freqs = freqs[:,0]
-    elif mode == 'v5':
-        print('Loading Signal Response V5')
-        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v5.npy')
-        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_v5.npy')
-        freqs, h_fft = numpy.hsplit(antenna_response, 2)
-        freqs, sys_fft = numpy.hsplit(electronic_response, 2)
-        h_fft = numpy.ravel(h_fft)
-        sys_fft = numpy.ravel(sys_fft)
-        freqs = freqs[:,0]
-    elif mode == 'v6':
-        print('Loading Signal Response V6')
-        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v6.npy')
-        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_v6.npy')
-        freqs, h_fft = numpy.hsplit(antenna_response, 2)
-        freqs, sys_fft = numpy.hsplit(electronic_response, 2)
-        h_fft = numpy.ravel(h_fft)
-        sys_fft = numpy.ravel(sys_fft)
-        freqs =  numpy.ravel(freqs)
-    elif mode == 'v7':
-        print('Loading Signal Response V7')
-        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v7.npy')
-        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_v7.npy')
+    if mode == 'vpol':
+        print('Loading Signal Response vpol')
+        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_vpol.npy')
+        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_vpol.npy')
         freqs, h_fft = numpy.hsplit(antenna_response, 2)
         freqs, sys_fft = numpy.hsplit(electronic_response, 2)
         h_fft = numpy.ravel(h_fft)
         sys_fft = numpy.ravel(sys_fft)
         freqs =  numpy.ravel(freqs).astype(float)
     else:
-        print('Error, defaulting to loading Signal Response V7')
-        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_v7.npy')
-        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_v7.npy')
+        print('Error: No other responses available yet other than vpol, defaulting to loading Signal Response vpol')
+        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_vpol.npy')
+        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_vpol.npy')
         freqs, h_fft = numpy.hsplit(antenna_response, 2)
         freqs, sys_fft = numpy.hsplit(electronic_response, 2)
         h_fft = numpy.ravel(h_fft)
         sys_fft = numpy.ravel(sys_fft)
         freqs =  numpy.ravel(freqs).astype(float)
     
-    #sys_fft = numpy.ones_like(sys_fft) #to look at just one
-    #h_fft = numpy.ones_like(h_fft) #to look at just one
     return h_fft,sys_fft,freqs
 
 def RA(Energy_GeV,t_ns):
@@ -348,7 +292,7 @@ def electricFieldTimeDomainRaw(theta_obs_rad,R,Energy_GeV,n,u,plot = False,deriv
             pylab.plot(u,R*E,label = '$R|\\vec{E}_{raw}|$ ')
     return  E , u
 
-def electricFieldTimeDomainSignal(theta_obs_rad,R,Energy_GeV,n,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = False,return_pos = False,mode='v7',up_sample_factor=10,deriv_mode = 'time'):  
+def electricFieldTimeDomainSignal(theta_obs_rad,R,Energy_GeV,n,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = False,return_pos = False,mode='',up_sample_factor=10,deriv_mode = 'time'):  
     '''
     Calculates the full electric field, including response function calculations.
     '''
@@ -541,7 +485,8 @@ def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode=N
     u = numpy.arange(-(n_points_freq-1),(n_points_freq-1))*t_step #To increase time duration of signal I should just need to upsample?
     return u, h_fft, sys_fft, freqs
 
-def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pattern_factor,u, h_fft, sys_fft, freqs, fp_fft = None,plot_signals=False,plot_spectrum=False,plot_angles = False,plot_potential = False,include_noise = False, resistance = 50, temperature = 320,random_local = None):  
+
+def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pattern_factor,u, h_fft, sys_fft, freqs, fp_fft = None,plot_signals=False,plot_spectrum=False,plot_angles = False,plot_potential = False,include_noise = False, resistance = 50, noise_temperature = 320,random_local = None):  
     '''
     This should do the entire calculation, mostly in the frequency domain. 
     Expects u, h_fft, sys_fft, freqs to all come straight from calculateTimes.
@@ -645,7 +590,7 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
         #calculating noise
         bandwidth = freqs[-1]/1e9 #Calculating full band noise, response cuts out stuff we don't see
         
-        V_rms = numpy.sqrt(gnosim.utils.constants.boltzmann * temperature * resistance * bandwidth * gnosim.utils.constants.GHz_to_Hz)
+        V_rms = numpy.sqrt(gnosim.utils.constants.boltzmann * noise_temperature * resistance * bandwidth * gnosim.utils.constants.GHz_to_Hz)
         #print('Internal V_rms is: %f'%V_rms)
         sigma = V_rms 
         
@@ -960,7 +905,7 @@ if __name__ == "__main__":
     for eventid in do_events:
         print('On event %i'%eventid)
         if output_just_noise == True:
-            V, u, Vd, ud, V_just_noise = gnosim.interaction.askaryan_testing.signalsFromInfo(eventid,reader,input_u,n,h_fft,sys_fft,freqs,include_noise = True,resistance = 50, temperature = 320,plot = True,output_just_noise = True)
+            V, u, Vd, ud, V_just_noise = gnosim.interaction.askaryan_testing.signalsFromInfo(eventid,reader,input_u,n,h_fft,sys_fft,freqs,include_noise = True,resistance = 50, noise_temperature = 320,plot = True,output_just_noise = True)
             V_out2,u_out2 = addSignals(u,V,plot=True,V_noise_in = [], remove_noise_overlap = False)
             V_out,u_out = addSignals(u,V,plot=True,V_noise_in = V_just_noise, remove_noise_overlap = True)
             '''
@@ -1008,7 +953,7 @@ if __name__ == "__main__":
             pylab.legend()
             '''
         else:
-            V, u, Vd, ud = gnosim.interaction.askaryan_testing.signalsFromInfo(eventid,reader,input_u,n,h_fft,sys_fft,freqs,include_noise = True,resistance = 50, temperature = 320,plot = False,output_just_noise = False)
+            V, u, Vd, ud = gnosim.interaction.askaryan_testing.signalsFromInfo(eventid,reader,input_u,n,h_fft,sys_fft,freqs,include_noise = True,resistance = 50, noise_temperature = 320,plot = False,output_just_noise = False)
         sub_info = info[info['eventid'] == eventid]
     
     
