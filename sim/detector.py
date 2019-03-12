@@ -193,7 +193,7 @@ class Station:
             antenna = Antenna(x_antenna + self.x, y_antenna + self.y, z_antenna + self.z, 
                                 alpha_deg, beta_deg, gamma_deg,
                                 self.config['antenna_definitions'][key]['antenna_type'],
-                                self.config['antenna_definitions'][key]['temp'], 
+                                self.config['antenna_definitions'][key]['noise_temperature'], 
                                 self.config['antenna_definitions'][key]['resistance'],
                                 self.config['antenna_definitions'][key]['lib'],
                                 key,
@@ -585,6 +585,19 @@ class Antenna:
                       include_noise = True, resistance = self.resistance, noise_temperature = self.noise_temperature)[3]
             noise_signal = numpy.append(noise_signal,noise_signal_i)
         self.noise_rms = numpy.std(noise_signal)
+
+    def constructAntennaPattern(self):
+        '''
+        This will hopefully create whatever is needed for a given antenna type, including beam pattern, polarization sensitivity, etc.
+        As this is intended to do a fair bit I am not quite yet sure how to handle it.
+        '''
+        if self.antenna_type == simple:
+            print('I will figure out the harder version first and backsolve')
+        elif self.antenna_type == dipole:
+            polarization_sensitivity_theta = 0.0    #Angle from pole (in antenna frame) the antenna is most sensitive to polarization.
+            polarization_sensitivity_phi = 0.0      #Azimuthal angle (from x in antenna frame) the antenna is most sensitive to polarization.
+
+
 
 class test:
     def __init__(self,x):
