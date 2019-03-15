@@ -794,13 +794,7 @@ class RefractionLibrary:
             for solution in self.solutions:
                 for key in self.keys:
                     if len(self.data[solution][key]) > 0:
-                        if numpy.logical_and(key == 'a_s', ~numpy.isin('a_s',list(reader.keys()))):
-                            old_key = 'a_h'
-                        elif numpy.logical_and(key == 'a_p', ~numpy.isin('a_p',list(reader.keys()))):
-                            old_key = 'a_v'
-                        else:
-                            old_key = key
-                        self.data[solution][key] = numpy.concatenate(self.data[solution][old_key])
+                        self.data[solution][key] = numpy.concatenate(self.data[solution][key])
                 print (solution, len(self.data[solution]['t']))
 
             print ('Intersections...')
@@ -815,22 +809,10 @@ class RefractionLibrary:
                 theta_ant_divide = self.data['direct']['theta_ant'][numpy.argmax(self.data['direct']['r'])]
                 cut = self.data['direct_2']['theta_ant'] < theta_ant_divide
                 for key in self.keys:
-                    if numpy.logical_and(key == 'a_s', ~numpy.isin('a_s',list(reader.keys()))):
-                        old_key = 'a_h'
-                    elif numpy.logical_and(key == 'a_p', ~numpy.isin('a_p',list(reader.keys()))):
-                        old_key = 'a_v'
-                    else:
-                        old_key = key
-                    self.data['cross_2'][key] = self.data['direct_2'][old_key][cut]
+                    self.data['cross_2'][key] = self.data['direct_2'][key][cut]
                 cut = numpy.logical_not(cut)
                 for key in self.keys:
-                    if numpy.logical_and(key == 'a_s', ~numpy.isin('a_s',list(reader.keys()))):
-                        old_key = 'a_h'
-                    elif numpy.logical_and(key == 'a_p', ~numpy.isin('a_p',list(reader.keys()))):
-                        old_key = 'a_v'
-                    else:
-                        old_key = key
-                    self.data['direct_2'][key] = self.data['direct_2'][old_key][cut]
+                    self.data['direct_2'][key] = self.data['direct_2'][key][cut]
             
         else:
             #Below is what happens if the solution types are already sorted into subfolders
@@ -1105,8 +1087,8 @@ if __name__ == '__main__':
     plot_library = False
     save_envelope = True
     plot_envelope = False
-    z_array = numpy.array([-173.0,-174.0,-175.0,-176.0,-177.0,-179.0,-181.0])[~numpy.isin([-173.0,-174.0,-175.0,-176.0,-177.0,-179.0,-181.0],[-175,-176,-177,-178,-179,-181,-183])]
-    #z_array = [-200.,-201.,-202.,-203.,-204.,-205.,-206.,-207.]#[-175,-176,-177,-178,-179,-181,-183]#[-200.,-201.,-202.,-203.,-204.,-205.,-206.,-207.]
+    z_array = numpy.array([-173.0,-174.0,-175.0,-176.0,-177.0,-179.0,-181.0])
+    #z_array = [-200.,-201.,-202.,-203.,-204.,-205.,-206.,-207.]
     n_rays = 180
     r_limit = None #Note if this is NOT None, then all thrown rays will quit once they read this particular radius.  Use with care.  If you want a simulation with r = 6300m, it might be advisable to make r_limit = 7000 so the boundaries of hulls are still well defined
     ice_model = 'antarctica'
@@ -1117,12 +1099,7 @@ if __name__ == '__main__':
     ice_model = gnosim.earth.ice.checkIceModel(ice_model) #Checks if ice model exists and replaces as necessary.
     for z_0 in z_array:
         library_dir = 'library_%i_%s_%i_rays_signed_fresnel'%(int(z_0),ice_model,n_rays)
-        if os.path.isdir(library_dir):
-            print('Output directory Name %s is taken, saving in current directory and appending \'_new\' if necessary'%(library_dir))
-            while os.path.isdir(library_dir):
-                library_dir = library_dir + '_new'
-        print ('library dir = %s'%(library_dir))
-        print ('z_0 = %.2f'%(z_0))
+        
         #print ('ice model = %s'%(ice_model))
        
         theta_array = numpy.linspace(0., 180., n_rays) # 60, Trying double the density
@@ -1134,6 +1111,12 @@ if __name__ == '__main__':
         solution_list = numpy.array(['direct','cross','reflect','direct_2','cross_2','reflect_2'])
         #solution_list = numpy.array(['direct','cross','reflect'])
         if make_library == True:
+            if os.path.isdir(library_dir):
+                print('Output directory Name %s is taken, saving in current directory and appending \'_new\' if necessary'%(library_dir))
+                while os.path.isdir(library_dir):
+                    library_dir = library_dir + '_new'
+            print ('library dir = %s'%(library_dir))
+            print ('z_0 = %.2f'%(z_0))
             os.mkdir(library_dir)
             makeLibrary(z_0, theta_array,ice_model, save=True, library_dir=library_dir,r_limit = r_limit)
             
