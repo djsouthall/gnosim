@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 '''
 This file will eventually load in the various configuration types and other information
 to calculate and plot volumetric acceptance of various configuration types as a
@@ -22,7 +23,6 @@ sys.path.append('/home/dsouthall/Projects/GNOSim/')
 import gnosim.utils.constants
 import gnosim.utils.bayesian_efficiency
 import gnosim.earth.ice
-import gnosim.trace.refraction_library
 from matplotlib.colors import LogNorm
 pylab.ion()
 
@@ -31,10 +31,10 @@ def volumetricAcceptance(reader,verbose = True):
     '''
     Calculates the volumetric acceptance of a run in # km^3 sr
     '''
-    if numpy.isin('config_0',list(reader.attrs)):
-        config = yaml.load(open(reader.attrs['config_0']))
-    elif numpy.isin('config',list(reader.attrs)):
+    if numpy.isin('config',list(reader.attrs)):
         config = yaml.load(open(reader.attrs['config']))
+    elif numpy.isin('config_0',list(reader.attrs)):
+        config = yaml.load(open(reader.attrs['config_0']))
     else:
         print('Config file not found...')
         pass
@@ -42,7 +42,7 @@ def volumetricAcceptance(reader,verbose = True):
     if numpy.isin('geometric_factor_0',list(reader.attrs)):
         geometric_factor = reader.attrs['geometric_factor_0']
     elif numpy.isin('geometric_factor',list(reader.attrs)):
-        geometric_factor = reader.attrs['geometric_factor_0']
+        geometric_factor = reader.attrs['geometric_factor']
     else:
         print('geometric_factor file not found...')
         pass
@@ -85,18 +85,21 @@ if __name__ == "__main__":
     #Calculation Parameters
     calculate_data = False
     config = 'real_config'
-    outdir = '/home/dsouthall/scratch-midway2/'
+    outdir = '/home/dsouthall/scratch-midway2/mar_testing_real_config/'
     outname = outdir +'volumetric_acceptance_data_%s.h5'%(config)
-    
+    expect_merged = False
     #Plotting Parameters
     plot_data = True
-    dataname = '/home/dsouthall/scratch-midway2/real_config_10deg_pretrigger_Feb2019/volumetric_acceptance_data_real_config.h5'
+    dataname = '/home/dsouthall/scratch-midway2/mar_testing_real_config/volumetric_acceptance_data_real_config.h5'
     plot_comparison = True
     comparison_file = '/home/dsouthall/Projects/GNOSim/gnosim/analysis/DesignPerformancePaperData.py'
     
     if calculate_data == True:
         ######
-        infiles = glob.glob('./*merged*.h5')
+        if expect_merged == True:
+            infiles = glob.glob('./*merged*.h5')
+        else:
+            infiles = glob.glob('./*seed*.h5')
         print('Attempting to calculate volumetric acceptance for the following files:')
         for infile in infiles:
             print(infile)
@@ -117,15 +120,13 @@ if __name__ == "__main__":
             reader = h5py.File(infile , 'r')
             VA, error, energy_neutrino = volumetricAcceptance(reader,verbose = True)
             reader.close()
-            writer[index] = VA
+            writer['volumetric_acceptance'][index] = VA
             writer['error'][index] = error
             writer['energy_neutrino'][index] = energy_neutrino
          
         writer.close()
     
     if plot_data:
-    
-    
         markersize = 10
         linewidth = 5
         reader = h5py.File(dataname , 'r')

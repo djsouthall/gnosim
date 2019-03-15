@@ -10,6 +10,7 @@ import scipy.spatial
 import h5py
 import pylab
 import os
+from mpl_toolkits.mplot3d import Axes3D
 sys.path.append('/home/dsouthall/Projects/GNOSim/')
 import gnosim.utils.constants
 import gnosim.utils.rf
@@ -21,10 +22,122 @@ pylab.ion()
 
 ############################################################
 
+def fresnelAmplitude(n_1, n_2, incidence_angle, mode, return_power = False):
+    """
+    Reflected or transmitted amplitudes for different polarizations.
+
+    n_1 = index of refraction of current medium
+    n_2 = index of refraction of encountered medium
+    incidence_angle = incidence angle to surface (deg)
+    mode = 'reflection' or 'transmission'
+
+    Need to return to this function to make it more numpy compliant eventually.
+    """
+    #theta_c = numpy.arcsin(n_2/n_1)
+    #if numpy.logical_and(n_2 < n_1, numpy.deg2rad(incidence_angle) > theta_c):
+    #    t_p = 0.0
+    #    t_s = 0.0
+    #    r_p = 1.0
+    #    r_s = 1.0
+    #else:
+    n_1 = n_1 + 0j
+    n_2 = n_2 + 0j
+
+    c_i = numpy.cos(numpy.radians(incidence_angle)) #+ 0j
+    s_i = numpy.sin(numpy.radians(incidence_angle)) #+ 0j
+    s_t = (n_1/n_2)*s_i# + 0j
+    c_t = numpy.cos(numpy.arcsin(s_t))# + 0j
+
+    # s-polarized light (i.e., electric field perpendicular to the plane of reflection and transmission)
+    r_s = (n_1*c_i - n_2*c_t)/(n_1*c_i + n_2*c_t)
+    t_s = (2*n_1*c_i)/(n_1*c_i + n_2*c_t)
+    # p-polarized light (i.e., electric field parallel to the plane of reflection and transmission)
+    r_p = (n_2*c_i - n_1*c_t)/(n_2*c_i + n_1*c_t)
+    t_p = (2*n_1*c_i)/(n_2*c_i + n_1*c_t)
+
+    if return_power == True:
+        #Powers (should match with fresnel Power?)
+        R_p = numpy.real(r_p * numpy.conj(r_p))
+        R_s = numpy.real(r_s * numpy.conj(r_s))
+
+        T_pre_factor = (n_2*c_t)/(n_1*c_i)
+        T_p = T_pre_factor*numpy.real(t_p * numpy.conj(t_p))
+        T_s = T_pre_factor*numpy.real(t_s * numpy.conj(t_s))
+        if mode == 'reflection':
+            return R_s, R_p
+        elif mode == 'transmission':
+            return T_s, T_p
+        else:
+            print ('WARNING: mode %s not recognized'%(mode))
+    else:
+        if mode == 'reflection':
+            return r_s, r_p
+        elif mode == 'transmission':
+            return t_s, t_p
+        else:
+            print ('WARNING: mode %s not recognized'%(mode))
+
+def testFresnelSign():
+    pylab.figure()
+    pylab.plot(r,z_power)
+
+    n_1 = 1.5#ice.indexOfRefraction(-2950)
+    n_2 = 1.0#ice.indexOfRefraction(-3050)
+    mode = 'reflection'
+    r_s = []
+    r_p = []
+    for i in numpy.arange(91.):
+        r_s_i,r_p_i = gnosim.trace.refraction_library_beta.fresnelAmplitude(n_1, n_2, i, mode)
+        r_s.append(r_s_i)
+        r_p.append(r_p_i)
+
+    pylab.figure()
+    pylab.title('Ice to Air')
+    pylab.plot(numpy.arange(91.),r_s, label = 'r_s')
+    pylab.plot(numpy.arange(91.),r_p, label = 'r_p')
+
+    mode = 'transmission'
+    r_s = []
+    r_p = []
+    for i in numpy.arange(91.):
+        r_s_i,r_p_i = gnosim.trace.refraction_library_beta.fresnelAmplitude(n_1, n_2, i, mode)
+        r_s.append(r_s_i)
+        r_p.append(r_p_i)
+
+    pylab.plot(numpy.arange(91.),r_s,label = 't_s')
+    pylab.plot(numpy.arange(91.),r_p,label = 't_p')
+    pylab.legend()
 
 
+    #######
+    n_1 = 1.0#ice.indexOfRefraction(-2950)
+    n_2 = 1.5#ice.indexOfRefraction(-3050)
+    mode = 'reflection'
+    r_s = []
+    r_p = []
+    for i in numpy.arange(91.):
+        r_s_i,r_p_i = gnosim.trace.refraction_library_beta.fresnelAmplitude(n_1, n_2, i, mode)
+        r_s.append(r_s_i)
+        r_p.append(r_p_i)
 
-def fresnel(n_1, n_2, incidence_angle, mode):
+    pylab.figure()
+    pylab.title('Air to Ice')
+    pylab.plot(numpy.arange(91.),r_s, label = 'r_s')
+    pylab.plot(numpy.arange(91.),r_p, label = 'r_p')
+
+    mode = 'transmission'
+    r_s = []
+    r_p = []
+    for i in numpy.arange(91.):
+        r_s_i,r_p_i = gnosim.trace.refraction_library_beta.fresnelAmplitude(n_1, n_2, i, mode)
+        r_s.append(r_s_i)
+        r_p.append(r_p_i)
+
+    pylab.plot(numpy.arange(91.),r_s,label = 't_s')
+    pylab.plot(numpy.arange(91.),r_p,label = 't_p')
+    pylab.legend()
+
+def fresnelPower(n_1, n_2, incidence_angle, mode):
     """
     Reflected or transmitted power for different polarizations.
 
@@ -89,8 +202,8 @@ def testFresnel(n_low=1., n_high=1.5):
     t_s = numpy.zeros(len(incidence_angle_array))
     t_p = numpy.zeros(len(incidence_angle_array))
     for ii, incidence_angle in enumerate(incidence_angle_array):
-        r_s[ii], r_p[ii] = fresnel(n_low, n_high, incidence_angle, mode='reflection')
-        t_s[ii], t_p[ii] = fresnel(n_low, n_high, incidence_angle, mode='transmission')
+        r_s[ii], r_p[ii] = fresnelPower(n_low, n_high, incidence_angle, mode='reflection')
+        t_s[ii], t_p[ii] = fresnelPower(n_low, n_high, incidence_angle, mode='transmission')
     pylab.figure()
     pylab.plot(incidence_angle_array, r_s, label='R_s', c='red', linestyle='--')
     pylab.plot(incidence_angle_array, r_p, label='R_p', c='red', linestyle='-')
@@ -108,8 +221,8 @@ def testFresnel(n_low=1., n_high=1.5):
     t_s = numpy.zeros(len(incidence_angle_array))
     t_p = numpy.zeros(len(incidence_angle_array))
     for ii, incidence_angle in enumerate(incidence_angle_array):
-        r_s[ii], r_p[ii] = fresnel(n_high, n_low, incidence_angle, mode='reflection')
-        t_s[ii], t_p[ii] = fresnel(n_high, n_low, incidence_angle, mode='transmission')
+        r_s[ii], r_p[ii] = fresnelPower(n_high, n_low, incidence_angle, mode='reflection')
+        t_s[ii], t_p[ii] = fresnelPower(n_high, n_low, incidence_angle, mode='transmission')
     pylab.figure()
     pylab.plot(incidence_angle_array, r_s, label='R_s', c='red', linestyle='--')
     pylab.plot(incidence_angle_array, r_p, label='R_p', c='red', linestyle='-')
@@ -125,7 +238,7 @@ def testFresnel(n_low=1., n_high=1.5):
 
 
 
-def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = None): # t_max=40000, t_max=1000 (testing)
+def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = None, fresnel_mode = 'power'): # t_max=40000, t_max=1000 (testing)
     """
     z_0 = initial elevation (m)
     t_max = max time (ns)
@@ -152,8 +265,14 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = N
     x_array = numpy.zeros(n_steps + 1) # m
     y_array = numpy.zeros(n_steps + 1) # m
     z_array = numpy.zeros(n_steps + 1) # m
-    a_v_array = numpy.ones(n_steps + 1) # Amplitude of vertically polarized electric field (m)
-    a_h_array = numpy.ones(n_steps + 1) # Amplitude of horizontally polarized electric field (m)
+
+    if fresnel_mode == 'power':
+        a_p_array = numpy.ones(n_steps + 1) # Amplitude of vertically polarized electric field (m)
+        a_s_array = numpy.ones(n_steps + 1) # Amplitude of horizontally polarized electric field (m)
+    elif fresnel_mode == 'amplitude':
+        a_p_array = numpy.ones(n_steps + 1) + 0j # Amplitude of vertically polarized electric field (m)
+        a_s_array = numpy.ones(n_steps + 1) + 0j # Amplitude of horizontally polarized electric field (m)
+
     d_array = numpy.zeros(n_steps + 1) # m
 
     phi_array = phi_0 * numpy.ones(n_steps + 1) # deg
@@ -261,13 +380,14 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = N
         
         d_array[ii + 1] = d_step
         
+        # TODO: This online calculates attenuation at one frequency.  Would eventually be good to think of a way to generalize this for time domain signal.  This seems hard, as this is used as a look up table with interpolation.
         attenuation_length = ice.attenuationLength(z_array[ii], 0.3) # m, Transmission
         if attenuation_length > 1.e10:
-            a_v_array[ii + 1] = 1.
-            a_h_array[ii + 1] = 1.
+            a_p_array[ii + 1] = 1.
+            a_s_array[ii + 1] = 1.
         else:
-            a_v_array[ii + 1] = numpy.exp(-1. * d_array[ii + 1] / ice.attenuationLength(z_array[ii], 0.3)) # Transmission 
-            a_h_array[ii + 1] = numpy.exp(-1. * d_array[ii + 1] / ice.attenuationLength(z_array[ii], 0.3)) # Transmission
+            a_p_array[ii + 1] = numpy.exp(-1. * d_array[ii + 1] / ice.attenuationLength(z_array[ii], 0.3)) # Transmission 
+            a_s_array[ii + 1] = numpy.exp(-1. * d_array[ii + 1] / ice.attenuationLength(z_array[ii], 0.3)) # Transmission
 
         x_array[ii + 1] = x_array[ii] + x_step
         y_array[ii + 1] = y_array[ii] + y_step
@@ -292,11 +412,18 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = N
             # Ray going from ice to air (for a ray going backwards from antenna to interaction vertex)
             # Compute reflection coefficients (power which is reflected)
             incidence_angle = theta_array[ii]
-            r_s, r_p = fresnel(ice.indexOfRefraction(z_array[ii]),
-                               ice.indexOfRefraction(z_array[ii + 1]),
-                               incidence_angle, mode='reflection')
-            a_v_array[ii + 1] *= numpy.sqrt(r_p)
-            a_h_array[ii + 1] *= numpy.sqrt(r_s)
+            if fresnel_mode == 'power':
+                r_s, r_p = fresnelPower(ice.indexOfRefraction(z_array[ii]),
+                                   ice.indexOfRefraction(z_array[ii + 1]),
+                                   incidence_angle, mode='reflection')
+                a_p_array[ii + 1] *= numpy.sqrt(r_p)
+                a_s_array[ii + 1] *= numpy.sqrt(r_s)
+            elif fresnel_mode == 'amplitude':
+                r_s, r_p = fresnelAmplitude(ice.indexOfRefraction(z_array[ii]),
+                                   ice.indexOfRefraction(z_array[ii + 1]),
+                                   incidence_angle, mode='reflection')
+                a_p_array[ii + 1] *= r_p
+                a_s_array[ii + 1] *= r_s
             #print ('ICE -> AIR', ii, r_p, r_s)
             theta_array[ii + 1] = 180. - theta_array[ii]
             index_reflect = ii + 1
@@ -308,22 +435,31 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = N
             # Compute reflection coefficients (power which is transmitted)
             theta_array[ii + 1] = 180. - numpy.degrees(numpy.arcsin(value))
             incidence_angle = 180. - theta_array[ii + 1]
-            t_s, t_p = fresnel(ice.indexOfRefraction(z_array[ii + 1]),
-                               ice.indexOfRefraction(z_array[ii]),
-                               incidence_angle, mode='transmission')
-            a_v_array[ii + 1] *= numpy.sqrt(t_p)
-            a_h_array[ii + 1] *= numpy.sqrt(t_s)
+
+            if fresnel_mode == 'power':
+                t_s, t_p = fresnelPower(ice.indexOfRefraction(z_array[ii]),
+                                   ice.indexOfRefraction(z_array[ii + 1]),
+                                   incidence_angle, mode='transmission')
+                a_p_array[ii + 1] *= numpy.sqrt(t_p)
+                a_s_array[ii + 1] *= numpy.sqrt(t_s)
+            elif fresnel_mode == 'amplitude':
+                t_s, t_p = fresnelAmplitude(ice.indexOfRefraction(z_array[ii]),
+                                   ice.indexOfRefraction(z_array[ii + 1]),
+                                   incidence_angle, mode='transmission')
+                a_p_array[ii + 1] *= t_p
+                a_s_array[ii + 1] *= t_s
+            
             #print ('AIR -> ICE', ii, t_p, t_s)
         elif delta_index_of_refraction < -0.1 and theta_array[ii] > 90.:
             # Ray going from ice to water
             # Compute reflection coefficients (power which is reflected)
             incidence_angle = 180. - theta_array[ii]
             r_s, r_p = 1., 1. # Water is conductor, so complete reflection
-            #r_s, r_p = fresnel(ice.indexOfRefraction(z_array[ii]),
+            #r_s, r_p = fresnelPower(ice.indexOfRefraction(z_array[ii]),
             #                   ice.indexOfRefraction(z_array[ii + 1]),
             #                   incidence_angle, mode='reflection')
-            a_v_array[ii + 1] *= numpy.sqrt(r_p)
-            a_h_array[ii + 1] *= numpy.sqrt(r_s)
+            a_p_array[ii + 1] *= numpy.sqrt(r_p)
+            a_s_array[ii + 1] *= numpy.sqrt(r_s)
             reflection_water = True
             #print ('ICE -> WATER', ii, r_p, r_s)
             theta_array[ii + 1] = 180. - theta_array[ii]
@@ -351,16 +487,18 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = N
     # Convert to total distance
     d_array = numpy.cumsum(d_array)
 
-    # Convert from transmission at each step to cumulative transmission
-    a_v_array = numpy.cumprod(a_v_array)
-    a_h_array = numpy.cumprod(a_h_array)
+    # Convert from transmission at each step to cumulative transmission 
+    a_p_array = numpy.real(numpy.cumprod(a_p_array))  #If ever working with dielectrics should not use 
+    a_s_array = numpy.real(numpy.cumprod(a_s_array))
+    #using the amplitudes keeps the sign here.
+
     if r_limit != None:
         if max_ii != None:
             n_steps = max_ii
                 
     return (x_array[0: n_steps], y_array[0: n_steps], z_array[0: n_steps], \
         t_array[0: n_steps], d_array[0: n_steps], phi_array[0: n_steps], \
-        theta_array[0: n_steps], a_v_array[0: n_steps], a_h_array[0: n_steps], \
+        theta_array[0: n_steps], a_p_array[0: n_steps], a_s_array[0: n_steps], \
         index_reflect_air, index_reflect_water)
 
 def plotGeometry(stations,neutrino_loc,phi_0,info,ice):
@@ -392,7 +530,7 @@ def plotGeometry(stations,neutrino_loc,phi_0,info,ice):
                 origin_r = numpy.sqrt(antenna_loc[0]**2 + antenna_loc[1]**2)
                 ssub_info = sub_info[numpy.logical_and(station_cut,antenna_cut)]
                 for index_solution, solution in enumerate(ssub_info['solution']):
-                    x, y, z, t, d, phi, theta, a_v, a_h, index_reflect_air, index_reflect_water = rayTrace(antenna_loc, phi_0, ssub_info['theta_ant'][ssub_info['solution'] == solution],ice, r_limit = 1.001*neutrino_loc_r)
+                    x, y, z, t, d, phi, theta, a_p, a_s, index_reflect_air, index_reflect_water = rayTrace(antenna_loc, phi_0, ssub_info['theta_ant'][ssub_info['solution'] == solution],ice, r_limit = 1.001*neutrino_loc_r)
                     r = numpy.sqrt(x**2 + y**2)
                     label = 'S%iA%i %s'%(index_station,index_antenna,solution.decode())
                     if numpy.isin(solution.decode(),list(linestyle_dict.keys())):
@@ -428,8 +566,8 @@ def makeLibrary(z_0, theta_ray_array, ice_model, save=True, library_dir='library
     d_array = []
     phi_array = []
     theta_array = []
-    a_v_array = []
-    a_h_array = []
+    a_p_array = []
+    a_s_array = []
     reflection = False
     
     theta_ant_array = []
@@ -438,7 +576,7 @@ def makeLibrary(z_0, theta_ray_array, ice_model, save=True, library_dir='library
 
     for ii in range(0, len(theta_ray_array)):
         print ('(%i/%i) theta_ant = %.4f'%(ii, len(theta_ray_array), theta_ray_array[ii]))
-        x, y, z, t, d, phi, theta, a_v, a_h, index_reflect_air, index_reflect_water = rayTrace([x_0, y_0, z_0], phi_0, theta_ray_array[ii],ice)
+        x, y, z, t, d, phi, theta, a_p, a_s, index_reflect_air, index_reflect_water = rayTrace([x_0, y_0, z_0], phi_0, theta_ray_array[ii],ice)
         x_array.append(x)
         y_array.append(y)
         z_array.append(z)
@@ -446,8 +584,8 @@ def makeLibrary(z_0, theta_ray_array, ice_model, save=True, library_dir='library
         d_array.append(d)
         phi_array.append(phi)
         theta_array.append(theta)
-        a_v_array.append(a_v)
-        a_h_array.append(a_h)
+        a_p_array.append(a_p)
+        a_s_array.append(a_s)
 
         if save:
             n_points = len(t)
@@ -466,8 +604,8 @@ def makeLibrary(z_0, theta_ray_array, ice_model, save=True, library_dir='library
             file.create_dataset('d', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             file.create_dataset('theta', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             file.create_dataset('theta_ant', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('a_v', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('a_h', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            file.create_dataset('a_p', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            file.create_dataset('a_s', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
         
             file['r'][...] = x
             file['z'][...] = z
@@ -475,8 +613,8 @@ def makeLibrary(z_0, theta_ray_array, ice_model, save=True, library_dir='library
             file['d'][...] = d
             file['theta'][...] = theta
             file['theta_ant'][...] = theta_ray_array[ii] * numpy.ones(n_points)
-            file['a_v'][...] = a_v
-            file['a_h'][...] = a_h
+            file['a_p'][...] = a_p
+            file['a_s'][...] = a_s
 
             file.close()
     
@@ -487,12 +625,12 @@ def makeLibrary(z_0, theta_ray_array, ice_model, save=True, library_dir='library
     d_array = numpy.concatenate([d_array])
     phi_array = numpy.concatenate([phi_array])
     theta_array = numpy.concatenate([theta_array])
-    a_v_array = numpy.concatenate([a_v_array])
-    a_h_array = numpy.concatenate([a_h_array])
+    a_p_array = numpy.concatenate([a_p_array])
+    a_s_array = numpy.concatenate([a_s_array])
 
     """
     pylab.figure()
-    pylab.scatter(x_array, z_array, c=numpy.clip(gnosim.utils.rf.decibel(a_v_array), -30., 0.), edgecolors='none')
+    pylab.scatter(x_array, z_array, c=numpy.clip(gnosim.utils.rf.decibel(a_p_array), -30., 0.), edgecolors='none')
     colorbar = pylab.colorbar()
     colorbar.set_label('VPOL Attenuation (dB)')
     pylab.xlabel('Radius (m)')
@@ -514,7 +652,7 @@ class RefractionLibrary:
             print('Limiting Solution Types Currently only works for pre_split = True, using default solution types.')
             self.solutions = accepted_solutions
             
-        self.keys = ['r', 'z', 't', 'd', 'theta', 'theta_ant', 'a_v', 'a_h']
+        self.keys = ['r', 'z', 't', 'd', 'theta', 'theta_ant', 'a_p', 'a_s']
 
         # Dictionary to store data
         self.data = {}
@@ -545,6 +683,7 @@ class RefractionLibrary:
             for infile in self.infiles:
                 print (infile)
                 reader = h5py.File(infile, 'r')
+
                 n = len(reader['t'])
                 current_model = reader.attrs['ice_model']
                 if current_model == 'arthern':
@@ -564,27 +703,51 @@ class RefractionLibrary:
                     cut = numpy.zeros(n, bool)
                     cut[0: reader.attrs['index_reflect_air']] = True
                     for key in self.keys:
+                        if numpy.logical_and(key == 'a_s', ~numpy.isin('a_s',list(reader.keys()))):
+                            old_key = 'a_h'
+                        elif numpy.logical_and(key == 'a_p', ~numpy.isin('a_p',list(reader.keys()))):
+                            old_key = 'a_v'
+                        else:
+                            old_key = key
                         #Upward-going rays prior to reflection off ice-air interface 
-                        self.data['direct'][key].append(reader[key][cut])
+                        self.data['direct'][key].append(reader[old_key][cut])
                     if reader.attrs['index_reflect_water'] > 0:
                         # Additional reflection off ice-water interface
                         cut = numpy.zeros(n, bool)
                         cut[reader.attrs['index_reflect_air']: reader.attrs['index_reflect_water']] = True
                         for key in self.keys:
+                            if numpy.logical_and(key == 'a_s', ~numpy.isin('a_s',list(reader.keys()))):
+                                old_key = 'a_h'
+                            elif numpy.logical_and(key == 'a_p', ~numpy.isin('a_p',list(reader.keys()))):
+                                old_key = 'a_v'
+                            else:
+                                old_key = key
                             # Downward-going rays from reflection off ice-air interface 
-                            self.data['reflect'][key].append(reader[key][cut])
+                            self.data['reflect'][key].append(reader[old_key][cut])
                         cut = numpy.zeros(n, bool)
                         cut[reader.attrs['index_reflect_water']:] = True
                         for key in self.keys:
+                            if numpy.logical_and(key == 'a_s', ~numpy.isin('a_s',list(reader.keys()))):
+                                old_key = 'a_h'
+                            elif numpy.logical_and(key == 'a_p', ~numpy.isin('a_p',list(reader.keys()))):
+                                old_key = 'a_v'
+                            else:
+                                old_key = key
                             # Upward-going rays from reflection off ice-water interface 
-                            self.data['reflect_2'][key].append(reader[key][cut])
+                            self.data['reflect_2'][key].append(reader[old_key][cut])
                     else:
                         # No reflection off ice-water interface
                         cut = numpy.zeros(n, bool)
                         cut[reader.attrs['index_reflect_air']:] = True
                         for key in self.keys:
+                            if numpy.logical_and(key == 'a_s', ~numpy.isin('a_s',list(reader.keys()))):
+                                old_key = 'a_h'
+                            elif numpy.logical_and(key == 'a_p', ~numpy.isin('a_p',list(reader.keys()))):
+                                old_key = 'a_v'
+                            else:
+                                old_key = key
                             # Downward-going rays from reflection off ice-air interface 
-                            self.data['reflect'][key].append(reader[key][cut])
+                            self.data['reflect'][key].append(reader[old_key][cut])
                 else:
                     # Rays without reflections off ice-air interface
                     if reader.attrs['index_reflect_water'] > 0:
@@ -592,20 +755,38 @@ class RefractionLibrary:
                         cut = numpy.zeros(n, bool)
                         cut[0: reader.attrs['index_reflect_water']] = True
                         for key in self.keys:
+                            if numpy.logical_and(key == 'a_s', ~numpy.isin('a_s',list(reader.keys()))):
+                                old_key = 'a_h'
+                            elif numpy.logical_and(key == 'a_p', ~numpy.isin('a_p',list(reader.keys()))):
+                                old_key = 'a_v'
+                            else:
+                                old_key = key
                             # Downward-going rays before reflection off ice-water interface 
-                            self.data['direct'][key].append(reader[key][cut])
+                            self.data['direct'][key].append(reader[old_key][cut])
 
                         cut = numpy.zeros(n, bool)
                         cut[reader.attrs['index_reflect_water']:] = True
                         for key in self.keys:
+                            if numpy.logical_and(key == 'a_s', ~numpy.isin('a_s',list(reader.keys()))):
+                                old_key = 'a_h'
+                            elif numpy.logical_and(key == 'a_p', ~numpy.isin('a_p',list(reader.keys()))):
+                                old_key = 'a_v'
+                            else:
+                                old_key = key
                             # Upward-going rays after reflection off ice-water interface 
-                            self.data['direct_2'][key].append(reader[key][cut])
+                            self.data['direct_2'][key].append(reader[old_key][cut])
                     else:
                         # No reflection off ice-water interface
                         cut = numpy.ones(n, bool)
                         for key in self.keys:
+                            if numpy.logical_and(key == 'a_s', ~numpy.isin('a_s',list(reader.keys()))):
+                                old_key = 'a_h'
+                            elif numpy.logical_and(key == 'a_p', ~numpy.isin('a_p',list(reader.keys()))):
+                                old_key = 'a_v'
+                            else:
+                                old_key = key
                             # Downward-going rays from reflection off ice-air interface 
-                            self.data['direct'][key].append(reader[key][cut])
+                            self.data['direct'][key].append(reader[old_key][cut])
 
                 
                 reader.close()
@@ -613,7 +794,13 @@ class RefractionLibrary:
             for solution in self.solutions:
                 for key in self.keys:
                     if len(self.data[solution][key]) > 0:
-                        self.data[solution][key] = numpy.concatenate(self.data[solution][key])
+                        if numpy.logical_and(key == 'a_s', ~numpy.isin('a_s',list(reader.keys()))):
+                            old_key = 'a_h'
+                        elif numpy.logical_and(key == 'a_p', ~numpy.isin('a_p',list(reader.keys()))):
+                            old_key = 'a_v'
+                        else:
+                            old_key = key
+                        self.data[solution][key] = numpy.concatenate(self.data[solution][old_key])
                 print (solution, len(self.data[solution]['t']))
 
             print ('Intersections...')
@@ -628,10 +815,22 @@ class RefractionLibrary:
                 theta_ant_divide = self.data['direct']['theta_ant'][numpy.argmax(self.data['direct']['r'])]
                 cut = self.data['direct_2']['theta_ant'] < theta_ant_divide
                 for key in self.keys:
-                    self.data['cross_2'][key] = self.data['direct_2'][key][cut]
+                    if numpy.logical_and(key == 'a_s', ~numpy.isin('a_s',list(reader.keys()))):
+                        old_key = 'a_h'
+                    elif numpy.logical_and(key == 'a_p', ~numpy.isin('a_p',list(reader.keys()))):
+                        old_key = 'a_v'
+                    else:
+                        old_key = key
+                    self.data['cross_2'][key] = self.data['direct_2'][old_key][cut]
                 cut = numpy.logical_not(cut)
                 for key in self.keys:
-                    self.data['direct_2'][key] = self.data['direct_2'][key][cut]
+                    if numpy.logical_and(key == 'a_s', ~numpy.isin('a_s',list(reader.keys()))):
+                        old_key = 'a_h'
+                    elif numpy.logical_and(key == 'a_p', ~numpy.isin('a_p',list(reader.keys()))):
+                        old_key = 'a_v'
+                    else:
+                        old_key = key
+                    self.data['direct_2'][key] = self.data['direct_2'][old_key][cut]
             
         else:
             #Below is what happens if the solution types are already sorted into subfolders
@@ -648,7 +847,13 @@ class RefractionLibrary:
                         if self.ice_model != reader.attrs['ice_model']:
                             print ('WARNING: Ice models used in ray-tracing libraries do not match, e.g., %s != %s'%(self.ice_model, reader.attrs['ice_model']))
                     for key in self.keys:
-                        self.data[solution][key] = numpy.append( self.data[solution][key] , reader[key][...] )
+                        if numpy.logical_and(key == 'a_s', ~numpy.isin('a_s',list(reader.keys()))):
+                            old_key = 'a_h'
+                        elif numpy.logical_and(key == 'a_p', ~numpy.isin('a_p',list(reader.keys()))):
+                            old_key = 'a_v'
+                        else:
+                            old_key = key
+                        self.data[solution][key] = numpy.append( self.data[solution][key] , reader[old_key][...] )
             
 
     def saveEnvelope(self, out_dir, solution_list = None,verbose = False, plot_hulls = False):
@@ -897,11 +1102,12 @@ class RefractionLibrary:
 if __name__ == '__main__':
     make_library = True
     split_library = True
-    plot_library = True
+    plot_library = False
     save_envelope = True
-    plot_envelope = True
-    z_array = [-100]#[-175,-176,-177,-178,-179,-181,-183]#[-200.,-201.,-202.,-203.,-204.,-205.,-206.,-207.]
-    n_rays = 18
+    plot_envelope = False
+    z_array = numpy.array([-173.0,-174.0,-175.0,-176.0,-177.0,-179.0,-181.0])[~numpy.isin([-173.0,-174.0,-175.0,-176.0,-177.0,-179.0,-181.0],[-175,-176,-177,-178,-179,-181,-183])]
+    #z_array = [-200.,-201.,-202.,-203.,-204.,-205.,-206.,-207.]#[-175,-176,-177,-178,-179,-181,-183]#[-200.,-201.,-202.,-203.,-204.,-205.,-206.,-207.]
+    n_rays = 180
     r_limit = None #Note if this is NOT None, then all thrown rays will quit once they read this particular radius.  Use with care.  If you want a simulation with r = 6300m, it might be advisable to make r_limit = 7000 so the boundaries of hulls are still well defined
     ice_model = 'antarctica'
 
@@ -910,7 +1116,7 @@ if __name__ == '__main__':
 
     ice_model = gnosim.earth.ice.checkIceModel(ice_model) #Checks if ice model exists and replaces as necessary.
     for z_0 in z_array:
-        library_dir = 'library_%i_%s_%i_rays'%(int(z_0),ice_model,n_rays)
+        library_dir = 'library_%i_%s_%i_rays_signed_fresnel'%(int(z_0),ice_model,n_rays)
         if os.path.isdir(library_dir):
             print('Output directory Name %s is taken, saving in current directory and appending \'_new\' if necessary'%(library_dir))
             while os.path.isdir(library_dir):
@@ -925,8 +1131,8 @@ if __name__ == '__main__':
         #theta_array = numpy.append(theta_array,0.99*theta_reflect)
         #theta_array = numpy.append(theta_array,1.01*theta_reflect)
         
-        #solution_list = numpy.array(['direct','cross','reflect','direct_2','cross_2','reflect_2'])
-        solution_list = numpy.array(['direct','cross','reflect'])
+        solution_list = numpy.array(['direct','cross','reflect','direct_2','cross_2','reflect_2'])
+        #solution_list = numpy.array(['direct','cross','reflect'])
         if make_library == True:
             os.mkdir(library_dir)
             makeLibrary(z_0, theta_array,ice_model, save=True, library_dir=library_dir,r_limit = r_limit)

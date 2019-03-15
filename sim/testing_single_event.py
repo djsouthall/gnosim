@@ -34,7 +34,7 @@ pylab.ion()
 if __name__ == "__main__":
     pylab.close('all')
     #Parameters
-    infile = '/home/dsouthall/scratch-midway2/results_2019_Feb_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_10000_events_1.h5'
+    infile = '/home/dsouthall/scratch-midway2/results_2019_Mar_config_dipole_octo_-200_antarctica_180_rays_3.00e+09_GeV_10000_events_1.h5'
     plot_geometry = False
     plot_signals = True
     choose_n = 10 #How many of the triggered events to run
@@ -48,11 +48,11 @@ if __name__ == "__main__":
         solutions = numpy.array(['direct', 'cross', 'reflect'])
         config_file = reader.attrs['config']
         trigger = 0#reader.attrs['trigger_threshold']
-        testSim = gnosim.sim.antarcticsim.Sim(config_file,solutions = solutions, electricFieldDomain = 'time',do_beamforming = True)
+        testSim = gnosim.sim.antarcticsim.Sim(config_file, solutions = solutions, electricFieldDomain = 'time',do_beamforming = True)
         for station in testSim.stations:
             station.loadLib(pre_split = True, build_lib = False)
             station.loadConcaveHull()
-        testSim.makeFlagDicArrayFromInfo(info)
+        testSim.makeFlagDicArrayFromInfo(info) #Necessary for running events without interpolation (calling throw)
         pre_loaded = True
 
     #'''

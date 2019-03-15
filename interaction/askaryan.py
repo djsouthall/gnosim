@@ -486,7 +486,7 @@ def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode=N
     return u, h_fft, sys_fft, freqs
 
 
-def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pattern_factor,u, h_fft, sys_fft, freqs, fp_fft = None,plot_signals=False,plot_spectrum=False,plot_angles = False,plot_potential = False,include_noise = False, resistance = 50, noise_temperature = 320,random_local = None):  
+def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,signal_reduction_factor,u, h_fft, sys_fft, freqs, fp_fft = None,plot_signals=False,plot_spectrum=False,plot_angles = False,plot_potential = False,include_noise = False, resistance = 50, noise_temperature = 320,random_local = None):  
     '''
     This should do the entire calculation, mostly in the frequency domain. 
     Expects u, h_fft, sys_fft, freqs to all come straight from calculateTimes.
@@ -570,11 +570,7 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
     #calculating E_raw_fft    
     E_raw_fft = -1.0j*2.0*numpy.pi*numpy.multiply(A_fft , freqs) #negitive sign because E = -dA/dt
     
-    #Accouning for beam pattern
-    E_raw_fft *= beam_pattern_factor
-    
-    #Accounting for attenuation
-    E_raw_fft *= attenuation #Want to do before noise is added.  Noise is not attenuated by 
+    E_raw_fft *= signal_reduction_factor #This includes beam pattern, signal attenuation, and polarization
     #Adding antenna response
     E_antenna_fft = numpy.multiply(E_raw_fft, h_fft) 
     V_fft_noiseless = numpy.multiply(E_antenna_fft,sys_fft)
@@ -617,7 +613,7 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,attenuation,beam_pat
             V_noise = numpy.fft.fftshift(V_noise)
     
     if include_noise == True:
-        #I should move this calculation to outside of the function.  Return p2p and then divide by the same rms for each event rather than calculate each time
+        # TODO: I should move this calculation to outside of the function.  Return p2p and then divide by the same rms for each event rather than calculate each time
         V_rms_measured = numpy.sqrt(numpy.mean((V_noise - V_noiseless)**2)) #This is the 'measured' V_rms, rather than the set.  This is after system response
         SNR = (p2p_half/V_rms_measured)**2
         #SNR_dB = 10*numpy.log10( SNR )#dB, using 10log10 because input is power ratio 
@@ -867,8 +863,8 @@ if __name__ == "__main__":
     h_fft,sys_fft,freqs = loadSignalResponse()
     input_u, h_fft, sys_fft, freqs = calculateTimes(up_sample_factor=20)
     inelasticity = 0.2
-    noise_rms = numpy.std(quickSignalSingle(0,R,inelasticity*energy_neutrino,n,R,0,0,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)[3])
-    V_noiseless, u, dominant_freq, V_noise,  SNR = quickSignalSingle(numpy.deg2rad(50),R,inelasticity*energy_neutrino,n,2500,0.7,0.7,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)
+    noise_rms = numpy.std(quickSignalSingle(0,R,inelasticity*energy_neutrino,n,R,0,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)[3])
+    V_noiseless, u, dominant_freq, V_noise,  SNR = quickSignalSingle(numpy.deg2rad(50),R,inelasticity*energy_neutrino,n,2500,0.7,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)
     sampling_rate = 1.5 #GHz
     bytes = 7
     scale_noise_from = noise_rms

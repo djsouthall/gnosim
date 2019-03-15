@@ -79,8 +79,8 @@ if __name__ == "__main__":
         if plot_spectrum == True:
             #plotting a noise spectrum
 
-            noise_signal_i = gnosim.interaction.askaryan.quickSignalSingle( 0,1,0,mean_index,\
-                              0,0,0,testSim.stations[0].antennas[0].signal_times,testSim.stations[0].antennas[0].h_fft,testSim.stations[0].antennas[0].sys_fft,testSim.stations[0].antennas[0].freqs_response,\
+            noise_signal_i = gnosim.interaction.askaryan.quickSignalSingle( 0.0,1.0,0.0,mean_index,\
+                              0.0,0.0,testSim.stations[0].antennas[0].signal_times,testSim.stations[0].antennas[0].h_fft,testSim.stations[0].antennas[0].sys_fft,testSim.stations[0].antennas[0].freqs_response,\
                               plot_signals=False,plot_spectrum=True,plot_potential = False,\
                               include_noise = True, resistance = numpy.mean(resistance), noise_temperature = numpy.mean(noise_temp_array))[3]
 
@@ -101,7 +101,7 @@ if __name__ == "__main__":
             for i in range(int(numpy.max([1,noise_length_multiplier]))):
                 #Artificially extending noise to be longer
                 noise_signal_i = gnosim.interaction.askaryan.quickSignalSingle( 0.0,1.0,0.0,mean_index,\
-                              0.0,0.0,0.0,antenna.signal_times,antenna.h_fft,antenna.sys_fft,antenna.freqs_response,\
+                              0.0,0.0,antenna.signal_times,antenna.h_fft,antenna.sys_fft,antenna.freqs_response,\
                               plot_signals=False,plot_spectrum=False,plot_potential = False,\
                               include_noise = True, resistance = antenna.resistance, noise_temperature = antenna.noise_temperature)[3]  #This is just producing a 0eV energy pulse, so only thing returned is noise
                 signal_tick_x.append(len(noise_signal))

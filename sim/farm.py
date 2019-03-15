@@ -46,7 +46,7 @@ energy_neutrino_array =  10**numpy.arange(7., 12.1, 0.5)#10**numpy.arange(6.5, 1
 cpu_per_task = 16
 mem_per_cpu = 1500 #1000 = 1GB, looks like the total MaxRSS for 1M events was 13GB total, so 2000-3000 per cpu for that.  
 n_events = 1000000
-n_trials = 20 # 1, 10
+n_trials = 1 # 1, 10
 use_seed = True
 seeds = numpy.arange(n_trials)#[0,1,2,3,4]#IF USING SEEDS THERE NEEDS TO BE n_trials DIFFERENT SEEDS SO YOU DON'T RUN THE SAME SEED MULTIPLE TIMES
 jobname = 'gnosim'
@@ -71,13 +71,13 @@ for config_file in config_file_array:
 
             outpath = '/home/dsouthall/scratch-midway2/'
             if use_seed == True:
-                outfile = 'results_2019_Jan_%s_%.2e_GeV_%i_events_seed_%i_%i.h5'%(config_file.split('/')[-1].replace('.py',''),
+                outfile = 'results_2019_Mar_%s_%.2e_GeV_%i_events_seed_%i_%i.h5'%(config_file.split('/')[-1].replace('.py',''),
                                                                             energy_neutrino,
                                                                             n_events,
                                                                             seeds[index],
                                                                             index_name)
             else:
-                outfile = 'results_2019_Jan_%s_%.2e_GeV_%i_events_%i.h5'%(config_file.split('/')[-1].replace('.py',''),
+                outfile = 'results_2019_Mar_%s_%.2e_GeV_%i_events_%i.h5'%(config_file.split('/')[-1].replace('.py',''),
                                                                             energy_neutrino,
                                                                             n_events,
                                                                             index_name)

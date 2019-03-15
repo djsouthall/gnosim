@@ -219,21 +219,38 @@ pylab.ylabel('Theta Antenna')
 pylab.colorbar()
 pylab.title(title + " a_v/Theta For Seen")
 
-#Theta vs a_h, for detected
-pylab.figure()
-pylab.hist2d(numpy.log(reader['a_h'][cut_detected]), reader['theta_ant'][cut_detected], bins=(25,75))
-pylab.xlabel('Sanity Check -- horizontal EF')
-pylab.ylabel('Theta Antenna')
-pylab.colorbar()
-pylab.title(title + " a_h/Theta For Detected")
+if numpy.isin('a_h',list(reader.keys())):
+  #Theta vs a_h, for detected
+  pylab.figure()
+  pylab.hist2d(numpy.log(reader['a_h'][cut_detected]), reader['theta_ant'][cut_detected], bins=(25,75))
+  pylab.xlabel('Sanity Check -- horizontal EF')
+  pylab.ylabel('Theta Antenna')
+  pylab.colorbar()
+  pylab.title(title + " a_h/Theta For Detected")
 
-#Theta vs a_h, for seen
-pylab.figure()
-pylab.hist2d(numpy.log(reader['a_h'][cut_seen]), reader['theta_ant'][cut_seen], bins=(25,75))
-pylab.xlabel('Sanity Check -- Horizontal EF')
-pylab.ylabel('Theta Antenna')
-pylab.colorbar() 
-pylab.title(title + " a_h/Theta For Seen")
+  #Theta vs a_h, for seen
+  pylab.figure()
+  pylab.hist2d(numpy.log(reader['a_h'][cut_seen]), reader['theta_ant'][cut_seen], bins=(25,75))
+  pylab.xlabel('Sanity Check -- Horizontal EF')
+  pylab.ylabel('Theta Antenna')
+  pylab.colorbar() 
+  pylab.title(title + " a_h/Theta For Seen")
+elif numpy.isin('a_s',list(reader.keys())):
+  #Theta vs a_s, for detected
+  pylab.figure()
+  pylab.hist2d(numpy.log(reader['a_s'][cut_detected]), reader['theta_ant'][cut_detected], bins=(25,75))
+  pylab.xlabel('Sanity Check -- horizontal EF')
+  pylab.ylabel('Theta Antenna')
+  pylab.colorbar()
+  pylab.title(title + " a_s/Theta For Detected")
+
+  #Theta vs a_s, for seen
+  pylab.figure()
+  pylab.hist2d(numpy.log(reader['a_s'][cut_seen]), reader['theta_ant'][cut_seen], bins=(25,75))
+  pylab.xlabel('Sanity Check -- Horizontal EF')
+  pylab.ylabel('Theta Antenna')
+  pylab.colorbar() 
+  pylab.title(title + " a_s/Theta For Seen")
 
 #Theta vs electric field, for detected
 pylab.figure()
