@@ -33,7 +33,7 @@ config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Con
                      '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_simple_-2_polar_BW_450-750MHz.py']
 '''
 
-config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/real_config.py']
+config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/real_config_antarctica_180_rays_signed_fresnel.py']
 '''
 config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/real_config.py',\
                      '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_dipole_octo_-200_polar_120_rays.py']

@@ -716,8 +716,8 @@ class Antenna:
             '''
         elif self.antenna_type == 'old_dipole':
             #This is how is was calculated before the polarization was added. 
-            k_1_ice_frame = getWaveVector(theta_ray_from_ant_at_antenna,phi_ray_from_ant_at_antenna) #Note for many beam patterns likely want vector point TO observation, i.e. negative of this. But for this calculation is doesn't matter.
-            k_1_antenna_frame = gnosim.interaction.polarization.antennaFrameCoefficients(self.R_inv, k_1_ice_frame, pre_inv = True)
+            k_1_ice_frame = gnosim.interaction.polarization.getWaveVector(theta_ray_from_ant_at_antenna,phi_ray_from_ant_at_antenna) #Note for many beam patterns likely want vector point TO observation, i.e. negative of this. But for this calculation is doesn't matter.
+            k_1_antenna_frame = antennaFrameCoefficients(self.R_inv, k_1_ice_frame, pre_inv = True)
             beam_pattern_factor = 1.0 - k_1_antenna_frame[2]**2.0 #where r is assumed to be 1 because working with unit vectors
             
             signal_reduction_factor = numpy.abs(a_p)*beam_pattern_factor

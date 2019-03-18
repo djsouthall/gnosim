@@ -15,6 +15,18 @@ import gnosim.utils.constants
 pylab.ion()
 
 ############################################################
+def getAcceptedIceModels():
+    '''
+    Returns an array of the acceptable ice model labels.
+
+    Returns:
+    ----------
+    ice_models : numpy.ndarray of str
+        Array of the acceptable ice model labels.
+    '''
+    ice_models = numpy.array(['antarctica', 'greenland','parametric_greenland','empirical_greenland','ross','polar','arthern'])
+    return ice_models
+
 
 def checkIceModel(ice_model):
     '''
@@ -24,7 +36,7 @@ def checkIceModel(ice_model):
     sudonym (i.e. arthern -> greenland), or will return
     the default value if no sudonym found. 
     '''
-    possible_models = ['antarctica', 'greenland','parametric_greenland','empirical_greenland','ross','polar','arthern']
+    possible_models = getAcceptedIceModels()
     ice_model_default = possible_models[0]
     if ~numpy.isin(ice_model, possible_models):
         print("Requested ice model %s not in available ice model list, defaulting to %s"%(ice_model,ice_model_default))

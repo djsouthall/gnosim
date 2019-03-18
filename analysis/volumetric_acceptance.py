@@ -84,16 +84,20 @@ def volumetricAcceptance(reader,verbose = True):
 if __name__ == "__main__":
     #Calculation Parameters
     calculate_data = False
-    config = 'real_config'
-    outdir = '/home/dsouthall/scratch-midway2/mar_testing_real_config/'
+    config = 'real_config_signed_fresnel'
+    outdir = '/home/dsouthall/scratch-midway2/new_fresnel/'
     outname = outdir +'volumetric_acceptance_data_%s.h5'%(config)
     expect_merged = False
     #Plotting Parameters
     plot_data = True
-    dataname = '/home/dsouthall/scratch-midway2/mar_testing_real_config/volumetric_acceptance_data_real_config.h5'
-    plot_comparison = True
-    comparison_file = '/home/dsouthall/Projects/GNOSim/gnosim/analysis/DesignPerformancePaperData.py'
-    
+    label='GNOSim - Current'
+    dataname = outname
+    plot_paper_comparison = True
+    paper_comparison_file = '/home/dsouthall/Projects/GNOSim/gnosim/analysis/DesignPerformancePaperData.py'
+    plot_self_comparison = True
+    self_comparison_file = '/home/dsouthall/scratch-midway2/mar_testing_real_config/volumetric_acceptance_data_real_config.h5'
+    label_compare = 'GNOSim Old - No polarization'
+
     if calculate_data == True:
         ######
         if expect_merged == True:
@@ -136,19 +140,30 @@ if __name__ == "__main__":
         error = reader['error'][...]
         
         cut = VA != 0 
-        label='GNOSim'
         sorted_cut = numpy.argsort(energy_neutrino)[numpy.isin(numpy.argsort(energy_neutrino),numpy.where(cut)[0])]
         fig = pylab.figure(figsize=(16.,11.2))
-        pylab.errorbar(energy_neutrino[sorted_cut]/1e6, VA[sorted_cut], yerr=error[sorted_cut],fmt='go-',label=label,capsize=5,markersize=markersize,linewidth=linewidth)
-            
-        if plot_comparison == True:
-            plot_comparison = True
-            compare_data = yaml.load(open(comparison_file))
+        if plot_paper_comparison == True:
+            plot_paper_comparison = True
+            compare_data = yaml.load(open(paper_comparison_file))
             for key in compare_data.keys():
                 x = numpy.array(compare_data[key]['x'])
                 y = numpy.array(compare_data[key]['y'])
                 pylab.errorbar(x,y, yerr=None,fmt=compare_data[key]['style'],label=compare_data[key]['label'],capsize=5,markersize=markersize,linewidth=linewidth)
+        
+        if plot_self_comparison == True:
+            plot_self_comparison = True
+            reader_compare = h5py.File(self_comparison_file , 'r')
+            energy_neutrino_compare = reader_compare['energy_neutrino'][...]
+        
+            VA_compare = reader_compare['volumetric_acceptance'][...]
+            error_compare = reader_compare['error'][...]
             
+            cut_compare = VA_compare != 0 
+            sorted_cut_compare = numpy.argsort(energy_neutrino_compare)[numpy.isin(numpy.argsort(energy_neutrino_compare),numpy.where(cut_compare)[0])]
+            pylab.errorbar(energy_neutrino_compare[sorted_cut_compare]/1e6, VA_compare[sorted_cut_compare], yerr=error_compare[sorted_cut_compare],color='orange',fmt='o-',label=label_compare,capsize=5,markersize=markersize,linewidth=linewidth)
+
+        pylab.errorbar(energy_neutrino[sorted_cut]/1e6, VA[sorted_cut], yerr=error[sorted_cut],fmt='go-',label=label,capsize=5,markersize=markersize,linewidth=linewidth)
+                    
             
         pylab.legend(loc = 'lower right',fontsize = 24)
         #pylab.ylim(8e-7,1.5e2)

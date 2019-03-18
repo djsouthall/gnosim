@@ -21,36 +21,70 @@ import gnosim.earth.ice
 pylab.ion()
 
 ############################################################
+def getAcceptedSolutions():
+    '''
+    Returns an array of the acceptable solution type labels.
+
+    Returns:
+    ----------
+    solutions : numpy.ndarray
+        Array of the acceptable solution type labels.
+    '''
+    solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2'])
+    return solutions
+
 
 def fresnelAmplitude(n_1, n_2, incidence_angle, mode, return_power = False):
-    """
-    Reflected or transmitted amplitudes for different polarizations.
+    '''
+    Given two indices of refraction and an angle of incidence this calculates the fresnel amplitude coefficients
+    (or power coefficients if return_power == True) for the s and p polarizations.  Mode selects whether to return
+    the reflection coefficients (mode = 'reflection', transmission (mode = 'transmission'), or both (mode = 'both').
+    
+    Parameters:
+    ----------
+    n_1 : float
+        Initial index of refraction
+    n_2 : float
+        Final index of refraction
+    incidence_angle : float
+        Angle of incidence in degrees measured from the normal to interface.
+    mode : str
+        Specifes which coefficients to return.  Possible values are 'reflection', 'transmission', and 'both'.
+    return_power : bool, optional
+        If True, the power coefficients are returned, otherise the amplitude coefficients are. (False is default).
 
-    n_1 = index of refraction of current medium
-    n_2 = index of refraction of encountered medium
-    incidence_angle = incidence angle to surface (deg)
-    mode = 'reflection' or 'transmission'
+    Returns:
+    ----------
+    r_s : cfloat, optional
+        s polarizaton reflection amplitude coefficient
+    r_p : cfloat, optional
+        p polarizaton reflection amplitude coefficient
+    t_s : cfloat, optional
+        s polarizaton transmission amplitude coefficient
+    t_p : cfloat, optional
+        p polarizaton transmission amplitude coefficient
+    R_s : cfloat, optional
+        s polarizaton reflection power coefficient
+    R_p : cfloat, optional
+        p polarizaton reflection power coefficient
+    T_s : cfloat, optional
+        s polarizaton transmission power coefficient
+    T_p : cfloat, optional
+        p polarizaton transmission power coefficient
+    '''
 
-    Need to return to this function to make it more numpy compliant eventually.
-    """
-    #theta_c = numpy.arcsin(n_2/n_1)
-    #if numpy.logical_and(n_2 < n_1, numpy.deg2rad(incidence_angle) > theta_c):
-    #    t_p = 0.0
-    #    t_s = 0.0
-    #    r_p = 1.0
-    #    r_s = 1.0
-    #else:
     n_1 = n_1 + 0j
     n_2 = n_2 + 0j
 
-    c_i = numpy.cos(numpy.radians(incidence_angle)) #+ 0j
-    s_i = numpy.sin(numpy.radians(incidence_angle)) #+ 0j
-    s_t = (n_1/n_2)*s_i# + 0j
-    c_t = numpy.cos(numpy.arcsin(s_t))# + 0j
+    c_i = numpy.cos(numpy.radians(incidence_angle)) 
+    s_i = numpy.sin(numpy.radians(incidence_angle)) 
+    s_t = (n_1/n_2)*s_i
+    c_t = numpy.cos(numpy.arcsin(s_t))
 
     # s-polarized light (i.e., electric field perpendicular to the plane of reflection and transmission)
     r_s = (n_1*c_i - n_2*c_t)/(n_1*c_i + n_2*c_t)
     t_s = (2*n_1*c_i)/(n_1*c_i + n_2*c_t)
+
     # p-polarized light (i.e., electric field parallel to the plane of reflection and transmission)
     r_p = (n_2*c_i - n_1*c_t)/(n_2*c_i + n_1*c_t)
     t_p = (2*n_1*c_i)/(n_2*c_i + n_1*c_t)
@@ -67,6 +101,8 @@ def fresnelAmplitude(n_1, n_2, incidence_angle, mode, return_power = False):
             return R_s, R_p
         elif mode == 'transmission':
             return T_s, T_p
+        elif mode == 'both':
+            return R_s, R_p, T_s, T_p
         else:
             print ('WARNING: mode %s not recognized'%(mode))
     else:
@@ -74,15 +110,29 @@ def fresnelAmplitude(n_1, n_2, incidence_angle, mode, return_power = False):
             return r_s, r_p
         elif mode == 'transmission':
             return t_s, t_p
+        elif mode == 'both':
+            return r_s, r_p, t_s, t_p
         else:
             print ('WARNING: mode %s not recognized'%(mode))
 
-def testFresnelSign():
-    pylab.figure()
-    pylab.plot(r,z_power)
+def testFresnelSign(n_1 = 1.5,n_2 = 1.0):
+    '''
+    Plots the fresnel amplitude coefficients over a range of incidence angles for two indices of refraction.
 
-    n_1 = 1.5#ice.indexOfRefraction(-2950)
-    n_2 = 1.0#ice.indexOfRefraction(-3050)
+    Parameters:
+    ----------
+    n_1 : float
+        Initial index of refraction
+    n_2 : float
+        Final index of refraction
+    
+    See Also:
+    ----------
+    fresnelAmplitude
+
+    '''
+    pylab.figure()
+
     mode = 'reflection'
     r_s = []
     r_p = []
@@ -138,16 +188,33 @@ def testFresnelSign():
     pylab.legend()
 
 def fresnelPower(n_1, n_2, incidence_angle, mode):
-    """
-    Reflected or transmitted power for different polarizations.
+    '''
+    (OLD) Given two indices of refraction and an angle of incidence this calculates the fresnel power coefficients.
+    This function was replaced by fresnelAmplitude to allow for output of signs resulting from reflections.
+    
+    Parameters:
+    ----------
+    n_1 : float
+        Initial index of refraction
+    n_2 : float
+        Final index of refraction
+    incidence_angle : float
+        Angle of incidence in degrees measured from the normal to interface.
+    mode : str
+        Specifes which coefficients to return.  Possible values are 'reflection', 'transmission', and 'both'.
 
-    n_1 = index of refraction of current medium
-    n_2 = index of refraction of encountered medium
-    incidence_angle = incidence angle to surface (deg)
-    mode = 'reflection' or 'transmission'
+    Returns:
+    ----------
+    R_s : float, optional
+        s polarizaton reflection power coefficient
+    R_p : float, optional
+        p polarizaton reflection power coefficient
+    T_s : float, optional
+        s polarizaton transmission power coefficient
+    T_p : float, optional
+        p polarizaton transmission power coefficient
+    '''
 
-    Need to return to this function to make it more numpy compliant eventually.
-    """
     c = numpy.cos(numpy.radians(incidence_angle))
     s = numpy.sin(numpy.radians(incidence_angle))
 
@@ -191,9 +258,22 @@ def fresnelPower(n_1, n_2, incidence_angle, mode):
 ############################################################
 
 def testFresnel(n_low=1., n_high=1.5):
-    """
-    Simple test for Fresnel coefficients.
-    """
+    '''
+    (OLD) Plots the fresnel power coefficients over a range of indices of refraction.
+    This currently only does this using the old calculation of fresnelPower.
+
+    Parameters:
+    ----------
+    n_low : float
+        Lower bound for index of refraction
+    n_high : float
+        Upper bound for index of refraction
+    
+    See Also:
+    ----------
+    fresnelPower
+
+    '''
 
     incidence_angle_array = numpy.arange(0., 90. + 1.e-10, 1.)
     
@@ -238,30 +318,69 @@ def testFresnel(n_low=1., n_high=1.5):
 
 
 
-def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = None, fresnel_mode = 'power'): # t_max=40000, t_max=1000 (testing)
-    """
-    z_0 = initial elevation (m)
-    t_max = max time (ns)
-    t_step = time step (ns)
-    """
-    # IDEA: let t_step grow when the index of refraction isn't changing fast, i.e.,
-    #       a dynamic t_step 
+def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = None, fresnel_mode = 'ampltude'): 
+    '''
+    Throws a ray in the given direction in the given ice.  Returns information for each point in the calculated ray.
+    Calculates key values along a the ray.  THe most common use case of this function is to throw rays from the
+    antenna, with values later being interpolated between rays.  
+    
+    Parameters:
+    ----------
+    origin : numpy.ndarray
+        x-y-z coordinates of the source of the ray (often the location of the antenna that would be detecting it).
+        This should be specified in the ice coordinate frame, with negative values of z being below the ice.
+    phi_0 : float
+        The azimuthal direction the ray is thrown from the origin in the ice coordinate frame.  Given in degrees.
+    theta_ant : float
+        The polar angle of the direction the ray is thrown from the origin in the ice coordinate frame.  Given in degrees.
+    ice : gnosim.earth.ice.Ice
+        The ice object containing the appropriate ice model.
+    t_max : float, optional
+        The maximum time the ray can travel.  Given in ns. (Default is 50000. ns).
+    t_step : float, optional
+        The normal time step between each point in the ray propogation.  May vary near boundaries where time step is reduced
+        for accuracy.  Use output t_array for times rather than assuming a uniform time step.  Given in ns.  (Default is 1 ns).
+    r_limit : float, optional
+        The maximum radius the ray is allowed to propogate.  Computed in celindrical coordinates from the origin.  Given in meters.
+        (Default is None).
+    fresnel_mode : str, optional
+        Selects which function is used to calculate the fresnel amplitudes.  
+        'power' - Selects the older coefficient calculator which cannot return signs resulting from reflections.
+        'amplitude' - Selects the more recently created coefficient calculator which calculates the fresnel amplitudes and thus has signs.
 
-    # ORIGINAL
+    Returns:
+    ----------
+    x_array : numpy.ndarray
+        Cartesian x-coordinate of each point along the ray in the ice frame.  Given in meters.
+    y_array : numpy.ndarray
+        Cartesian y-coordinate of each point along the ray in the ice frame.  Given in meters.
+    z_array : numpy.ndarray
+        Cartesian z-coordinate of each point along the ray in the ice frame.  Given in meters.
+    t_array : numpy.ndarray
+        Total time of flight elapsed at each point along the ray.  Given in ns.
+    d_array : numpy.ndarray
+        Total distance traveled elapsed at each point along the ray.  Given in meters.
+    phi_array : numpy.ndarray
+        Spherical azimuthal coordinate the momentum vector of the ray point along the ray in the ice frame.  I.e. as the ray is thrown
+        from the origin, the momentum vector will be in the direction azimuthal phi_0 direction, phi_array[0] = phi_0.  Given in degrees.
+    theta_array : numpy.ndarray
+        Spherical polar coordinate the momentum vector of the ray point along the ray in the ice frame.  I.e. as the ray is thrown
+        from the origin, the momentum vector will be in the direction polar theta_ant direction, theta_array[0] = theta_ant.  Given in degrees.
+    a_p_array : numpy.ndarray
+        p polarization attenuation factor.  Includes effects from general attenuation in ice due to attenuation length (currently only for 300 MHz), 
+        as well as reduction in signal resulting from fresnel coefficients (as well as sign lips resulting from fresnel amplitudes). 
+    a_s_array : numpy.ndarray
+        s polarization attenuation factor.  Includes effects from general attenuation in ice due to attenuation length (currently only for 300 MHz), 
+        as well as reduction in signal resulting from fresnel coefficients (as well as sign lips resulting from fresnel amplitudes). 
+    index_reflect_air : int
+        Index in the above arrays corresponding to reflections at the ice-air interface.
+    index_reflect_water : int
+        Index in the above arrays corresponding to reflections at the ice-water interface.
+    '''
+
     t_step_in = t_step
     n_steps =  int(t_max / t_step)
-    #print(n_steps,' with t_step ', t_step)
-    # ORIGINAL
-    # NEW
-    #n_steps = 100000 # 1000000, Arbitrary large number, but might be too big...
-    # NEW
-    
-    # ORIGINAL
-    #t_array = numpy.arange(0., t_step * (n_steps + 1), t_step) # Time (ns)
-    # ORIGINAL
-    # NEW
     t_array = numpy.zeros(n_steps + 1) # m
-    # NEW
     x_array = numpy.zeros(n_steps + 1) # m
     y_array = numpy.zeros(n_steps + 1) # m
     z_array = numpy.zeros(n_steps + 1) # m
@@ -290,6 +409,7 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = N
     index_reflect_air = 0 # Stores index of reflection event at ice-air interface
     index_reflect_water = 0 # Stores index of reflection event at ice-water interface
     max_ii = None
+
     #Finding surfaces:
     z_locate = numpy.linspace(1000,-10000,10000000)
     dndz = numpy.divide(numpy.diff(ice.indexOfRefraction(z_locate)),numpy.diff(z_locate))
@@ -297,7 +417,7 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = N
     z_downward_surface = ((z_locate[1:] + z_locate[:-1]) / 2.0)[numpy.equal(dndz,numpy.amax(dndz))]
     dndz = None
     z_locate = None
-    #print('What is going on')
+
     for ii in range(0, n_steps):
         #print('On Event',ii)
         # Dynamic time step depending on how fast the index of refraction is changing
@@ -334,19 +454,6 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = N
         if ii == 0 and z_array[ii] > 1.:
             # Rather than take many steps to the ice, take one large jump
 
-            """
-            # THIS VERSION WORKS, BUT DOES NOT FULLY TAKE INTO ACCOUNT EARTH CURVATURE
-            r = (z_array[ii] + 0.01) * numpy.tan(numpy.radians(theta_array[ii])) # 0.01 meter into ground (i.e., below surface)
-            d = numpy.sqrt(r**2 + z_array[ii]**2)
-            t = d * ice.indexOfRefraction(z_array[ii]) / gnosim.utils.constants.speed_light
-
-            t_array[1:] += (t - t_step)
-            x_step = d * numpy.sin(numpy.radians(theta_array[ii])) * numpy.cos(numpy.radians(phi_array[ii]))
-            y_step = d * numpy.sin(numpy.radians(theta_array[ii])) * numpy.sin(numpy.radians(phi_array[ii]))
-            z_step = d * numpy.cos(numpy.radians(theta_array[ii]))
-            # THIS VERSION WORKS, BUT DOES NOT FULLY TAKE INTO ACCOUNT EARTH CURVATURE
-            """
-            
             # Curvature corrections
             distance_with_curvature, angle_curvature, x_curvature = gnosim.earth.earth.curvature(z_array[ii], theta_array[ii]) 
             
@@ -501,16 +608,20 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = N
         theta_array[0: n_steps], a_p_array[0: n_steps], a_s_array[0: n_steps], \
         index_reflect_air, index_reflect_water)
 
-def plotGeometry(stations,neutrino_loc,phi_0,info,ice):
+def plotGeometry(stations,neutrino_loc,info,ice):
     '''
-    origin shuold be of the form [[x_0, y_0, z_0],[x_1, y_1, z_1],[x_2, y_2, z_2]]
-    neutrino_loc should be similar but for neutrino location but [x, y, z]
-    stations should be a list of stations built from a config file.
-    '''
-    '''
-    if len(numpy.shape(origin)) == 1:
-        origin = [origin] #this is sloppy and might break
-    #might want to do some check here to make sure values are all floats
+    Plots the antennas, rays, and neutrino location for an event.
+    
+    Parameters:
+    ----------
+    stations : list of gnosim.sim.detctor.Station objects
+        Station objects which will be used for plotting the locations of the various antennas.
+    neutrino_loc : numpy.ndarray
+        x-y-z coordinates of the neutrino interaction location in the ice frame.
+    info : numpy.ndarray of dtype = gnosim.sim.antarcticsim.Sim.info_dtype
+        The info object array corresponding to this event. 
+    ice : gnosim.earth.ice.Ice
+        The ice object containing the appropriate ice model.
     '''
     linestyle_dict = {'direct':(0, ()),'cross':(0, (3, 1, 1, 1)),'reflect':(0, (1, 1)),'direct_2':(0, (5, 1)),'cross_2':(0, (3, 5, 1, 5)),'reflect_2':(0, (1, 5))}
     neutrino_loc_r = numpy.sqrt(neutrino_loc[0]**2 + neutrino_loc[1]**2)
@@ -530,7 +641,8 @@ def plotGeometry(stations,neutrino_loc,phi_0,info,ice):
                 origin_r = numpy.sqrt(antenna_loc[0]**2 + antenna_loc[1]**2)
                 ssub_info = sub_info[numpy.logical_and(station_cut,antenna_cut)]
                 for index_solution, solution in enumerate(ssub_info['solution']):
-                    x, y, z, t, d, phi, theta, a_p, a_s, index_reflect_air, index_reflect_water = rayTrace(antenna_loc, phi_0, ssub_info['theta_ant'][ssub_info['solution'] == solution],ice, r_limit = 1.001*neutrino_loc_r)
+                    phi_throw = numpy.rad2deg(numpy.arctan((neutrino_loc[1] - antenna_loc[1])/(neutrino_loc[0] - antenna_loc[0]))) #Azimuthal direction from antenna to throw ray towards neutrino 
+                    x, y, z, t, d, phi, theta, a_p, a_s, index_reflect_air, index_reflect_water = rayTrace(antenna_loc, phi_throw, ssub_info['theta_ant'][ssub_info['solution'] == solution],ice, r_limit = 1.001*neutrino_loc_r)
                     r = numpy.sqrt(x**2 + y**2)
                     label = 'S%iA%i %s'%(index_station,index_antenna,solution.decode())
                     if numpy.isin(solution.decode(),list(linestyle_dict.keys())):
@@ -554,95 +666,113 @@ def plotGeometry(stations,neutrino_loc,phi_0,info,ice):
         return
 ############################################################
 
-def makeLibrary(z_0, theta_ray_array, ice_model, save=True, library_dir='library',r_limit = None):
+def makeLibrary(z_0, theta_ray_array, ice_model, library_dir='library',r_limit = None):
+    '''
+    Throws rays from a particular depth and throws rays at the specified angles in the specified ice model.
+    
+    Parameters:
+    ----------
+    z_0 : float
+        The z coordinate from which rays are throw radially outward.
+    theta_ray_array : numpy.ndarray of float
+        Array of polar angles of the direction the ray is thrown from the origin in the ice coordinate frame.  Given in degrees.
+    ice_model : str
+        Selects the ice model when loading the gnosim.earth.ice.Ice object internally.  Possible options defined in
+        gnosim.earth.ice.getAcceptedIceModels()
+    library_dir : str, optional
+        The location to save data.  (Default is 'library').
+    r_limit : float, optional
+        The maximum radius the rays are allowed to propogate.  Computed in celindrical coordinates from the origin.  Given in meters.
+        (Default is None).
+
+    See Also:
+    ----------
+    gnosim.earth.ice
+    '''
     x_0 = 0.
     y_0 = 0.
     phi_0 = 0.
-
-    x_array = []
-    y_array = []
-    z_array = []
-    t_array = []
-    d_array = []
-    phi_array = []
-    theta_array = []
-    a_p_array = []
-    a_s_array = []
-    reflection = False
-    
-    theta_ant_array = []
 
     ice = gnosim.earth.ice.Ice(ice_model)
 
     for ii in range(0, len(theta_ray_array)):
         print ('(%i/%i) theta_ant = %.4f'%(ii, len(theta_ray_array), theta_ray_array[ii]))
         x, y, z, t, d, phi, theta, a_p, a_s, index_reflect_air, index_reflect_water = rayTrace([x_0, y_0, z_0], phi_0, theta_ray_array[ii],ice)
-        x_array.append(x)
-        y_array.append(y)
-        z_array.append(z)
-        t_array.append(t)
-        d_array.append(d)
-        phi_array.append(phi)
-        theta_array.append(theta)
-        a_p_array.append(a_p)
-        a_s_array.append(a_s)
 
-        if save:
-            n_points = len(t)
-            outfile = '%s/z0_%.2f_theta_%.4f_n_%i.h5'%(library_dir, z_0, theta_ray_array[ii], n_points)
-            file = h5py.File(outfile, 'w')
-            
-            file.attrs['index_reflect_air'] = index_reflect_air
-            file.attrs['index_reflect_water'] = index_reflect_water
-            file.attrs['z_0'] = z_0
-            file.attrs['theta_ant'] = theta_ray_array[ii]
-            file.attrs['ice_model'] = ice.ice_model
-
-            file.create_dataset('r', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('z', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('t', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('d', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('theta', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('theta_ant', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('a_p', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            file.create_dataset('a_s', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+        n_points = len(t)
+        outfile = '%s/z0_%.2f_theta_%.4f_n_%i.h5'%(library_dir, z_0, theta_ray_array[ii], n_points)
+        file = h5py.File(outfile, 'w')
         
-            file['r'][...] = x
-            file['z'][...] = z
-            file['t'][...] = t
-            file['d'][...] = d
-            file['theta'][...] = theta
-            file['theta_ant'][...] = theta_ray_array[ii] * numpy.ones(n_points)
-            file['a_p'][...] = a_p
-            file['a_s'][...] = a_s
+        file.attrs['index_reflect_air'] = index_reflect_air
+        file.attrs['index_reflect_water'] = index_reflect_water
+        file.attrs['z_0'] = z_0
+        file.attrs['theta_ant'] = theta_ray_array[ii]
+        file.attrs['ice_model'] = ice.ice_model
 
-            file.close()
+        file.create_dataset('r', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+        file.create_dataset('z', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+        file.create_dataset('t', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+        file.create_dataset('d', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+        file.create_dataset('theta', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+        file.create_dataset('theta_ant', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+        file.create_dataset('a_p', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+        file.create_dataset('a_s', (n_points,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
     
-    x_array = numpy.concatenate([x_array])
-    y_array = numpy.concatenate([y_array])
-    z_array = numpy.concatenate([z_array])
-    t_array = numpy.concatenate([t_array])
-    d_array = numpy.concatenate([d_array])
-    phi_array = numpy.concatenate([phi_array])
-    theta_array = numpy.concatenate([theta_array])
-    a_p_array = numpy.concatenate([a_p_array])
-    a_s_array = numpy.concatenate([a_s_array])
+        file['r'][...] = x
+        file['z'][...] = z
+        file['t'][...] = t
+        file['d'][...] = d
+        file['theta'][...] = theta
+        file['theta_ant'][...] = theta_ray_array[ii] * numpy.ones(n_points)
+        file['a_p'][...] = a_p
+        file['a_s'][...] = a_s
 
-    """
-    pylab.figure()
-    pylab.scatter(x_array, z_array, c=numpy.clip(gnosim.utils.rf.decibel(a_p_array), -30., 0.), edgecolors='none')
-    colorbar = pylab.colorbar()
-    colorbar.set_label('VPOL Attenuation (dB)')
-    pylab.xlabel('Radius (m)')
-    pylab.ylabel('Elevation (m)')
-    """
+        file.close()
+    
 
 ############################################################
 
 class RefractionLibrary:
+    '''
+    Stores the attributes, information, and functions for a ray tracing library.
+    
+    Parameters:
+    ----------
+    search : str
+        Should contain the search string that would result in a list of all files/rays to be contained in the ray tracing library. 
+        Example: './library_-200_antarctica_180_rays/*.h5' 
+    solutions : numpy.ndarray of str, optional
+        A list of the solution types to load.  Often either all accepted solution types (the Default), or the same list omitting
+        the _2 strings, which represent libraries of solution that reflect of the bottom of the ice.
+    pre_split : bool, optional
+        Determines whether to attempt to load from pre split libraries.  If true (and the pre split libraries are calculated and 
+        saved appropriately) this avoids lengthy calculations which seperate the rays ito the different solution types.
+    build_lib : bool, optional
+        Must be called to actually populate most library information (such as the rays), however is left as an option such that 
+        the rest of the library can be worked with as a less bulky object when necessary.  (Default is True).
+
+    Attributes:
+    ----------
+    infiles : list of str
+        A list of the files names for each ray in the library.
+    solutions : numpy.ndarray of str
+        A list of the solution types (to be)loaded into the library.
+    keys : list of str
+        A list of the keys for the important values to be loaded/utilized by the library.
+    data : dict
+        Contains all of the ray tracig library raw data.  Sorted by solution type and key.
+    ice_mode : str
+        The ice model used in the libary.  Currently None if buildLib() has not been called.
+    pre_split : bool
+        Selection of whether to atempt loading from pre split (by solution type) libraries or not. 
+    concave_hull : dict
+        Contains the information about the concave hull, and relavent funtions/limits.
+
+
+    '''
     def __init__(self, search, solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']), pre_split = True,build_lib = True):
         self.infiles = glob.glob(search)
-        accepted_solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2'])
+        accepted_solutions = getAcceptedSolutions()
         # List attributes of interest
         self.solutions = accepted_solutions[numpy.isin(accepted_solutions,solutions)]
         if len(self.solutions) == 0:
@@ -678,6 +808,9 @@ class RefractionLibrary:
             self.buildLib()
 
     def buildLib(self):
+        '''
+        Builds the library from the pre-specified input file locations and selected solution types.
+        '''
         if self.pre_split == False:
             # Open data files and begin sorting solutions
             for infile in self.infiles:
@@ -695,8 +828,7 @@ class RefractionLibrary:
                     self.ice_model = current_model
                 else:
                     if self.ice_model != current_model:
-                        print ('WARNING: Ice models used in ray-tracing libraries do not match, e.g., %s != %s'%(self.ice_model, 
-                                                                                                                current_model))
+                        print ('WARNING: Ice models used in ray-tracing libraries do not match, e.g., %s != %s'%(self.ice_model, current_model))
 
                 if reader.attrs['index_reflect_air'] > 0:
                     # Rays with reflections off ice-air interface
@@ -838,22 +970,25 @@ class RefractionLibrary:
                         self.data[solution][key] = numpy.append( self.data[solution][key] , reader[old_key][...] )
             
 
-    def saveEnvelope(self, out_dir, solution_list = None,verbose = False, plot_hulls = False):
+    def saveEnvelope(self, out_dir,verbose = False, plot_hulls = False):
         '''
-        Should save the necessary information for a libraries hull so it can be
-        used to create a hull later
-        
-        out_dir should be of the form '/dir1/dir2'
-        i.e. it shouldn't end with a /
+        Should save the necessary information for a libraries hull so it can be used to create a hull later.
+
+        Parameters:
+        ----------
+        out_dir : str
+            Location of directory for output files to save.  Should be of the form '/dir1/dir2', i.e. it shouldn't end with a /.
+        verbose : bool, optional
+            Enables more print statements (Default is False).
+        plot_hulls : bool, optional
+            Plots the hulls.  (Default is False).
         '''
         out_dir = out_dir + '/concave_hull'
         os.mkdir(out_dir)
         legend_locs = {'direct':'upper right','cross':'upper right','reflect':'upper right','direct_2':'lower right','cross_2':'lower right','reflect_2':'lower right'}        
         concave_hull = {'direct':{'n_bins':1000},'cross':{'n_bins':1500},'reflect':{'n_bins':2000},'direct_2':{'n_bins':500},'cross_2':{'n_bins':400},'reflect_2':{'n_bins':2000}} # worked for 120 rays
-        if solution_list == None:
-            solution_list = ['direct','cross','reflect','direct_2','cross_2','reflect_2']
             
-        for solution in solution_list:
+        for solution in self.solutions:
             if verbose:
                 print('\tSolution Type: %10s \tNumber of points: %i'%( solution , len(self.data[solution]['z'])))
             if (len(self.data[solution]['z']) == 0):
@@ -942,38 +1077,71 @@ class RefractionLibrary:
             outfile['r_outer_r_bound'][...] = concave_hull[solution]['r_outer_r_bound']
             
             outfile.close()
+        self.concave_hull = concave_hull
 
-    def loadEnvelope(self, indir,store_fit_data = False):
+    def loadEnvelope(self, in_dir,store_fit_data = False):
         '''
-        Should load the necessary information for a libraries hull so it can be
-        used
-        
-        indir should be of the form '/dir1/concave_hull'
-        i.e. it shouldn't end with a /
-        where dir2 contains the files '/concave_hull_data_[solution].h5'
+        Loads the necessary information and creates the ray tracing hulls.  Each hull is a set of functions
+        which are interpolatd boundaries of the ray tracing libraries by solution type.  Returns a dictionary
+        of the hulls.
+
+        Parameters:
+        ----------
+        in_dir : str
+            Location of directory for input hull files to load.  Should be of the form '/dir1/dir2', 
+            i.e. it shouldn't end with a / where dir2 contains the files '/concave_hull_data_[solution].h5'.
+        store_fit_data : bool, optional
+            Keeps the loaded data that is used to create the interpolation functions, otherwise ignores - only keeping fits.
+            (Default is False).
+
+        concave_hull : dict
+            Contains the 'f_inner_r_bound' abd 'f_outer_r_bound' interpolated functions (and data used to create fits if store_fit_data == True).
+            These are often used in conjunction with upper and lower z boundaries to determine if a particular set of r,z coordinates (representing
+            the interaction location of a neutrino event) has a solution within the particular hulls solution type.  This also contains:
+            'z_inner_r_bound' , 'r_inner_r_bound' , 'z_outer_r_bound' , 'r_outer_r_bound' , 'z_min' , 'z_max',
+            which are also used in the hull calculation.
+
+            Example (from antarcticsim):
+            in_bound = numpy.logical_and((z_query >= antenna.concave_hull[solution]['z_min']),z_query <= antenna.concave_hull[solution]['z_max'])
+            r_in_hull = numpy.logical_and((r_query >= antenna.concave_hull[solution]['f_inner_r_bound'](z_query)),(r_query <= antenna.concave_hull[solution]['f_outer_r_bound'](z_query)))
+            has_solution = numpy.logical_and(in_bound,r_in_hull)
+
         '''
-        solution_list = numpy.array(['direct','cross','reflect','direct_2','cross_2','reflect_2'])
         concave_hull = {}
-        infiles = glob.glob(indir + '/*.h5')
+        infiles = glob.glob(in_dir + '/*.h5')
         infile_list = []
         
         for infile in infiles:
-            solution = (infile.split('concave_hull_data_')[-1]).replace('.h5','')
+            solution = (infile.split('concave_hull_data_')[-1]).replace('.h5','') # TODO: Maybe this should be from the reader as an attribute, not read in from file name.
             concave_hull[solution] ={}
             reader = h5py.File(infile, 'r')
             if store_fit_data:
                 for key in list(reader.keys()):
                     concave_hull[solution][key] = reader[key][...]
             for attr in list(reader.attrs.keys()):
-                concave_hull[solution][attr] = reader.attrs[attr]
+                concave_hull[solution][attr] = reader.attrs[attr] #Loads in z_max and z_min
+
             concave_hull[solution]['f_inner_r_bound'] = scipy.interpolate.interp1d(reader['z_inner_r_bound'][...],reader['r_inner_r_bound'][...],bounds_error=False,fill_value = ((reader['r_inner_r_bound'][...])[0],(reader['r_inner_r_bound'][...])[-1])) #fill_value=max(r_in))#,kind='cubic') #given z, give r, want big value for fill, because this is region where solution shouldn't exist, so a test of is this > f_in then solution should be false
             concave_hull[solution]['f_outer_r_bound'] = scipy.interpolate.interp1d(reader['z_outer_r_bound'][...],reader['r_outer_r_bound'][...],bounds_error=False,fill_value = ((reader['r_outer_r_bound'][...])[0],(reader['r_outer_r_bound'][...])[-1]))# fill_value=min(r_out))#,kind='cubic') These make boundaries weird but I think are a necessary evil?  Unless I match each with an z_min, z_max?  Could do....,  I can give interp1d two fill values so it fits well up to min/max z
+        self.concave_hull = concave_hull
         return concave_hull    
         
 
     def intersect(self, dic):
         """
-        Find intersection between rays to separate the "direct" and "cross" solutions.
+        Finds intersections between rays to separate the "direct" and "cross" solutions.
+
+        Parameters:
+        ----------
+        dic : dict
+            Should contain the information of all rays in the 'direct' solution type ray tracing library.
+        
+        Returns:
+        ----------
+        dic_direct : dict
+            Contains the information of all rays in the 'direct' solution type ray tracing library.
+        dic_cross : dict
+            Contains the information of all rays in the 'cross' solution type ray tracing library.
         """
         select_cross = numpy.array([],dtype=int)
         theta_ant_unique = numpy.unique(dic['theta_ant'])
@@ -1035,16 +1203,18 @@ class RefractionLibrary:
             # Then select direct points
             for key in self.keys:
                 dic_direct[key] = dic[key][numpy.logical_not(cross_cut)]
-        """       
-        pylab.figure()
-        pylab.scatter(dic_direct['r'], dic_direct['z'], c='blue', edgecolors='none')
-        pylab.scatter(dic_cross['r'], dic_cross['z'], c='red', edgecolors='none')
-        pylab.scatter(r_intersect, z_intersect, c='black', edgecolors='none')
-        """
         return dic_direct, dic_cross
 
 
     def plotRays(self, s=10):
+        '''
+        Plots the rays in the library.
+
+        Parameters:
+        ----------
+        s : int
+            Markersize as defined by matplotlib (Default = 10)
+        '''
         r = []
         z = []
         theta_ant = []
@@ -1118,7 +1288,7 @@ if __name__ == '__main__':
             print ('library dir = %s'%(library_dir))
             print ('z_0 = %.2f'%(z_0))
             os.mkdir(library_dir)
-            makeLibrary(z_0, theta_array,ice_model, save=True, library_dir=library_dir,r_limit = r_limit)
+            makeLibrary(z_0, theta_array,ice_model, library_dir=library_dir,r_limit = r_limit)
             
         if numpy.any([plot_library == True,split_library == True,save_envelope == True]):
             print('\n'+library_dir+'/*.h5\n')
@@ -1202,24 +1372,6 @@ if __name__ == '__main__':
             pylab.xlim(-10,6310)
             
             pylab.show()
-
-
-"""
-#From before DS worked on the code
-# WANT TO TAKE INTO ACCOUNT CURVATURE OF THE EARTH HERE
-#theta_array = numpy.degrees(numpy.arctan2(numpy.linspace(0., 50000., 120), -1000.)) # MINNA BLUFF
-theta_horizon = 90. + gnosim.earth.earth.horizon(z_0)[1] + 1.e-3 # deg
-x_horizon = -1. * z_0 * numpy.tan(numpy.radians(theta_horizon)) # m
-#theta_array = numpy.degrees(numpy.arctan2(numpy.linspace(0., x_horizon, 120), -1. * z_0)) # MINNA BLUFF
-theta_array = numpy.degrees(numpy.arctan2(numpy.linspace(0., x_horizon, 120), -1. * z_0)) # MINNA BLUFF
-
-
-# FULLY ACCOUNTING FOR EARTH CURVATURE, USE THIS FOR HIGH-ALTITUDE CONFIGURATIONS
-#theta_array = gnosim.earth.earth.curvatureToTheta(z_0, numpy.linspace(0., gnosim.earth.earth.horizon(z_0)[2] - 1., 60)) # 30, 60
-#print (theta_array)
-#import sys
-#sys.exit('DONE')
-"""
 
 
 
