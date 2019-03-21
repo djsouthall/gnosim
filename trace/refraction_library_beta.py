@@ -17,6 +17,7 @@ import gnosim.utils.rf
 import gnosim.utils.plane
 import gnosim.earth.earth
 import gnosim.earth.ice
+import gnosim.utils.misc
 
 pylab.ion()
 
@@ -25,8 +26,8 @@ def getAcceptedSolutions():
     '''
     Returns an array of the acceptable solution type labels.
 
-    Returns:
-    ----------
+    Returns
+    -------
     solutions : numpy.ndarray
         Array of the acceptable solution type labels.
     '''
@@ -40,7 +41,7 @@ def fresnelAmplitude(n_1, n_2, incidence_angle, mode, return_power = False):
     (or power coefficients if return_power == True) for the s and p polarizations.  Mode selects whether to return
     the reflection coefficients (mode = 'reflection', transmission (mode = 'transmission'), or both (mode = 'both').
     
-    Parameters:
+    Parameters
     ----------
     n_1 : float
         Initial index of refraction
@@ -53,8 +54,8 @@ def fresnelAmplitude(n_1, n_2, incidence_angle, mode, return_power = False):
     return_power : bool, optional
         If True, the power coefficients are returned, otherise the amplitude coefficients are. (False is default).
 
-    Returns:
-    ----------
+    Returns
+    -------
     r_s : cfloat, optional
         s polarizaton reflection amplitude coefficient
     r_p : cfloat, optional
@@ -119,15 +120,15 @@ def testFresnelSign(n_1 = 1.5,n_2 = 1.0):
     '''
     Plots the fresnel amplitude coefficients over a range of incidence angles for two indices of refraction.
 
-    Parameters:
+    Parameters
     ----------
     n_1 : float
         Initial index of refraction
     n_2 : float
         Final index of refraction
     
-    See Also:
-    ----------
+    See Also
+    --------
     fresnelAmplitude
 
     '''
@@ -192,7 +193,7 @@ def fresnelPower(n_1, n_2, incidence_angle, mode):
     (OLD) Given two indices of refraction and an angle of incidence this calculates the fresnel power coefficients.
     This function was replaced by fresnelAmplitude to allow for output of signs resulting from reflections.
     
-    Parameters:
+    Parameters
     ----------
     n_1 : float
         Initial index of refraction
@@ -203,8 +204,8 @@ def fresnelPower(n_1, n_2, incidence_angle, mode):
     mode : str
         Specifes which coefficients to return.  Possible values are 'reflection', 'transmission', and 'both'.
 
-    Returns:
-    ----------
+    Returns
+    -------
     R_s : float, optional
         s polarizaton reflection power coefficient
     R_p : float, optional
@@ -262,15 +263,15 @@ def testFresnel(n_low=1., n_high=1.5):
     (OLD) Plots the fresnel power coefficients over a range of indices of refraction.
     This currently only does this using the old calculation of fresnelPower.
 
-    Parameters:
+    Parameters
     ----------
     n_low : float
         Lower bound for index of refraction
     n_high : float
         Upper bound for index of refraction
     
-    See Also:
-    ----------
+    See Also
+    --------
     fresnelPower
 
     '''
@@ -294,7 +295,7 @@ def testFresnel(n_low=1., n_high=1.5):
     pylab.ylabel('Reflection or Transmission Fraction')
     pylab.title('n_1 = %.2f and n_2 = %.2f'%(n_low, n_high))
     pylab.ylim([-0.1, 1.1])
-    input("press any key to exit")
+    input('press any key to exit')
 
     r_s = numpy.zeros(len(incidence_angle_array))
     r_p = numpy.zeros(len(incidence_angle_array))
@@ -324,7 +325,7 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = N
     Calculates key values along a the ray.  THe most common use case of this function is to throw rays from the
     antenna, with values later being interpolated between rays.  
     
-    Parameters:
+    Parameters
     ----------
     origin : numpy.ndarray
         x-y-z coordinates of the source of the ray (often the location of the antenna that would be detecting it).
@@ -348,8 +349,8 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = N
         'power' - Selects the older coefficient calculator which cannot return signs resulting from reflections.
         'amplitude' - Selects the more recently created coefficient calculator which calculates the fresnel amplitudes and thus has signs.
 
-    Returns:
-    ----------
+    Returns
+    -------
     x_array : numpy.ndarray
         Cartesian x-coordinate of each point along the ray in the ice frame.  Given in meters.
     y_array : numpy.ndarray
@@ -612,7 +613,7 @@ def plotGeometry(stations,neutrino_loc,info,ice):
     '''
     Plots the antennas, rays, and neutrino location for an event.
     
-    Parameters:
+    Parameters
     ----------
     stations : list of gnosim.sim.detctor.Station objects
         Station objects which will be used for plotting the locations of the various antennas.
@@ -632,8 +633,7 @@ def plotGeometry(stations,neutrino_loc,info,ice):
         sub_info = numpy.unique(info[info['eventid'] == eventid])
         for index_station,station in enumerate(stations):
             station_cut = sub_info['station'] == index_station
-            colormap = pylab.cm.gist_ncar #nipy_spectral, Set1,Paired   
-            antenna_colors = [colormap(i) for i in numpy.linspace(0, 1,len(numpy.unique(sub_info['antenna']))+1)]
+            antenna_colors = gnosim.utils.misc.getColorMap(len(numpy.unique(sub_info['antenna'])))
             for index_antenna, antenna in enumerate(station.antennas):
                 antenna_cut = sub_info['antenna'] == index_antenna
                 #cut = numpy.logical_and(station_cut,antenna_cut)
@@ -670,7 +670,7 @@ def makeLibrary(z_0, theta_ray_array, ice_model, library_dir='library',r_limit =
     '''
     Throws rays from a particular depth and throws rays at the specified angles in the specified ice model.
     
-    Parameters:
+    Parameters
     ----------
     z_0 : float
         The z coordinate from which rays are throw radially outward.
@@ -685,8 +685,8 @@ def makeLibrary(z_0, theta_ray_array, ice_model, library_dir='library',r_limit =
         The maximum radius the rays are allowed to propogate.  Computed in celindrical coordinates from the origin.  Given in meters.
         (Default is None).
 
-    See Also:
-    ----------
+    See Also
+    --------
     gnosim.earth.ice
     '''
     x_0 = 0.
@@ -736,7 +736,7 @@ class RefractionLibrary:
     '''
     Stores the attributes, information, and functions for a ray tracing library.
     
-    Parameters:
+    Parameters
     ----------
     search : str
         Should contain the search string that would result in a list of all files/rays to be contained in the ray tracing library. 
@@ -746,12 +746,12 @@ class RefractionLibrary:
         the _2 strings, which represent libraries of solution that reflect of the bottom of the ice.
     pre_split : bool, optional
         Determines whether to attempt to load from pre split libraries.  If true (and the pre split libraries are calculated and 
-        saved appropriately) this avoids lengthy calculations which seperate the rays ito the different solution types.
+        saved appropriately) this avoids lengthy calculations which seperate the rays ito the different solution types. (Default is False).
     build_lib : bool, optional
         Must be called to actually populate most library information (such as the rays), however is left as an option such that 
         the rest of the library can be worked with as a less bulky object when necessary.  (Default is True).
 
-    Attributes:
+    Attributes
     ----------
     infiles : list of str
         A list of the files names for each ray in the library.
@@ -761,13 +761,12 @@ class RefractionLibrary:
         A list of the keys for the important values to be loaded/utilized by the library.
     data : dict
         Contains all of the ray tracig library raw data.  Sorted by solution type and key.
-    ice_mode : str
+    ice_model : str
         The ice model used in the libary.  Currently None if buildLib() has not been called.
     pre_split : bool
         Selection of whether to atempt loading from pre split (by solution type) libraries or not. 
     concave_hull : dict
         Contains the information about the concave hull, and relavent funtions/limits.
-
 
     '''
     def __init__(self, search, solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']), pre_split = True,build_lib = True):
@@ -974,7 +973,7 @@ class RefractionLibrary:
         '''
         Should save the necessary information for a libraries hull so it can be used to create a hull later.
 
-        Parameters:
+        Parameters
         ----------
         out_dir : str
             Location of directory for output files to save.  Should be of the form '/dir1/dir2', i.e. it shouldn't end with a /.
@@ -1085,7 +1084,7 @@ class RefractionLibrary:
         which are interpolatd boundaries of the ray tracing libraries by solution type.  Returns a dictionary
         of the hulls.
 
-        Parameters:
+        Parameters
         ----------
         in_dir : str
             Location of directory for input hull files to load.  Should be of the form '/dir1/dir2', 
@@ -1128,21 +1127,21 @@ class RefractionLibrary:
         
 
     def intersect(self, dic):
-        """
-        Finds intersections between rays to separate the "direct" and "cross" solutions.
+        '''
+        Finds intersections between rays to separate the 'direct' and 'cross' solutions.
 
-        Parameters:
+        Parameters
         ----------
         dic : dict
             Should contain the information of all rays in the 'direct' solution type ray tracing library.
         
-        Returns:
-        ----------
+        Returns
+        -------
         dic_direct : dict
             Contains the information of all rays in the 'direct' solution type ray tracing library.
         dic_cross : dict
             Contains the information of all rays in the 'cross' solution type ray tracing library.
-        """
+        '''
         select_cross = numpy.array([],dtype=int)
         theta_ant_unique = numpy.unique(dic['theta_ant'])
         r_intersect = []
@@ -1210,7 +1209,7 @@ class RefractionLibrary:
         '''
         Plots the rays in the library.
 
-        Parameters:
+        Parameters
         ----------
         s : int
             Markersize as defined by matplotlib (Default = 10)

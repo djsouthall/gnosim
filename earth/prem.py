@@ -1,9 +1,9 @@
-"""
+'''
 Density of the Earth.
 
 Source: Preliminary Reference Earth Model (PREM) (Dziewonski & Anderson, 1981)
         http://geophysics.ou.edu/solid_earth/prem.html
-"""
+'''
 
 import numpy
 import scipy.interpolate
@@ -13,10 +13,9 @@ import gnosim.utils.constants
 import gnosim.earth.ice
 
 pylab.ion()
-
 ############################################################
 
-prem_string = """#http://geophysics.ou.edu/solid_earth/prem.html
+prem_string = '''#http://geophysics.ou.edu/solid_earth/prem.html
 #Preliminary Reference Earth Model (PREM) (Dziewonski & Anderson, 1981)
 #Region         
 #Radius              alpha beta rho           Ks        mu      nu      P       g
@@ -85,16 +84,28 @@ prem_string = """#http://geophysics.ou.edu/solid_earth/prem.html
 6368.0  5800.00         3200.00         2600.00         52.0    26.6    0.2812  0.300   9.8222
 #Ocean  
 6368.0  1450.00         0.00    1020.00         2.1     0.0     0.5000  0.300   9.8222
-6371.0  1450.00         0.00    1020.00         2.1     0.0     0.5000  0.000   9.8156"""
+6371.0  1450.00         0.00    1020.00         2.1     0.0     0.5000  0.000   9.8156'''
 
 ############################################################
 
 #def prem(infile='prem.dat', plot=False):
 def prem(ice):
-    """
-    Returns:
-    Function for density of Earth (nucleons m^-3) as a function of radius (m), technically a scipy.interpolate.interp1d object
-    """
+    '''
+    Returns an scipy.interpolate.interp1d function representing the density of the Earth in nucleons m^-3 as a function of radius.
+    
+    Source: Preliminary Reference Earth Model (PREM) (Dziewonski & Anderson, 1981)
+        http://geophysics.ou.edu/solid_earth/prem.html
+
+    Parameters
+    ----------
+    ice : gnosim.earth.ice.Ice
+        The ice object containing the appropriate ice model.  This will be put on the surface of the PREM model.
+
+    Returns
+    -------
+    f : scipy.interpolate.interp1d
+        A function representing the density of the Earth in nucleons m^-3 as a function of radius.
+    '''
     lines = prem_string.split('\n')
 
     radius = [] # km
@@ -125,7 +136,7 @@ def prem(ice):
 
 ############################################################
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     ice_model = 'antarctica'
     ice = gnosim.earth.ice.Ice(antarctica)
     f = prem(ice) # Earth density interpolation function object

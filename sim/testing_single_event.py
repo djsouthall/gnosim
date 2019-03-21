@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 '''
 This is meant to rerun calculations from the simulaton for a single event.
 I.e. it will use an output file to get the necessary info to mostly reproduce
@@ -10,22 +9,11 @@ import sys
 import numpy
 import h5py
 import matplotlib
-#matplotlib.use('Agg') #Use so it doesn't popup plots during the running of the sime
 import pylab
-#pylab.ioff() #Use so it doesn't popup plots during the running of the sime
-import json
 import yaml
 import os
 import os.path
 import glob
-import scipy
-import scipy.signal
-import math
-from matplotlib import gridspec
-import pandas
-import time
-from concurrent.futures import ThreadPoolExecutor
-from multiprocessing import cpu_count
 
 sys.path.append("/home/dsouthall/Projects/GNOSim/")
 import gnosim.sim.antarcticsim

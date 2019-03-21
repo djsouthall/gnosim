@@ -23,19 +23,33 @@ pylab.ion()
 
 ############################################################
 
-def electricFieldFrequencyDomainRaw(frequency, d, angle, Energy_GeV, inelasticity, mode, index_of_refraction):
+def electricFieldFrequencyDomainRaw(frequency, d, angle, Energy_GeV, inelasticity, index_of_refraction):
     '''
-    This is the old method
+    The old method of calculating the electric field.  This is a frequency domain model:
     Askaryan Emission
     Source: Lehtinen et al. 2003, arXiv:0309656
     
-    
-    frequency = frequency (GHz)
-    d = observation distance (m)
-    angle = observation angle relative to shower axis (deg)
-    energy neutrino = neutrino energy (GeV)
-    inelasticity = inelasticity
-    Return electric field (V m^-1 GHz^-1)
+    Parameters
+    ----------
+    frequency : float
+        Frequencies for which to calculate the electric field.  Given in GHz.
+    d : float
+        Observation distance.  Given in m.
+    angle : float
+        Observation angle relative to shower axis.  Given in degrees.
+    Energy_GeV : float
+        Neutrino energy given.  Given in GeV.  This should represent the raw energy going into of the neutrino
+        before it interacts, and thus should NOT be reduced by the inelasticity factor (this is done internally).
+    inelasticity : float
+        The inelasticty factor of the interaction of the neutrino in ice.  Represents the portion of energy that
+        is actually transferred to the energy of the shower.
+    index_of_refraction : float
+        The index of refraction where the interaction occurs.
+
+    Returns
+    -------
+    electric_field : float
+        The electric field given in units of  V m^-1 GHz^-1.
     '''
     omega = 2. * numpy.pi * frequency
     mu = 1.
@@ -44,25 +58,40 @@ def electricFieldFrequencyDomainRaw(frequency, d, angle, Energy_GeV, inelasticit
     energy_shower = inelasticity * Energy_GeV # GeV
     q = 5.5e-20 * energy_shower # C
     k = index_of_refraction * omega / gnosim.utils.constants.speed_light
-    
-    return (mu * gnosim.utils.constants.mu_0 * q * length * (gnosim.utils.constants.GHz_to_Hz * omega) / (d * numpy.sqrt(2. * numpy.pi))) \
-        * numpy.sin(numpy.radians(angle)) \
-        * numpy.exp(-0.5 * (k * length)**2 * (numpy.cos(numpy.radians(angle)) - index_of_refraction**-1)**2) \
-        * gnosim.utils.constants.GHz_to_Hz # V m^-1 GHz^-1, dimensionless
+    electric_field = (mu * gnosim.utils.constants.mu_0 * q * length * (gnosim.utils.constants.GHz_to_Hz * omega) / (d * numpy.sqrt(2. * numpy.pi))) \
+                    * numpy.sin(numpy.radians(angle)) \
+                    * numpy.exp(-0.5 * (k * length)**2 * (numpy.cos(numpy.radians(angle)) - index_of_refraction**-1)**2) \
+                    * gnosim.utils.constants.GHz_to_Hz # V m^-1 GHz^-1, dimensionless
+    return electric_field
     
 ############################################################
 
 ############################################################
-'''
-Practical and Accurate Calculations of Askaryan Radiation
-Source: Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283
-'''
+
 
 def loadSignalResponse(mode='vpol'):
     '''
-    Returns the fft's of the signals, and their frequencies.  
-    Eventually these file locations should be part of the config file such that
-    individual response functions could be input per antenna.  
+    This loads the system response, antenna response, and corresponding frequencies.  This is no longer being used
+    as loading has become part of the antenna type definition in gnosim.sim.detector.Antenna.addTimingInfo().
+    The responses are returned in the frequency domain.
+    
+    Parameters
+    ----------
+    mode : str, optional
+        The label for a particular response function loading operation.  (Default is 'vpol').
+
+    Returns
+    -------
+    h_fft : numpy.ndarray of cfloat
+        The values for the antenna response. (Should have units of m, i.e. effective height).
+    sys_fft : numpy.ndarray of cfloat
+        The values for the syste response. (Should be unitless).
+    freqs : numpy.ndarray of float
+        The values for the frequencies corresponding to the above responses.
+
+    See Also
+    --------
+    gnosim.sim.detector.Antenna.addTimingInfo
     '''
     if mode == 'vpol':
         print('Loading Signal Response vpol')
@@ -87,19 +116,35 @@ def loadSignalResponse(mode='vpol'):
 
 def RA(Energy_GeV,t_ns):
     '''
-    Ideally this would be a function of index of refraction as well, right now
-    this model is parameterized specifically for n = 1.78
-    I beliee this should return units of V s (i.e. it is disgned to output SI,
-    not something in terms of ns)
-    
-    #THIS IS NOT DEPENDANT ON ANYTHING OTHER THAN ENERGY, CAN BE CALCULATED EXTERNALLY AND FED TO QUICKSIGNAL
+    The corresponds to Equation 16 of Practical and Accurate Calculations of Askaryan Radiation, and is the far field 
+    parameterization of the vector potential (multiplied by the observation distance R).  Ideally this would be a 
+    function of index of refraction as well, right now this model is parameterized specifically for n = 1.78. 
+    Returns in units of V s .
+
+    Source:
+    Practical and Accurate Calculations of Askaryan Radiation - Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283
+
+    Parameters
+    ----------
+    Energy_GeV : float
+        The energy for which to calculate the vector potential of the Askaryan radiation.  Should already be reduced
+        by the inelasticity factor if applicable.  Given in GeV.
+    t_ns : numpy.ndarray of float or float
+        The observer times for which to calculate the Askaryan radiation.  Should span both negative and positive times
+        to get the full details of the pulse.  Given in ns.
+
+    Returns
+    -------
+    ra : numpy.ndarray of float or float
+        The vector potential (multiplied by the observation distance).  Given in V s.
     '''
+
     Energy_TeV = 0.001*Energy_GeV
     if numpy.size(t_ns) == 1:
         if t_ns > 0:
-            return (-4.5e-14) * Energy_TeV * ( numpy.exp(- numpy.fabs(t_ns)/0.057) + (1. + 2.87*numpy.fabs(t_ns))**(-3.0))
+            ra = (-4.5e-14) * Energy_TeV * ( numpy.exp(- numpy.fabs(t_ns)/0.057) + (1. + 2.87*numpy.fabs(t_ns))**(-3.0))
         else:
-            return (-4.5e-14) * Energy_TeV * ( numpy.exp(- numpy.fabs(t_ns)/0.030) + (1. + 3.05*numpy.fabs(t_ns))**(-3.5)) 
+            ra = (-4.5e-14) * Energy_TeV * ( numpy.exp(- numpy.fabs(t_ns)/0.030) + (1. + 3.05*numpy.fabs(t_ns))**(-3.5)) 
     else:
         ra = numpy.zeros_like(t_ns)
         #ra_gt = (-4.5e-14) * Energy_TeV * ( numpy.exp(- numpy.fabs(t_ns[t_ns > 0])/0.057) + (1. + 2.87*numpy.fabs(t_ns[t_ns > 0]))**(-3.0))
@@ -108,60 +153,125 @@ def RA(Energy_GeV,t_ns):
         #ra[t_ns <= 0] = ra_lt
         ra[t_ns > 0] = (-4.5e-14) * Energy_TeV * ( numpy.exp(- numpy.fabs(t_ns[t_ns > 0])/0.057) + (1. + 2.87*numpy.fabs(t_ns[t_ns > 0]))**(-3.0))
         ra[t_ns <= 0] = (-4.5e-14) * Energy_TeV * ( numpy.exp(- numpy.fabs(t_ns[t_ns <= 0])/0.030) + (1. + 3.05*numpy.fabs(t_ns[t_ns <= 0]))**(-3.5)) 
-        return ra
+    return ra
 
 
 def Q(x,a=4.85,b=0.60,loc=0,scale=1.0,random_params=False,random_local = None):
-        '''
-        b is included to make the python variant of the gamma function align with
-        that defined in: 
-        Coherent radio pulses from GEANT generated electromagnetic showers in ice  -  Phys. Rev. D 65, 103002
-        The mean a an b values they found are a = 4.85, b = 0.60 with sig_a = 1.01, sig_b = 0.14
-        Perhaps we would want to pull randomly from gaussion distros for each of 
-        these params for each event. 
-        
-        Note random_params = True it will overwrite any a or b passed to the function. 
-        
-        '''
-        if random_params:
-            #NOTE THIS MAY THROW OFF SEEDING.  THIS FEATURE WAS ADDED BUT NEVER USED, SO RANDOMNESS NOT REALLY ACCOUNTED FOR.
-            #With random_local this should be consistent between trigger/pretrigger events, but likely not
-            #between when using this feature and not.  Would ruin all noise etc.  Be careful if you ever implement this
-            if random_local == None:
-                a = numpy.random.normal(loc=4.85,scale=1.01,size=None)
-                b = numpy.random.normal(loc=0.60,scale=0.14,size=None)
-            else:
-                a = random_local.normal(loc=4.85,scale=1.01,size=None)
-                b = random_local.normal(loc=0.60,scale=0.14,size=None)
-        return b * scipy.stats.gamma.pdf( b * x , a = a , loc = loc , scale = scale )
+    '''
+    This is the charge profile of the Askaryan calculation.  b is included to make the python variant of the gamma function align with
+    that used in the papers definition of the charge profile.  The scale is arbitrary as it is normalized in the use of it by LQ (ideally).
+    The scale should be set to 1.0, as it is assumed to be so. 
+
+    This was not specified in the 'Practical and Accurate Calculations 
+    of Askaryan Radiation' paper, but a parameterization was seperately found in 'Coherent radio pulses from GEANT generated 
+    electromagnetic showers in ice'  -  Phys. Rev. D 65, 103002
+
+    The mean a an b values they found are a = 4.85, b = 0.60 with sig_a = 1.01, sig_b = 0.14
+    Perhaps we would want to pull randomly from gaussion distros for each of these params for each event (not currently done). 
+    
+    Source:
+    Coherent radio pulses from GEANT generated electromagnetic showers in ice  -  Phys. Rev. D 65, 103002
+
+    Parameters
+    ----------
+    x : numpy.ndarray of float
+        The input value for Q.  Originally intended to be a position in m, however in practice is a u-substitution term:
+        Q(u/alpha).   My explaination for this is as follows:
+        The scale factor is added to modify this function by scaling the z' input such that the convolution described 
+        in Eq17 of arXiv:1106.6283. Essentially in trying to understand how to implement the convolution described by 
+        that equation I decided a u-substitution had to be done where  u = z' * alpha where alpha = (1-n*cos(theta))/c.   
+        The convolution is then 1/alpha INT du Q(u/alpha)*Fp(dt - u).  The scale factor is meant to account for the 
+        scaling in Q to make it appear more like a convolution: 1/alpha INT du Q'(u)*Fp(dt - u), where Q' scales u.  
+        The scaling factor not being one implies the input x is some value of ns that was converted from meters using 
+        the scale factor.
+
+        I apologize if this is not clear, I am doing my best :/
+    a : float, optional
+        Charge profile parameter from Phys. Rev. D 65, 103002 (Default is 4.85, the mean value from the paper).
+    b : float, optional
+        Charge profile parameter from Phys. Rev. D 65, 103002 (Default is 0.60, the mean value from the paper).
+    loc : float, optional
+        The location parameter of the gamma function used in the charge distrobution.  (Default is 0).
+    scale : float, optional
+        The scaling factor from the gamma function used in the charge distrobution.  (Default is 1).
+    random_params : float, optional
+        Enables randomly generated values for a and b based on the distrobutions found in the source.
+    random_local : numpy.random.RandomState, optional
+        A prevously seeded random object, to avoid issues with consistency in seeding of events.  Should be set in 
+        gnosim.sim.antarcticsim.Sim.event using random_local = numpy.random.RandomState(seed = event_seed).  (Default is None).
+
+    Returns
+    -------
+    Q : numpy.ndarray of float or float
+        The charge profile.
+    '''
+    if random_params:
+        if random_local == None:
+            a = numpy.random.normal(loc=4.85,scale=1.01,size=None)
+            b = numpy.random.normal(loc=0.60,scale=0.14,size=None)
+        else:
+            a = random_local.normal(loc=4.85,scale=1.01,size=None)
+            b = random_local.normal(loc=0.60,scale=0.14,size=None)
+    return b * scipy.stats.gamma.pdf( b * x , a = a , loc = loc , scale = scale )
         
 def excessProjectedTrackLength(Q,int_min=-100.,int_max=100.,n_steps = 1000):
     '''
-    integration_length in meters.
-    This is meant to go from Q to LQ following the paper Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283
-    for motivating LQ, and the paper Phys. Rev. D 65, 103002 for the shape of Q.
-    
-    In the paper this was normalized to 1.  Still trying figure out what this
-    should actually be normalized to.  The scaling may not matter as Q is ultimately
-    is in the numerator of a convolution and LQ is in the denomenator.  So the scaling
-    may be already accounted for by that division.  
+    This is the charge profile of the Askaryan calculation.  b is included to make the python variant of the gamma function align with
+    that used in the papers definition of the charge profile.  The scale is arbitrary as it is normalized in the use of it by LQ (ideally).
+    The scale should be set to 1.0, as it is assumed to be so. 
+
+    Source:
+    Practical and Accurate Calculations of Askaryan Radiation - Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283
+
+    Parameters
+    ----------
+    Q : function
+        The charge profile function to be integrated.
+    int_min : float, optional
+        The lower integration bound. (Default is -100.0).
+    int_max : float, optional
+        The upper integration bound. (Default is 100.0).
+    n_steps : int, optional
+        The number of steps in the integration. (Default is 1000).
+
+    Returns
+    -------
+    LQ : float
+        Integrated Q.
     '''
     LQ,error = scipy.integrate.quad(Q,int_min,int_max)
     return LQ
     
 def F_p(Energy_GeV,t_ns,n,LQ):
     '''
-    This is the form factor as in Eq15 of Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283
+    This is the form factor as in Equation 15 of Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283
     This is to be calculated at the cherenkov angle (which in the paper was for n=1.78)
-    And then convolved with the charge profile Q to determine the vector potential. 
-    '''
-    '''
-    cherenkov_angle = numpy.arccos(1./n)
-    #mu_0 = gnosim.utils.constants.mu_0 # m kg s^-2 A^-2
-    prefactor = 4. * numpy.pi /( gnosim.utils.constants.mu_0 * numpy.sin(cherenkov_angle))
-    ra = RA(Energy_GeV,t_ns)  
-    #print(ra)
-    return prefactor * ra / LQ
+    And then convolved with the charge profile Q to determine the vector potential.  Despite the
+    paremeterization in the paper being specifically for n=1.78 we assume that applying it for
+    other indices of refractions is approximately correct.
+
+    Source:
+    Practical and Accurate Calculations of Askaryan Radiation - Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283
+
+    Parameters
+    ----------
+    Energy_GeV : float
+        The energy for which to calculate the vector potential of the Askaryan radiation.  Should already be reduced
+        by the inelasticity factor if applicable.  Given in GeV.
+    t_ns : numpy.ndarray of float or float
+        The observer times for which to calculate the Askaryan radiation.  Should span both negative and positive times
+        to get the full details of the pulse.  Given in ns.
+    n : float
+        The index of refraction where the interaction occurs. 
+    LQ : function
+        The integrated charge profile.
+
+    Returns
+    -------
+    fp : float
+        The form factor from Equation 15 of Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283.
+        fp represents the average vector potential at the Chernkov angle per unit excess track length (LQ)
+        scaled with the factor 4*pi*R/mu.
     '''
     ra = RA(Energy_GeV,t_ns)  
     fp = (4. * numpy.pi /(LQ * gnosim.utils.constants.mu_0 * math.sqrt(1-1/n**2))) * ra #note that math.sqrt(1-1/1.78**2) is a faster form of numpy.sin(cherenkov_angle) = numpy.sin(numpy.arccos(1/n))
@@ -170,7 +280,38 @@ def F_p(Energy_GeV,t_ns,n,LQ):
     
 def vectorPotentialTimeDomain(theta_obs_rad,R,Energy_GeV,n,u,plot = False):
     '''
-    This should do it all?
+    This calculates the vector potential in the time domain following the source listed below.
+    
+    ***
+    This function is NOT maintained or used.  It's contents have been moved to quickSignalSingle which
+    contains the full calculation but streamlined for calculation duration.
+    ***
+    
+    Source:
+    Practical and Accurate Calculations of Askaryan Radiation - Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283
+
+    Parameters
+    ----------
+    theta_obs_rad : float
+        The observation angle relative to the shower axis.  Given in radians.
+    R : float
+        The observation distance.  Given in m.
+    Energy_GeV : float
+        The energy for which to calculate the vector potential of the Askaryan radiation.  Should already be reduced
+        by the inelasticity factor if applicable.  Given in GeV.
+    n : float
+        The index of refraction where the interaction occurs. 
+    u : numpy.ndarray of floats
+        The times for which to calculate the vector potential.  Given in ns.
+    plot : bool, optional
+        Enables plotting.
+
+    Returns
+    -------
+    A : numpy.ndarray of float
+        The vector potential.  Given in V s/m.
+    u : numpy.ndarray of float
+        The times corresponding to the vector potential.  Given in ns.
     '''
     cherenkov_angle = numpy.arccos(1./n)
     LQ = excessProjectedTrackLength(Q)
@@ -266,12 +407,44 @@ def vectorPotentialTimeDomain(theta_obs_rad,R,Energy_GeV,n,u,plot = False):
             pylab.subplots_adjust(left=0.08, bottom=0.05, right=0.98, top=0.97, wspace=None, hspace=None)
     return A , u
 
-def electricFieldTimeDomainRaw(theta_obs_rad,R,Energy_GeV,n,u,plot = False,deriv_mode = 'time'):
+def electricFieldTimeDomainRaw(theta_obs_rad,R,Energy_GeV,n,u,plot = False,deriv_mode = 'freq'):
     '''
-    Calculates the time domain electric field using the method from 
-    Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283.  This stage has not 
-    accounted for any system responses and is just the signal as emitted.  
+    This calculates the electric field in the time domain following the source listed below.  
+    Does not include antenna or system responses.
     
+    ***
+    This function is NOT maintained or used.  It's contents have been moved to quickSignalSingle which
+    contains the full calculation but streamlined for calculation duration.
+    ***
+    
+    Source:
+    Practical and Accurate Calculations of Askaryan Radiation - Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283
+
+    Parameters
+    ----------
+    theta_obs_rad : float
+        The observation angle relative to the shower axis.  Given in radians.
+    R : float
+        The observation distance.  Given in m.
+    Energy_GeV : float
+        The energy for which to calculate the vector potential of the Askaryan radiation.  Should already be reduced
+        by the inelasticity factor if applicable.  Given in GeV.
+    n : float
+        The index of refraction where the interaction occurs. 
+    u : numpy.ndarray of floats
+        The times for which to calculate the vector potential.  Given in ns.
+    plot : bool, optional
+        Enables plotting.
+    deriv_mode : str, optional
+        Determines how the derivate is performed (time v.s. frequency domain derivative).
+        The options are 'time' and 'freq'. (Default is 'freq').
+
+    Returns
+    -------
+    E : numpy.ndarray of float
+        The electric field.  Given in V.
+    u : numpy.ndarray of float
+        The times corresponding to the electric field.  Given in ns.
     '''
     A, u = vectorPotentialTimeDomain(theta_obs_rad,R,Energy_GeV,n,u)
     if deriv_mode == 'freq':
@@ -292,9 +465,66 @@ def electricFieldTimeDomainRaw(theta_obs_rad,R,Energy_GeV,n,u,plot = False,deriv
             pylab.plot(u,R*E,label = '$R|\\vec{E}_{raw}|$ ')
     return  E , u
 
-def electricFieldTimeDomainSignal(theta_obs_rad,R,Energy_GeV,n,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = False,return_pos = False,mode='',up_sample_factor=10,deriv_mode = 'time'):  
+def electricFieldTimeDomainSignal(theta_obs_rad,R,Energy_GeV,n,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = False,return_pos = False,mode='vpol',up_sample_factor=10,deriv_mode = 'freq'):  
     '''
-    Calculates the full electric field, including response function calculations.
+    This calculates the electric field in the time domain following the source listed below.  
+    Includes the antenna and system responses.
+    
+    ***
+    This function is NOT maintained or used.  It's contents have been moved to quickSignalSingle which
+    contains the full calculation but streamlined for calculation duration.
+    ***
+    
+    Source:
+    Practical and Accurate Calculations of Askaryan Radiation - Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283
+
+    Parameters
+    ----------
+    theta_obs_rad : float
+        The observation angle relative to the shower axis.  Given in radians.
+    R : float
+        The observation distance.  Given in m.
+    Energy_GeV : float
+        The energy for which to calculate the vector potential of the Askaryan radiation.  Should already be reduced
+        by the inelasticity factor if applicable.  Given in GeV.
+    n : float
+        The index of refraction where the interaction occurs. 
+    u : numpy.ndarray of floats
+        The times for which to calculate the vector potential.  Given in ns.
+    h_fft : numpy.ndarray of cfloat
+        The values for the antenna response. (Should have units of m, i.e. effective height).
+    sys_fft : numpy.ndarray of cfloat
+        The values for the syste response. (Should be unitless).
+    freqs : numpy.ndarray of float
+        The values for the frequencies corresponding to the above responses.
+    plot : bool, optional
+        Enables plotting.
+    out_dom_freq  : bool, optional
+        Enables returning of the frequency corresponding to the max power bin in the signal spectrum.
+    return_pos  : bool, optional
+        Enables returning of only the signal and times that correspond to positive u.
+    mode : str, optional
+        The label for a particular response function loading operation.  (Default is 'vpol').
+    up_sample_factor : int, optional
+        Characterizes how much calculateTimes should up sample the responses.  This is no longer used, as it
+        is expected that signal responses are up sampled in advance. up_sample_factor is not exact, as the
+        number of points is rounded to a factor of 2 to ensure future ifft's are as fast as possible.
+    deriv_mode : str, optional
+        Determines how the derivate is performed (time v.s. frequency domain derivative).
+        The options are 'time' and 'freq'. (Default is 'freq').
+
+    Returns
+    -------
+    V : numpy.ndarray of float
+        The electric field.  Given in V.
+    u : numpy.ndarray of float
+        The times corresponding to the electric field.  Given in ns.
+    dominant_freq : float, optional
+        The frequency corresponding to the max power bin in the signal spectrum.
+
+    See Also
+    --------
+    gnosim.sim.response.upsample_response
     '''
     if any([numpy.size(h_fft) ==1,numpy.size(sys_fft)==1,numpy.size(freqs)==1]):
         h_fft,sys_fft,freqs = loadSignalResponse(mode=mode)
@@ -362,18 +592,12 @@ def electricFieldTimeDomainSignal(theta_obs_rad,R,Energy_GeV,n,h_fft=None,sys_ff
 
 def addSignals(u_in,V_in,plot=False,V_noise_in = [], remove_noise_overlap = False):
     '''
-    u_in should be an array of times with dimensions (n_signal , n_timestep )
-    u is assumed to be in order, i.e. u[0] is the min of each row and u[-1] is the max.
-    Each row of u is also assumed to have the same time step.  
-    V_in should be an array of electric fields with dimensions (n_signal , n_timestep )
-    Note that the timing of signals may be shifted by up to a u-step here to align 
-    descretized timing values.  There may be a more elegant want do this if this
-    added wiggle becomes a problem. 
-    
-    If remove_noise_overlap is true and an array V_noise_in is provided, this will
-    remove noise from each signal in regions of overlapping noise (using a ramp) such
-    that noise does not add where realistically it should be one continuous stream
-    of noise.  
+    Joins signals from V_in into a continuous signal signal stream.  Should be used to combine
+    voltages calculated independently for each solution type, such that they appear in the same
+    stream as they would in reality.  If remove_noise_overlap is True and an array V_noise_in 
+    is provided, this will remove noise from each signal in regions of overlapping noise 
+    (by reducing them by the appropriate factor) such that noise does not add where realistically 
+    it should be one continuous stream of noise.  
     
     V_noise in should be the same shape as V_in, and should correspond to the same
     times u_in.  
@@ -384,6 +608,36 @@ def addSignals(u_in,V_in,plot=False,V_noise_in = [], remove_noise_overlap = Fals
     the same length as u_in, V_in. In region of overlapping noise/signal I need
     to subtract off real signs, ramp noise in overlapping regions, and then add
     back the signals.  
+    
+    Source:
+    Practical and Accurate Calculations of Askaryan Radiation - Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283
+
+    Parameters
+    ----------
+    u_in : numpy.ndarray of float
+        The times corresponding to the electric field.  Given in ns. Should be an array of times with 
+        dimensions (n_signal , n_timestep ). It is assumed to be in order, i.e. u[0] is the min of 
+        each row and u[-1] is the max.  Each row of u is also assumed to have the same time step.  
+    V_in : numpy.ndarray of float
+        The electric field of the askaryan radiation (including noise if applicable).  Given in V.  
+        V_in should be an array of electric fields with dimensions (n_signal , n_timestep ).  Note 
+        that the timing of signals may be shifted by up to a u-step here to align descretized timing 
+        values.  There may be a more elegant way do this if this if added wiggle becomes a problem. 
+    plot : bool, optional
+        Enables plotting.
+    V_noise_in : , optional
+        The electric field of JUST the noise.  Given in V.  V_noise_in should be the same format as V_in.
+    remove_noise_overlap : bool, optional
+        If remove_noise_overlap is True and an array V_noise_in is provided, this will remove noise 
+        from each signal in regions of overlapping noise (by reducing them by the appropriate factor) 
+        such that noise does not add where realistically it should be one continuous stream of noise.  
+
+    Returns
+    -------
+    V_out : numpy.ndarray of float
+        The electric field.  Given in V_out.
+    u_out : numpy.ndarray of float
+        The times corresponding to the electric field.  Given in ns.
     '''
     if len(numpy.shape(u_in)) <=1:
         return V_in, u_in
@@ -452,10 +706,51 @@ def addSignals(u_in,V_in,plot=False,V_noise_in = [], remove_noise_overlap = Fals
 
 def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode=None):
     '''
+    This loads (if not given) the system response, antenna response, and corresponding frequencies, 
+    and additionally calculates the times for which the Askaryan calculation will be calculated.  
+    This is no longer being used as loading has become part of the  antenna type definition in 
+    gnosim.sim.detector.Antenna.addTimingInfo(). The responses are returned in the frequency domain.
+
+    ***
+    This function is NOT maintained or used.  It's contents have been moved to quickSignalSingle which
+    contains the full calculation but streamlined for calculation duration.
+    ***
+
+    Parameters
+    ----------
+    up_sample_factor : int, optional
+        Characterizes how much calculateTimes should up sample the responses.  This is no longer used, as it
+        is expected that signal responses are up sampled in advance. up_sample_factor is not exact, as the
+        number of points is rounded to a factor of 2 to ensure future ifft's are as fast as possible.
+    h_fft : numpy.ndarray of cfloat
+        The values for the antenna response. (Should have units of m, i.e. effective height).
+    sys_fft : numpy.ndarray of cfloat
+        The values for the syste response. (Should be unitless).
+    freqs : numpy.ndarray of float
+        The values for the frequencies corresponding to the above responses.
+    mode : str, optional
+        The label for a particular response function loading operation.  (Default is 'vpol').
+
+    Returns
+    -------
+    u : numpy.ndarray of float
+        The times corresponding to the electric field.  Given in ns.
+    h_fft : numpy.ndarray of cfloat
+        The values for the antenna response. (Should have units of m, i.e. effective height).
+    sys_fft : numpy.ndarray of cfloat
+        The values for the syste response. (Should be unitless).
+    freqs : numpy.ndarray of float
+        The values for the frequencies corresponding to the above responses.
+
+    See Also
+    --------
+    gnosim.sim.response.upsample_response
+    gnosim.sim.detector.Antenna.addTimingInfo()
+    '''
+
+    '''
     Calculates the times used for signal calculations based on the response functions
-    (assumed to have the same frequency step).  up_sample_factor is not exact, as the
-    number of points is rounded to a factor of 2 to ensure future ifft's are as fast
-    as possible.
+    (assumed to have the same frequency step).  
     
     This also returns the newly padded responses and freqs.
     '''
@@ -486,23 +781,86 @@ def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode=N
     return u, h_fft, sys_fft, freqs
 
 
-def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,signal_reduction_factor,u, h_fft, sys_fft, freqs, fp_fft = None,plot_signals=False,plot_spectrum=False,plot_angles = False,plot_potential = False,include_noise = False, resistance = 50, noise_temperature = 320,random_local = None):  
+def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reduction_factor, u, h_fft, sys_fft, freqs, fp_fft = None, plot_signals=False, plot_spectrum=False, plot_angles = False, plot_potential = False, include_noise = False, resistance = 50, noise_temperature = 320, random_local = None):  
     '''
-    This should do the entire calculation, mostly in the frequency domain. 
-    Expects u, h_fft, sys_fft, freqs to all come straight from calculateTimes.
-    These are the same for a given up_sample and response so don't need to be calculated
-    every signal. 
-    
-    
-    Return pattern:
-    if include_noise == True:
-        return V_noiseless, u, dominant_freq, V_noise,  SNR
-    else:
-        return V_noiseless, u, dominant_freq
-        
-    SNR is calculated as the ratio of the peak to peak/2 over rms(noise), squared 
-    (ratio of powers)
+    This calculates the electric field in the time domain following the source listed below.  
+    Includes the antenna and system responses.  This should do the entire calculation, mostly
+    in the frequency domain.  It is intended to be as fast as possible, though as it is a large
+    calculaton it is possible I missed possible ways to speed it up.
+
+    Source:
+    Practical and Accurate Calculations of Askaryan Radiation - Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283
+
+    Parameters
+    ----------
+    theta_obs_rad : float
+        The observation angle relative to the shower axis.  Given in radians.
+    R : float
+        The observation distance.  Given in m.
+    Energy_GeV : float
+        The energy for which to calculate the vector potential of the Askaryan radiation.  Should already be reduced
+        by the inelasticity factor if applicable.  Given in GeV.
+    n : float
+        The index of refraction where the interaction occurs.
+    t_offset : float
+        An offset in time to apply to the output times.  Given in ns.
+    signal_reduction_factor : float
+        This is the reduction factor that should be multiplied with the antenna response.  This should be calculated
+        using gnosim.sim.detector.Antenna.getAntennaResponseFactor
+    u : numpy.ndarray of floats
+        The times for which to calculate the vector potential.  Given in ns.
+    h_fft : numpy.ndarray of cfloat
+        The values for the antenna response. (Should have units of m, i.e. effective height).
+        Should be loaded using gnosim.sim.detector.Antenna.addTimingInfo
+    sys_fft : numpy.ndarray of cfloat
+        The values for the syste response. (Should be unitless).
+        Should be loaded using gnosim.sim.detector.Antenna.addTimingInfo
+    freqs : numpy.ndarray of float
+        The values for the frequencies corresponding to the above responses.
+        Should be loaded using gnosim.sim.detector.Antenna.addTimingInfo
+    fp_fft : numpy.ndarray of float, optional
+        The frequency domain version of the form factor.  This is the same for a particular neutrino event, so
+        can be calculated in advance and passed to this function to save computation time.  (Default is None).
+    plot_signals : bool, optional
+        Enables plotting of signals.
+    plot_spectrum : bool, optional
+        Enables plotting of the signal spectrum.
+    plot_angles : bool, optional
+        Enables plotting of the signal phases.
+    plot_potential : bool, optional
+        Enables plotting of the vector potential.
+    include_noise : bool, optional
+        Enables the addition of noise (Default is False).
+    resistance : float, optional
+        The resistance to be used in the noise calculation.  Given in Ohms.  (Default is 50.0)
+        Note that the noise is also processed by the system response, which may be scaled to obtain a particular noise
+        level for a certain temperature.
+    noise_temperature : float, optional
+        The temperature to be used in the noise calculation.  Given in K.  (Default is 320.0)
+        Note that the noise is also processed by the system response, which may be scaled to obtain a particular noise
+        level for a certain temperature.
+    random_local : numpy.random.RandomState, optional
+        A prevously seeded random object, to avoid issues with consistency in seeding of events.  Should be set in 
+        gnosim.sim.antarcticsim.Sim.event using random_local = numpy.random.RandomState(seed = event_seed).  (Default is None).
+
+    Returns
+    -------
+    V_noiseless : numpy.ndarray of float
+        The electric field without noise.  Given in V.
+    u : numpy.ndarray of float
+        The times corresponding to the electric field.  Given in ns.
+    dominant_freq : float, optional
+        The frequency corresponding to the max power bin in the signal spectrum.
+    V_noise : numpy.ndarray of float, optional
+        The electric field with noise.  Given in V.
+    SNR : numpy.ndarray of float, optional
+        SNR is calculated as the ratio of the peak to peak/2 over rms(noise), squared (ratio of powers)
+
+    See Also
+    --------
+    gnosim.sim.detector.Antenna
     '''
+
     t_step = u[1]-u[0] #ns
     
     #Calculating the vector potential
@@ -586,7 +944,8 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,signal_reduction_fac
         #calculating noise
         bandwidth = freqs[-1]/1e9 #Calculating full band noise, response cuts out stuff we don't see
         
-        V_rms = numpy.sqrt(gnosim.utils.constants.boltzmann * noise_temperature * resistance * bandwidth * gnosim.utils.constants.GHz_to_Hz)
+        #V_rms = numpy.sqrt(gnosim.utils.constants.boltzmann * noise_temperature * resistance * bandwidth * gnosim.utils.constants.GHz_to_Hz)
+        V_rms = gnosim.utils.rf.thermalNoise(resistance, noise_temperature, bandwidth)
         #print('Internal V_rms is: %f'%V_rms)
         sigma = V_rms 
         
@@ -805,53 +1164,6 @@ def quickSignalSingle(theta_obs_rad,R,Energy_GeV,n,t_offset,signal_reduction_fac
 
 
 if __name__ == "__main__":
-    '''
-    energy_neutrino = 1.e9 # GeV
-    mode = 'cc'
-    d = 1000. # m
-    angle = numpy.linspace(0., 90., 1000)
-    index_of_refraction = 1.8
-    inelasticity = gnosim.interaction.inelasticity.inelasticity(energy_neutrino, mode)
-
-    #omega = 0.5 # GHz
-    '''
-    """
-    omega_array = numpy.arange(0.1, 1., 0.05)
-    electric_field_array = []
-    for omega in omega_array:
-        electric_field_array.append(electricFieldFrequencyDomainRaw(omega, d, angle, energy_neutrino, mode, index_of_refraction))
-    pylab.figure()
-    for ii, omega in enumerate(omega_array):
-        pylab.plot(angle, electric_field_array[ii])
-    """
-    #
-    """
-    angle_array = numpy.arange(45., 65, 2.5)
-    omega = numpy.linspace(0.1, 1., 1000)
-    electric_field_array = []
-    for angle in angle_array:
-        electric_field_array.append(electricFieldFrequencyDomainRaw(omega, d, angle, energy_neutrino, mode, index_of_refraction))
-    pylab.figure()
-    for ii, angle in enumerate(angle_array):
-        pylab.plot(omega, electric_field_array[ii])
-    """
-    '''
-    frequency_mesh, angle_mesh = numpy.meshgrid(numpy.linspace(0.01, 1.5, 100), numpy.arange(50., 65. + 1.e-10, 0.1))
-    electric_field = electricFieldFrequencyDomainRaw(frequency_mesh, d, angle_mesh, energy_neutrino, inelasticity, mode, index_of_refraction)
-    pylab.figure()
-    #pylab.scatter(frequency_mesh, angle_mesh, c=electric_field, edgecolors='none')
-    pylab.pcolormesh(frequency_mesh, angle_mesh, numpy.roll(electric_field, 0, 0))
-    colorbar = pylab.colorbar()
-    colorbar.set_label(r'V m$^{-1}$ GHz$^{-1}$')
-    pylab.title(r'E$_{\nu}$ = %.1e GeV; d = %.1f m'%(energy_neutrino, d))
-    pylab.xlabel('Frequency (GHz)')
-    pylab.ylabel('Observation Angle (deg)')
-    pylab.xlim([numpy.min(frequency_mesh), numpy.max(frequency_mesh)])
-    pylab.ylim([numpy.min(angle_mesh), numpy.max(angle_mesh)])
-    
-    u,V,f_dom = electricFieldTimeDomainSignal(numpy.deg2rad(50),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=True,out_dom_freq = True,return_pos = True,mode='v2')
-    u,V,f_dom = electricFieldTimeDomainSignal(numpy.deg2rad(50),R,energy_neutrino,n,h_fft=None,sys_fft=None,freqs=None,plot=True,out_dom_freq = True,return_pos = True,mode='v2')    
-    '''
     pylab.close('all')
     energy_neutrino = 3.e9 # GeV
     n = 1.78
@@ -876,82 +1188,7 @@ if __name__ == "__main__":
     V_bit, sampled_times = gnosim.sim.fpga.digitizeSignal(u,V_noise,sample_times,bytes,scale_noise_from,scale_noise_to, dc_offset = dc_offset, plot = False)
     dt = sampled_times[1] - sampled_times[0]
     #################################################################
-    config_file = '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_dipole_octo_-200_polar_120_rays.py'
-    import yaml
-    config = yaml.load(open(config_file))
-    
-    from gnosim.trace.refraction_library_beta import *
-    #reader = h5py.File('./Output/results_2018_Dec_config_dipole_octo_-200_polar_120_rays_3.00e+09_GeV_100_events_1_seed_6.h5' , 'r')
-    reader = h5py.File('./Output/results_2019_Jan_config_dipole_octo_-200_polar_120_rays_3.10e+09_GeV_100_events_1_seed_3.h5' , 'r')
-    
-    
-    info = reader['info'][...]
-    #info_cut = info[numpy.logical_and(info['SNR'] > 1 , info['SNR'] < 10) ]
-    info_cut = info[numpy.logical_and(info['SNR'] > 1 , info['SNR'] < 100) ]
-    #events 15, 92
-    
-    eventids = numpy.unique(info_cut[info_cut['has_solution']==1]['eventid'])
-    choose_n = 3
-    try:
-        do_events = numpy.random.choice(eventids,choose_n,replace=False)
-    except:
-        do_events = numpy.unique(numpy.random.choice(eventids,choose_n,replace=True))
-    
-    output_just_noise = True
-    for eventid in do_events:
-        print('On event %i'%eventid)
-        if output_just_noise == True:
-            V, u, Vd, ud, V_just_noise = gnosim.interaction.askaryan_testing.signalsFromInfo(eventid,reader,input_u,n,h_fft,sys_fft,freqs,include_noise = True,resistance = 50, noise_temperature = 320,plot = True,output_just_noise = True)
-            V_out2,u_out2 = addSignals(u,V,plot=True,V_noise_in = [], remove_noise_overlap = False)
-            V_out,u_out = addSignals(u,V,plot=True,V_noise_in = V_just_noise, remove_noise_overlap = True)
-            '''
-            V_in = V
-            u_in = u
-            left_indices = []
-            right_indices = []
-            
-            u_step = u_in[0,1]-u_in[0,0]
-            u_out_min = min(u_in[:,0])
-            u_out_max = max(u_in[:,-1])
-            u_out = numpy.arange(u_out_min,u_out_max+u_step,u_step)
-            V_just_signal = numpy.zeros_like(u_out)
-            V_out = numpy.tile(V_just_signal,(numpy.shape(V_in)[0],1))
-            
-            
-            for i in range(numpy.shape(V_in)[0]):
-                V = V_in[i,:]
-                u = u_in[i,:]
-                
-                if len(u) == 0:
-                    u = u_out
-                    V = numpy.zeros_like(u_out)   
-                left_index = numpy.argmin(abs(u_out - u[0]))
-                right_index = left_index + len(V)
-                
-                V_out[i,left_index:right_index] += V_just_noise[i,:]
-                
-                V_just_signal[left_index:right_index] += numpy.add(V,-V_just_noise[i,:])
-            
-            
-            weights = 1/numpy.sqrt(numpy.maximum(numpy.sum((V_out != 0)*1.0,axis=0),numpy.ones_like(u_out)))
-            #V_out = numpy.sum(V_out,axis = 0)
-            V_out = numpy.multiply(numpy.sum(V_out,axis=0),weights) + V_just_signal
-            '''
-            '''
-            pylab.figure(figsize=(16.,11.2))
-            pylab.plot(1/weights)
-            
-            pylab.figure(figsize=(16.,11.2))
-            
-            pylab.plot(u_out2,V_out2,label='Old')
-            pylab.plot(u_out,V_out,label='New')
-            
-            pylab.legend()
-            '''
-        else:
-            V, u, Vd, ud = gnosim.interaction.askaryan_testing.signalsFromInfo(eventid,reader,input_u,n,h_fft,sys_fft,freqs,include_noise = True,resistance = 50, noise_temperature = 320,plot = False,output_just_noise = False)
-        sub_info = info[info['eventid'] == eventid]
-    
-    
-    
-    
+
+    '''
+    See gnosim.sim.testing_single_event for how to rerun calculations for an event.
+    '''    

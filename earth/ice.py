@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 '''
 This file contains the properties of any ice model (Greenland v.s. Antarctic ice)
 As well as functions for using these models.
@@ -19,8 +18,8 @@ def getAcceptedIceModels():
     '''
     Returns an array of the acceptable ice model labels.
 
-    Returns:
-    ----------
+    Returns
+    -------
     ice_models : numpy.ndarray of str
         Array of the acceptable ice model labels.
     '''
@@ -28,26 +27,81 @@ def getAcceptedIceModels():
     return ice_models
 
 
-def checkIceModel(ice_model):
+def checkIceModel(ice_model_in):
     '''
-    Checks if the current ice_model is supported.
-    Returns the ice model if it is, otherwise it will
-    either replace the ice_model give with it's current
-    sudonym (i.e. arthern -> greenland), or will return
-    the default value if no sudonym found. 
+    If the input is in the accepted list of ice models (which can be obtained from getAcceptedIceModels), then it will
+    be returned unchcanged, unless it is an accepted ice model that has been renamed (i.e. arthern -> greenland),
+    in which case the new name will be returned.  If this input is not one of the accepted ice models then the default
+    ice model will be returned (currently the first element in the array returned by getAcceptedIceModels).
+
+    Parameters
+    ----------
+    ice_model_in : str
+        Input ice model to be checked.
+
+    Returns
+    -------
+    ice_model_out : str
+        Output ice model, which will be an accepted ice model.
     '''
     possible_models = getAcceptedIceModels()
     ice_model_default = possible_models[0]
-    if ~numpy.isin(ice_model, possible_models):
-        print("Requested ice model %s not in available ice model list, defaulting to %s"%(ice_model,ice_model_default))
-        ice_model = ice_model_default
-    elif ice_model == 'polar':
-        ice_model = 'antarctica' #For some backwards compatibility
-    elif ice_model == 'arthern':
-        ice_model = 'greenland'  #For some backwards compatibility
-    return ice_model
+    if ~numpy.isin(ice_model_in, possible_models):
+        print("Requested ice model %s not in available ice model list, defaulting to %s"%(ice_model_in,ice_model_default))
+        ice_model_out = ice_model_default
+    elif ice_model_in == 'polar':
+        ice_model_out = 'antarctica' #For some backwards compatibility
+    elif ice_model_in == 'arthern':
+        ice_model_out = 'greenland'  #For some backwards compatibility
+    else:
+        ice_model_out = ice_model_in
+    return ice_model_out
 
 class Ice:
+    '''
+    Stores the attributes, information, and functions for the ice used in a simulation or related proceses.
+    
+    Parameters
+    ----------
+    ice_model : str
+        The desired ice model (label) to be loaded when the ice is initiated.  This will be checked with checkIceModel to ensure
+        it is an acceptable ice model.
+    suppress_fun : bool, optional
+        If fun is not suppressed (suppress_fun = False) then a nice little ASCII image representing the selected ice model will be 
+        printed to the command line, if True then this will not be printed.  (Default is False).
+
+    Attributes
+    ----------
+    ice_model : str
+        The ice model (label) that is loaded for the ice.
+    ice_thickness : float
+        The thickness of the ice.
+    profile_deep : numpy.ndarray of floats, optional
+        Density (Mg m^-3) data and corresponding depths (m) from a particular ice model.  Only present for certain emperical models.
+    elevation_deep : numpy.ndarray of floats, optional
+        The depth data points for the density model (now seperated from profile_deep).  Given in m where negative values are below 
+        the surface.  Only present for certain emperical models.
+    density_deep : numpy.ndarray of floats or float
+        The density data points from the density model in profile_deep, except converted to nucleons/m^3.  For certain models this
+        might be a single value.
+    profile_firn : numpy.ndarray of floats, optional
+        Density (kg m^-3) data and corresponding depths (m) from a particular ice model in just the firn region.  Only present for 
+        certain emperical models.  Depths below the surface are positive values.
+    elevation_firn : numpy.ndarray of floats, optional
+        The depth data points for the firn density data (now seperated from profile_firn).  Given in m where negative values are below 
+        the surface.  Only present for certain emperical models.
+    density_firn : numpy.ndarray of floats or float
+        The firn density data points from the density model in profile_firn, except converted to nucleons/m^3. 
+    f_density : scipy.interpolate.interp1d cubic interpolation function
+        Funtion that returns the density in nucleons/m^3.  For certain emperical ice models this is a cubic interpolation function 
+        of for desnity_deep.  For others it might represent a parametric density model.
+    z_data : numpy.ndarray of floats
+        The depth data for the temperature model given in m.
+    t_data : numpy.ndarray of floats
+        The temperature data for the temperature model gien in C.
+    f_temperature : scipy.interpolate.interp1d cubic interpolation function
+        Tbe cubic interpolation function for the temperature model.
+    '''
     def __init__(self, ice_model, suppress_fun = False):
         self.ice_model = checkIceModel(ice_model)
 
@@ -269,13 +323,20 @@ class Ice:
             self.f_temperature = scipy.interpolate.interp1d(self.z_data, self.t_data, bounds_error=False, fill_value=-50.)
 
     def density(self,z):
-        """
-        z = elevation (m)
-        
-        Returns:
-        density (nuclei m^-3)
+        '''
+        Returns the density (nuclei m^-3) for a particular depth z (m).
         Source: http://www.iceandclimate.nbi.ku.dk/research/flowofice/densification/
-        """
+
+        Parameters
+        ----------
+        z : numpy.ndarray of floats
+            Depths to return densities for.
+
+        Returns
+        -------
+        density : float
+            The density in nuclei/m^3.
+        '''
         
         if self.ice_model == 'parametric_greenland':
             density_surface = 50. # kg m^-3
@@ -310,14 +371,20 @@ class Ice:
             return -999
 
     def indexOfRefraction(self,z):
-        """
-        z = elevation (m)
+        '''
+        Returns the index of refraction for a particular depth z (m).
 
-        Returns:
-        index of refraction
+        Parameters
+        ----------
+        z : numpy.ndarray of floats or float
+            Depths to return index of refraction for.
 
-       
-        """
+        Returns
+        -------
+        index of refraction : float
+            The index of refraction.
+        '''
+
         if numpy.isscalar(z):
             scalar = True
             z = numpy.array([z])
@@ -392,50 +459,86 @@ class Ice:
     ############################################################
 
     def deltaIndexOfRefraction(self,z, delta_z=2.):
-        """
-        Change in index of refraction
-        """
-        return numpy.max([numpy.fabs(self.indexOfRefraction(z) - self.indexOfRefraction(z - delta_z)),
+        '''
+        Returns the change in index of refraction for a particular depth z (m) over a particular delta_z.
+
+        Parameters
+        ----------
+        z : numpy.ndarray of floats or float
+            Depths to return index of refraction for.
+        delta_z : float, optional
+            The delta_z for which to calculate the change in index of refraction. (Default is 2.0 m).
+
+        Returns
+        -------
+        d_n : float
+            The change in index of refraction.
+        '''
+        d_n = numpy.max([numpy.fabs(self.indexOfRefraction(z) - self.indexOfRefraction(z - delta_z)),
                           numpy.fabs(self.indexOfRefraction(z) - self.indexOfRefraction(z + delta_z))], axis=0) / delta_z
+        return d_n
 
     ############################################################
     def temperature(self,z):
-        """
-        z = elevation (m)
+        '''
+        Returns the temperature for a particular depth z (m) over a particular delta_z.
 
-        Returns temperature (C)
-        """
-        return self.f_temperature(z) 
+        Parameters
+        ----------
+        z : numpy.ndarray of floats or float
+            Depths to return temperature for.
+
+        Returns
+        -------
+        temps : numpy.ndarray of float
+            The temperatures (C).
+        '''
+        temps = self.f_temperature(z) 
+        return temps
 
     ############################################################
         
     def attenuationLengthBase(self,temperature, frequency):
-        """
-        http://icecube.wisc.edu/~mnewcomb/radio/
-        
-        temperature = Temperature (C)
-        frequency = Frequency (GHz)
+        '''
+        Returns attenuation length (m) in the ice at a particular frequency and temperature.
+        Source: http://icecube.wisc.edu/~mnewcomb/radio/
+        Parameters
+        ----------
+        temperature : numpy.ndarray of floats or float
+            The temperature (C) for which to calculate the attenuation length.
+        frequency : float
+            The frequency (GHz) for which to calculate the attenuation length.
 
-        Returns attenuation length (m)
-        """
+        Returns
+        -------
+        attenuation_length : numpy.ndarray of float
+            The attenuation length (m).
+        '''
         a = 5.03097 * numpy.exp(0.134806 * temperature)
         b = (0.172082 * temperature) + 10.629
         c = (-0.00199175 * temperature) - 0.703323
-        return 2. * 1.e3 * 1.701 / (a + (b * frequency**(c + 1.))) # WARNING: The factor 2 is a kludge! do we need it??
+        attenuation_length = 2. * 1.e3 * 1.701 / (a + (b * frequency**(c + 1.))) # WARNING: The factor 2 is a kludge! do we need it??  (DS: Likely related to power v.s. amplitude?  Site doesn't mention it...)
+        return attenuation_length
     ########################################################################################################
 
     def attenuationLength(self,z, frequency):
-        """
-        z = elevation (m)
-        frequency = radio frequency (GHz)
-
-        Returns:
-        attenuation length, i.e., distance at which electric field is reduced by e (m)
-
+        '''
+        Returns attenuation length (m) in the ice at a particular frequency and depth.  i.e., distance at which electric field is reduced by e (m).
+        Accounts for depths that are above ground, returning very large values.
         Source: ARA insturment paper Allison et al. 2011, arXiv:1105.2854
+        
+        Parameters
+        ----------
+        z : numpy.ndarray of floats or float
+            The depth (m) for which to calculate the attenuation length.
+        frequency : float
+            The frequency (GHz) for which to calculate the attenuation length.
 
-        Question: What is radio attenuation lenth in air??
-        """
+        Returns
+        -------
+        attenuation_length : numpy.ndarray of float
+            The attenuation length (m).
+        '''
         # Treat as constant with respect to depth and frequency until add real data points
         frequency_0 = 0.3 # GHz
 
@@ -444,9 +547,9 @@ class Ice:
         elif self.ice_model in ['ross']:
             attenuation_length = 400. # m
         elif self.ice_model in ['greenland']:
-            attenuation_length = self.attenuationLengthBase(self.f_temperature(z), frequency) # m
+            attenuation_length = self.attenuationLengthBase(self.temperature(z), frequency) # m
         elif self.ice_model in ['antarctica']:
-            attenuation_length = self.attenuationLengthBase(self.f_temperature(z), frequency) # m
+            attenuation_length = self.attenuationLengthBase(self.temperature(z), frequency) # m
         else:
             attenuation_length = 1000. # m
             print ('WARNING, auto setting attenuation length to %0.2f'%attenuation_length)

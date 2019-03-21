@@ -11,44 +11,29 @@ import gnosim.trace.refraction_library_beta
 pylab.ion()
 import gnosim.earth.ice
 from mpl_toolkits.mplot3d import Axes3D
+import gnosim.utils.quat
 
 ############################################################
-def unitVector(in_vector):
-    '''
-    Return the unit vector of the input vector.
-
-    Parameters:
-    ----------
-    in_vector : numpy.ndarray
-        Input vector of abitrary length
-
-    Returns:
-    ----------
-    vector : numpy.ndarray
-        out_vector of unit length in same direction as input vector
-    See Also:
-    gnosim.sim.detector
-    '''
-    out_vector = in_vector/numpy.linalg.norm(in_vector)
-    return out_vector
 
 def getWaveVector(theta_ray_from_ant,phi_ray_from_ant):
     '''
     This will get the unit vector the travelling radiation along the ray towards the antenna.
 
-    Parameters:
+    Parameters
     ----------
     theta_ray_from_ant : float
         Zenith theta of vector of ray from antenna along path to neutrino (degrees).
     phi_ray_from_ant : float
         Azimuthal theta of vector of ray from antenna along path to neutrino (degrees).
 
-    Returns:
-    ----------
+    Returns
+    -------
     vec_ray_to_ant: numpy.ndarray
         The unit vector for the vector direct towards the antenna along the observation ray. 
         This is returned in ice-frame cartesian coordinates.
-    See Also:
+    
+    See Also
+    --------
     gnosim.sim.detector
     '''
     vec_ray_from_ant = numpy.array([numpy.sin(numpy.deg2rad(theta_ray_from_ant))*numpy.cos(numpy.deg2rad(phi_ray_from_ant)),numpy.sin(numpy.deg2rad(theta_ray_from_ant))*numpy.sin(numpy.deg2rad(phi_ray_from_ant)),numpy.cos(numpy.deg2rad(theta_ray_from_ant))])
@@ -59,19 +44,21 @@ def getNeutrinoMomentumVector(theta_neutrino_source_dir,phi_neutrino_source_dir)
     '''
     This will get the unit vector for the direction the neutrino is moving/direction of the shower
 
-    Parameters:
+    Parameters
     ----------
     theta_ray_from_ant : float
         Zenith theta of vector of ray from antenna along path to neutrino (degrees).
     phi_ray_from_ant : float
         Azimuthal theta of vector of ray from antenna along path to neutrino (degrees).
 
-    Returns:
-    ----------
+    Returns
+    -------
     vec_ray_to_ant: numpy.ndarray
         The unit vector for the vector direct towards the antenna along the observation ray. 
         This is returned in ice-frame cartesian coordinates.
-    See Also:
+    
+    See Also
+    --------
     gnosim.sim.detector
     '''
     vec_neutrino_source_dir = numpy.array([numpy.sin(numpy.deg2rad(theta_neutrino_source_dir))*numpy.cos(numpy.deg2rad(phi_neutrino_source_dir)),numpy.sin(numpy.deg2rad(theta_neutrino_source_dir))*numpy.sin(numpy.deg2rad(phi_neutrino_source_dir)),numpy.cos(numpy.deg2rad(theta_neutrino_source_dir))])
@@ -84,7 +71,7 @@ def getInitialPolarization(theta_ray_from_ant,phi_ray_from_ant,theta_neutrino_so
     ray geometry and the neutrino direction geometry.  The polarization is in the plane of the shower and observation ray, and perpendicular
     to the observation ray.
 
-    Parameters:
+    Parameters
     ----------
     theta_ray_from_ant : float
         Zenith theta of vector of ray from antenna along path to neutrino (degrees).
@@ -95,23 +82,25 @@ def getInitialPolarization(theta_ray_from_ant,phi_ray_from_ant,theta_neutrino_so
     phi_neutrino_source_dir : float
         Azimuthal theta of vector directed towards the source of the neutrino (degrees).
 
-    Returns:
-    ----------
+    Returns
+    -------
     polarization_vector: numpy.ndarray
         The unit vector for the polarization. This is returned in ice-frame cartesian coordinates.
-    vec_ray_to_ant: numpy.ndarray
+    vec_ray_to_ant : numpy.ndarray
         The unit vector for the vector direct towards the antenna along the observation ray. 
         This is returned in ice-frame cartesian coordinates.
-    vec_neutrino_travel_dir: numpy.ndarray
+    vec_neutrino_travel_dir : numpy.ndarray
         The unit vector for the direction the shower is propogating.
         This is returned in ice-frame cartesian coordinates.
-    See Also:
+    
+    See Also
+    --------
     gnosim.sim.detector
     '''
     vec_neutrino_travel_dir = getNeutrinoMomentumVector(theta_neutrino_source_dir,phi_neutrino_source_dir)
     vec_ray_to_ant = getWaveVector(theta_ray_from_ant,phi_ray_from_ant) #Vector from neutrino location to observation along ray
     polarization_vector = numpy.cross(vec_ray_to_ant, numpy.cross(vec_neutrino_travel_dir,vec_ray_to_ant))
-    polarization_vector = unitVector(polarization_vector)
+    polarization_vector = gnosim.utils.quat.normalize(polarization_vector)
 
     return polarization_vector, vec_ray_to_ant, vec_neutrino_travel_dir
 
@@ -120,29 +109,31 @@ def calculateSPUnitVectors(wave_vector):
     This will calculate the s-polarization and p-polarization unit vectors from 
     a given wave_vecter (vector along observation ray towards antenna)
 
-    Parameters:
+    Parameters
     ----------
     wave_vector : numpy.ndarray
         Zenith theta of vector of ray from antenna along path to neutrino (degrees).
         This should be given in ice-frame cartesian coordinates.
 
-    Returns:
-    ----------
-    s_vector: numpy.ndarray
+    Returns
+    -------
+    s_vector : numpy.ndarray
         The unit vector for the s-polarization. This is returned in ice-frame cartesian coordinates.
-    p_vector: numpy.ndarray
+    p_vector : numpy.ndarray
         The unit vector for the p-polarization. This is returned in ice-frame cartesian coordinates.
-    See Also:
+    
+    See Also
+    --------
     gnosim.sim.detector
     '''
-    s_vector   = unitVector(numpy.cross(wave_vector,numpy.array([0,0,1])))
-    p_vector   = unitVector(numpy.cross(s_vector,wave_vector))
+    s_vector   = gnosim.utils.quat.normalize(numpy.cross(wave_vector,numpy.array([0,0,1])))
+    p_vector   = gnosim.utils.quat.normalize(numpy.cross(s_vector,wave_vector))
     return s_vector, p_vector
 ############################################################
 
 def getPolarizationAtAntenna(theta_ray_from_ant_at_neutrino , phi_ray_from_ant_at_neutrino , theta_ray_from_ant_at_antenna , phi_ray_from_ant_at_antenna , theta_neutrino_source_dir , phi_neutrino_source_dir , a_s , a_p, return_k_1 = False):
     '''
-    Parameters:
+    Parameters
     ----------
     theta_ray_from_ant_at_neutrino : float
         Zenith theta of vector of ray from antenna along path to neutrino (degrees).
@@ -173,14 +164,16 @@ def getPolarizationAtAntenna(theta_ray_from_ant_at_neutrino , phi_ray_from_ant_a
         Currently only numpy.real(a_p) is returned from refraction_libray_beta.makeLibrary,
         so a real float is expected here.
 
-    Returns:
-    ----------
+    Returns
+    -------
     polarization_vector_1: numpy.ndarray
         The unit vector for the polarization as it is just before interacting with the antenna.
         This is NOT a unit vector, magnitudes represent how the s and p polarizations have been
         reduced during ray propogation.
         This is returned in ice-frame cartesian coordinates.
-    See Also:
+    
+    See Also
+    --------
     gnosim.sim.detector
     '''
     polarization_vector_0, k_0, vec_neutrino_travel_dir = getInitialPolarization(theta_ray_from_ant_at_neutrino,phi_ray_from_ant_at_neutrino,theta_neutrino_source_dir,phi_neutrino_source_dir)
@@ -198,6 +191,7 @@ def getPolarizationAtAntenna(theta_ray_from_ant_at_neutrino , phi_ray_from_ant_a
         return polarization_vector_1, k_1
     else:
         return polarization_vector_1
+
 def testPolarization():
     ice = gnosim.earth.ice.Ice('antarctica',suppress_fun = True)
     
@@ -318,10 +312,5 @@ def testPolarization():
 
 
 if __name__ == "__main__":
-    #Setup
-    plot_quiver = True
     pylab.close('all')
-    elev = 1.0 #viewing
-    azim = 90.0#-45.0
-    make_cube = True
     testPolarization()

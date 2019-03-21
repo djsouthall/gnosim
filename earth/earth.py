@@ -1,7 +1,7 @@
-"""
+'''
 Attenuation of neutrinos passing through the Earth.
 Geometry of the Earth.
-"""
+'''
 
 import numpy
 import pylab
@@ -10,18 +10,32 @@ import gnosim.earth.prem
 import gnosim.interaction.cross_section
 import gnosim.utils.constants
 import gnosim.earth.ice
-
+import gnosim.utils.misc
 pylab.ion()
+
 
 ############################################################
 
 def interactionLength(density_input, energy_neutrino_array, plot=False):
-    """
+    '''
     Tool for quickly plotting interaction length as a function of neutrino energy for a fixed density medium.
+    
+    Parameters
+    ----------
+    density_input : float
+        The density of the medium.  Given in kg m^-3.
+    energy_neutrino_array : numpy.ndarray of floats or float
+        The energy of the neutrino(s).  Given in GeV.
+    plot : bool, optional
+        Enables plotting.
 
-    density_input = density (kg m^-3)
-    energy_neutrino_array = energy of neutrino (GeV)
-    """
+    Returns
+    -------
+    interaction_length_array : numpy.ndarray of floats or float
+        The interaction length for each input neutrino energy for the normal neutrino cross section.  Given in m.
+    interaction_length__anti_array : numpy.ndarray of floats or float
+        The interaction length for each input neutrino energy for the anti neutrino cross section.  Given in m.
+    '''
     
     if numpy.isscalar(energy_neutrino_array):
         energy_neutrino_array = numpy.array([energy_neutrino_array])
@@ -57,17 +71,31 @@ def interactionLength(density_input, energy_neutrino_array, plot=False):
 ############################################################
 
 def probSurvival(energy_neutrino, theta, ice, elevation=0., anti=False, plot=False):
-    """
-    energy_neutrino = neutrino energy (GeV)
-    theta = zenith angle (deg)
-    ice should be an Ice object from the gnosim.earth.ice file.
-    Returns:
-    Survival probability of neutrino passing through the Earth
-    """
+    '''
+    Calculates the probability of survival of a neutrino passing through the Earth. 
 
-    # Original
-    #if theta <= 90.:
-    #    return 1.
+    Parameters
+    ----------
+    energy_neutrino_array : numpy.ndarray of floats or float
+        The energy of the neutrino(s).  Given in GeV.
+    theta : float
+        The spherical polar coordinate corresponding to the direction of the source of the neutrino.  Given in degrees.
+        Zero degrees is overhead at the point of interaction in the ice.  
+    ice : gnosim.earth.ice.Ice
+        The ice object containing the appropriate ice model.
+    elevation : float, optional
+        Position relative to surface.  Negative is below the surface.  Given in m.  (Default is 0.0).
+    anti : bool, optional
+        Selects either a neutrino (anti == False) or anti neutrino (anti == True).  (Default is False). 
+    plot : bool, optional
+        Enables plotting.
+
+    Returns
+    -------
+    survival : float
+        The probability of survival for the neutrino passing through the earth.
+    '''
+    # TODO: Double check these functions for validity.
 
     total_cross_section = gnosim.interaction.cross_section.totalCrossSection(energy_neutrino, anti=anti) # m^2 #No randomness
 
@@ -117,29 +145,51 @@ def probSurvival(energy_neutrino, theta, ice, elevation=0., anti=False, plot=Fal
 ############################################################
 
 def chordLength(theta, elevation=0.):
-    """
-    theta = zenith angle (deg)
-    elevation = elevation from surface, negative is below surface (m)
+    '''
+    Calculates the chord length through the Earth.
 
-    Return chord length through the Earth (m)
-    """
+    Parameters
+    ----------
+    theta : float
+        The spherical polar coordinate corresponding to the direction of the source of the neutrino.  Given in degrees.
+        Zero degrees is overhead at the point of interaction in the ice.  
+    elevation : float, optional
+        Position relative to surface.  Negative is below the surface.  Given in m.  (Default is 0.0).
+
+    Returns
+    -------
+    l : float
+        The chord length through the Earth.  Given in m.
+    '''
     depth = -1. * elevation
     if elevation > 0.:
         return 0.
     a = 1.
     b = 2. * (gnosim.utils.constants.radius_earth - depth) * numpy.cos(numpy.radians(theta))
     c = depth**2 - (2. * gnosim.utils.constants.radius_earth * depth)
-    return (numpy.sqrt(b**2 - (4. * a * c)) - b) / (2. * a)
+    l = (numpy.sqrt(b**2 - (4. * a * c)) - b) / (2. * a)
+    return l
 
 ############################################################
 
 def horizon(elevation):
-    """
-    elevation = elevation from surface, negative is below surface (m)
-    
-    Return distance to horizon (m), angle below horizontal (deg), 
-    and distance along curved Earth surface to horizon intercept (m)
-    """
+    '''
+    Calculates the distance to the horizon, angle below horizontal, and the distance along a curved Earth surface to horizen intercept.
+
+    Parameters
+    ----------
+    elevation : float, optional
+        Position relative to surface.  Negative is below the surface.  Given in m.  (Default is 0.0).
+
+    Returns
+    -------
+    distance : float
+        The distance to the horizen.  Given in m.
+    angle : float
+        The angle below the horizontal where the horizon is located.  Given in degrees.
+    x_curve : float
+        The distance along the surface of the Earth to the horizon.  Given in m.
+    '''
     # Distance from antenna to the horizon taking into account Earth's curvature
     distance = numpy.sqrt((2. * gnosim.utils.constants.radius_earth * elevation) + elevation**2) # m
     
@@ -155,13 +205,31 @@ def horizon(elevation):
 ############################################################
 
 def curvature(elevation, theta):
-    """
-    elevation = elevation from surface, negative is below surface (m)
-    theta = zenith angle of out-going ray from antenna
+    '''
+    Calculates the distance from the antenna to the surface of the Earth taking into account the Earth's curvature.
+    Calculates the disance from an antenna to the surface, the angle by which the angle of incidence is increased,
+    and the distance along the curve of the Earth's surface to the intercept.
 
-    Return distance from antenna to surface (m), angle by which the angle of incidence is increased (deg),
-    and distance along curve of Earth's surface to the intercept (m)
-    """
+    Parameters
+    ----------
+    elevation : float
+        Position relative to surface.  Negative is below the surface.  Given in m.  
+    theta : float
+        The spherical polar coordinate corresponding to the direction of the source of the neutrino.  Given in degrees.
+        Zero degrees is overhead at the point of interaction in the ice.  
+    
+    Returns
+    -------
+    d : float
+        The distance from the antenna to the surface, taking into account the Earth's curvature.  Given in m.
+    angle : float
+        The angle by which the angle of incidence is increased.  Given in degrees.
+    x_curve : float
+        The distance along the curved surface of the Earth to the intercept.  Given in m.
+
+    See Also
+    --------
+    '''
     # Distance from the antenna to the surface, taking into account the Earth's curvature
     a = 1.
     b = 2. * (gnosim.utils.constants.radius_earth + elevation) * numpy.cos(numpy.radians(180. - theta))
@@ -183,12 +251,21 @@ def curvature(elevation, theta):
 ############################################################
 
 def curvatureToTheta(elevation, x_curve):
-    """
-    elevation = elevation from surface, negative is below surface (m)
-    x_curve = distance along Earth's curved surface (m)
+    '''
+    Calculates zenith angle of the intercept.
 
-    Returns zenith angle to intercept (deg)
-    """
+    Parameters
+    ----------
+    elevation : float
+        Position relative to surface.  Negative is below the surface.  Given in m.  
+    x_curve : float
+        The distance along the curved surface of the Earth to the intercept.  Given in m.
+
+    Returns
+    -------
+    theta : float
+        The zenith angle of the intercept.  Given in degrees.
+    '''
     alpha_radians = x_curve / gnosim.utils.constants.radius_earth # radians
     theta = 180. - numpy.degrees(numpy.arctan2(gnosim.utils.constants.radius_earth * numpy.sin(alpha_radians),
                                                elevation + gnosim.utils.constants.radius_earth * (1. - numpy.cos(alpha_radians)))) # deg
@@ -197,9 +274,17 @@ def curvatureToTheta(elevation, x_curve):
 ############################################################
 
 def plotCurvature(elevation, n=10000):
-    """
-    elevation = elevation from surface, negative is below surface (m)
-    """
+    '''
+    Plots the curvature?  Seems to only work for positive elevation?
+    Not sure what this was trying to show.
+
+    Parameters
+    ----------
+    elevation : float
+        Position relative to surface.  Negative is below the surface.  Given in m. 
+    n : int, optional
+        The number of points plotted.  (Default is 10000).
+    '''
     theta_array = numpy.linspace(180. - 1.e-10, 90. + horizon(elevation)[1], n)
     
     x_flat = numpy.zeros(n)
@@ -213,7 +298,7 @@ def plotCurvature(elevation, n=10000):
         distance_flat[ii] = numpy.sqrt(elevation**2 + x_flat[ii]**2)
         distance_curve[ii] = curvature(elevation, theta_array[ii])[0]
     
-    """
+    '''
     pylab.figure()
     #pylab.scatter(distance_flat, distance_curve / distance_flat, c=theta_array, edgecolors='none')
     pylab.plot(distance_flat, distance_curve / distance_flat)
@@ -223,7 +308,7 @@ def plotCurvature(elevation, n=10000):
     pylab.xlabel('x_flat')
     pylab.ylabel('x_curve / x_flat')
     #pylab.colorbar()
-    """
+    '''
 
     pylab.figure()
     theta_circle_radians = numpy.linspace(0, 2. * numpy.pi, 100000)
@@ -232,22 +317,34 @@ def plotCurvature(elevation, n=10000):
     pylab.plot(r_circle, z_circle, c='black')
     r = distance_curve * numpy.sin(numpy.radians(theta_array))
     z = elevation + (distance_curve * numpy.cos(numpy.radians(theta_array)))
-    pylab.scatter(r, z, c=x_curve, edgecolors='none')
-    pylab.colorbar()
+    pylab.scatter(r, z, c=x_curve)
+    print(r)
+    print(z)
+    print(x_curve)
+    pylab.colorbar(label='Distance to Horizon Along Curved Surface')
+    
+    pylab.ylabel('Elevation (m)')
+    pylab.xlabel('r (m)')
     pylab.xlim([0., gnosim.utils.constants.radius_earth])
     pylab.ylim([-1. * gnosim.utils.constants.radius_earth, 0.])
 
 ############################################################
 
 def plotSampling(detector_volume_radius, n_events=1000000, detector_volume_depth=3000.):
-    """
+    '''
     Sanity check function to compare radial event sampling and geometric acceptance factors between
     flat Earth and curved Earth cases.
 
-    detector volume radius (m)
-    detector volume depth (m)
-    """
-    
+    Parameters
+    ----------
+    detector_volume_radius : float
+        The radius of the detector.  Given in m.
+    n : int, optional
+        The number of events to calculate.  (Default is 1000000).
+    detector_volume_depth : float, optional
+        The depth of the ice.  Given in m.  (Default is 3000).
+    '''    
+
     r_flat = numpy.random.triangular(0., detector_volume_radius, detector_volume_radius, size=n_events) # m
 
     alpha_max_radians = detector_volume_radius / gnosim.utils.constants.radius_earth # radians                                                           
@@ -271,34 +368,52 @@ def plotSampling(detector_volume_radius, n_events=1000000, detector_volume_depth
     
     pylab.figure()
     pylab.plot(detector_volume_radius, geometric_factor_flat, label='Flat')
-    pylab.plot(detector_volume_radius, geometric_factor_curve, label='Curve')
+    pylab.plot(detector_volume_radius, geometric_factor_curve, label='Curve',linestyle = '-.')
     pylab.legend(loc='upper left')
     pylab.xlabel('Distance Along Earth Surface (m)')
     pylab.ylabel(r'Geometric Factor (m$^{3}$ sr)')
 
+    pylab.figure()
+    pylab.plot(detector_volume_radius, numpy.divide(geometric_factor_curve,geometric_factor_flat))
+    pylab.title('geometric_factor_curve/geometric_factor_flat')
+    pylab.xlabel('Distance Along Earth Surface (m)')
+    pylab.ylabel(r'Ratio of Geometric Factors')
+
 ############################################################
 
 def probInteract(energy_neutrino, density, anti=False):
-    """
-    energy_neutrino = neutrino energy (GeV)
-    density = density at elevation of neutrino interaction in nucleons m^-3
-    anti = True -> anti-neutrino
+    '''
+    Calculates the probability of a neutrino interacting in a sphere containing a cubic meter of ice.
 
-    Returns: 
-    probability to interact in a sphere containing a cubic meter of ice
-    """
+    Parameters
+    ----------
+    energy_neutrino_array : numpy.ndarray of floats or float
+        The energy of the neutrino(s).  Given in GeV.
+    density : float
+        The density of the medium.  Given in nucleons m^-3.
+    anti : bool, optional
+        Selects either a neutrino (anti == False) or anti neutrino (anti == True).  (Default is False).
+
+    Returns
+    -------
+    p : float
+        The probability that the neutrino interacts in a sphere containing a cubic meter of ice.
+
+    '''
     volume_sphere = 1. # m^3 
     radius_sphere = (3. * volume_sphere / (4. * numpy.pi))**(1. / 3.)
     characteristic_length = (4. / 3.) * radius_sphere
 
     total_cross_section = gnosim.interaction.cross_section.totalCrossSection(energy_neutrino, anti=anti) # m^2
-    #Look into python 1- exponential function, because this has large error 
-    return 1. - numpy.exp(-1. * characteristic_length * density * total_cross_section) 
+    #p = 1. - numpy.exp(-1. * characteristic_length * density * total_cross_section) 
+    p = - numpy.expm1(-1. * characteristic_length * density * total_cross_section)
+    return p
 
 ############################################################
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     energy_neutrino_array = 10**numpy.arange(4., 12. + 1.e-10, 1.) # GeV
+    colors = gnosim.utils.misc.getColorMap(len(energy_neutrino_array))
     #theta_array = numpy.linspace(0, 180 + 1.e-10, 1000)
     cos_theta_array = numpy.linspace(1., -1., 1000)
     theta_array = numpy.degrees(numpy.arccos(cos_theta_array))
@@ -306,26 +421,31 @@ if __name__ == "__main__":
     ice = gnosim.earth.ice.Ice(ice_model)
     pylab.figure()
     survival_array = []
-    for energy_neutrino in energy_neutrino_array:
+    for i, energy_neutrino in enumerate(energy_neutrino_array):
         print ('Energy neutrino = %e'%(energy_neutrino))
         survival_array.append([])
         for theta in theta_array:
             survival_array[-1].append(probSurvival(energy_neutrino, theta,ice))
-        pylab.plot(cos_theta_array, survival_array[-1], c='blue')
+        pylab.plot(cos_theta_array, survival_array[-1], c=colors[i],label = 'E=%0.3gGeV'%energy_neutrino)
     pylab.title('Neutrinos')
     pylab.xlabel('Cos(Zenith Angle)')
     pylab.ylabel('Survival Probability')
+    pylab.legend(loc='lower right')
 
     pylab.figure()
     survival_anti_array = []
-    for energy_neutrino in energy_neutrino_array:
+    for i, energy_neutrino in enumerate(energy_neutrino_array):
         print ('Energy neutrino = %e'%(energy_neutrino))
         survival_anti_array.append([])
         for theta in theta_array:
             survival_anti_array[-1].append(probSurvival(energy_neutrino, theta, ice, anti=True))
-        pylab.plot(cos_theta_array, survival_anti_array[-1], c='blue')
+        pylab.plot(cos_theta_array, survival_anti_array[-1], c=colors[i],label = 'E=%0.3gGeV'%energy_neutrino)
     pylab.title('Anti-Neutrinos')
     pylab.xlabel('Cos(Zenith Angle)')
     pylab.ylabel('Survival Probability')
-    
+    pylab.legend(loc='lower right')
+
+
+    plotCurvature(-200.0, n=10000)
+
 ############################################################

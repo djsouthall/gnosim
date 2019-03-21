@@ -23,7 +23,7 @@ import copy
 sys.path.append("/home/dsouthall/Projects/GNOSim/")
 from matplotlib import gridspec
 import pandas
-
+import gnosim.utils.misc
 import gnosim.sim.antarcticsim
 pylab.ion()
 ############################################################
@@ -266,8 +266,7 @@ def fpgaBeamForming(u_in, V_in, beam_dict , plot1 = False, plot2 = False, save_f
             pylab.plot(beam_powersums[beam_label],label = '%s, $\\theta_{ant} = $ %0.2f'%(beam_label,weighted_theta_ant))
     if plot2 == True:
         ax = pylab.gca()
-        colormap = pylab.cm.gist_ncar #nipy_spectral, Set1,Paired   
-        colors = [colormap(i) for i in numpy.linspace(0, 1,len(ax.lines))]
+        colors = gnosim.utils.misc.getColorMap(len(ax.lines))
         for line_index,line in enumerate(ax.lines):
             line.set_color(colors[line_index])
         pylab.legend()

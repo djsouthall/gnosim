@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-"""
+'''
 Simulation
-"""
+'''
 
 import sys
 import numpy
@@ -28,7 +28,7 @@ import concurrent.futures
 from multiprocessing import cpu_count
 import threading
 
-sys.path.append("/home/dsouthall/Projects/GNOSim/")
+sys.path.append('/home/dsouthall/Projects/GNOSim/')
 import gnosim.utils.quat
 import gnosim.earth.earth
 import gnosim.earth.ice
@@ -44,7 +44,7 @@ pylab.ion() #this turns interactive mode on.  I should test with this off
 import cProfile, pstats, io
 
 def profile(fnc):
-    """
+    '''
     A decorator that uses cProfile to profile a function
     This is lifted from https://osf.io/upav8/
     
@@ -67,7 +67,7 @@ def profile(fnc):
               till exit). This figure is accurate even for recursive functions.
     percall - is the quotient of cumtime divided by primitive calls
     filename:lineno(function) - provides the respective data of each function
-    """
+    '''
     
     def inner(*args, **kwargs):
         
@@ -85,20 +85,126 @@ def profile(fnc):
 
     return inner
 
+def getAcceptedTriggerUnits():
+    '''
+    Gives a list of the accepted units (labels of) for triggering in the simulation.
+    
+    'adu'   Will trigger in digitized units.  In the simulation noise will be scaled to the value set in the configuration file.  
+            If noise is turned off this still scales as if noise were present and scaled appropriately.  This works on a per signal 
+            basis (i.e. beamforming does not effect it).
+    'V'     Will trigger on voltage in units of V.  This works on a per signal basis (i.e. beamforming does not effect it).
+    'fpga'  Will trigger in units of adu^2 using the beamforming power sum.  This requires do_beamforming == True.  An appropriate
+            trigger level can be determined using gnosim.analysis.threshold_scan_tool.py
+
+    Returns
+    -------
+    accepted_units : numpy.ndarray of str
+        The accepted labels for unit types to trigger on.
+    '''
+    accepted_units = numpy.array(['fpga','adu','V'])
+    return accepted_units
 
 class Sim:
+    '''
+    The object containing all information and functions specific to running the simuation.
 
-    def __init__(self, config_file,solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']),electricFieldDomain = 'time',do_beamforming = False):
+    Parameters
+    ----------
+    config_file : str
+        A string containing the address of the configuration file.
+    solutions : numpy.ndarray of str, optional
+        A list of the solution types to load.  Often either all accepted solution types (the Default), or the same list omitting
+        the _2 strings, which represent libraries of solution that reflect of the bottom of the ice.  Too see acceptable solution
+        types use gnosim.trace.refraction_library_beta.getAcceptedSolutions().  (Default is numpy.array([]) which will result in
+        all solution types being used).
+    electricFieldDomain : str, optional
+        Selects the type of Askaryan radiation calculation to use.  
+        Options:    'time'  for the newer time domain calculation that allows many more options in the simulation and is more maintained, 
+                    'freq'  which is the old Askaryan calculation method which does the calculation solely in the frequency domain and 
+                            is no longer maintined. 
+        (Default is 'time').
+    do_beamforming : bool, optional
+        Enables beamforming for the trigger.  If this is True then the units selected when using self.throw should correspondingly be 'fpga'.
+        Otherwise a simple threshold trigger is applied with the specified units per signal, without beamforming.  (Default is True).
+
+    Attributes
+    ----------
+    config_file : str
+        A string containing the address of the configuration file.
+    config : dict
+        The configuration dictionary loaded from a config file.
+    ice : gnosim.earth.ice.Ice
+        The ice object containing the appropriate ice model.
+    solutions : numpy.ndarray of str, optional
+        A list of the solution types to load.
+    electricFieldDomain : str
+        The selected type of Askaryan radiation calculation to use.
+    stations : list of gnosim.sim.detctor.Station objects
+        Station objects corresponding to the stations (and antennas) specified in the configuration file.
+    n_antenna : int
+        The total number of antennas across all stations.  Used interally.
+    do_beamforming : bool
+        Determines whether or not to perform beamforming.
+    n_cores : int
+        The number of cores available for multithreading.
+    lock : threading.Lock object
+        A lock used in multithreading to avoid multiple threads writing simultaneously.
+    info_dtype : numpy.dtype
+        The data type that will be used to store the meta data about each calculated solution type for each antenna for each station for each event.
+        Convenient for organization and performing cuts on many types of data simulatenously.  This is also the data type that the majority of the
+        meta data will be stored in on output as well (except for some attributes and signal waveforms).
+    in_flag_array : dict, optional
+        A dictionary that contains bools for if particular event has a solution for a particular solution type/antenna/station.  Only present if self.throw or
+        self.makeFlagDicArrayFromInfo are run.
+    in_dic_array, optional
+        A dictionary that contains the interpolated values for each events different solution types/antennas/stations.  Only present if self.throw or
+        self.makeFlagDicArrayFromInfo are run.
+    throw_start_time : float, optional
+        The internal clock time of when the simulation first ran self.throw.  Only present self.throw is run.
+    pre_split : bool, optional
+        Determines whether to attempt to load from pre split libraries.  If true (and the pre split libraries are calculated and 
+        saved appropriately) this avoids lengthy calculations which seperate the rays ito the different solution types.  (Default is False).  
+        Only present self.throw is run.
+    outfile : str, optional
+        The address/name of the output file.  Only present self.throw is run.
+    file : h5py.File(), optional
+        The h5py.File object for the output file.  Only present self.throw is run.
+    save_signals : bool, optional
+        Enables saving the waveforms for triggered events.  Waveforms are saved in the output file as a dictionary under the 'signals' header.
+        This dictionary is organized at the top level by event, then branching to station label. 
+        The signals from a station are in the form of a numpy.ndarray which contains the signals for all antennas in the station.
+        Each antenna in each station is stored as row in the numpy.ndarray corresponding to that station.  The final row of
+        this ndarray is the times corresponding to the signals in every other row.  Signals are given in units of adu and times
+        in units of ns.
+        # TODO: Add a script that converts these to be in the same format as real data taken from an ARA station.
+    n_events : int, optional
+        The number of events (to be) thrown.  Only present self.throw is run.
+    len_info_per_event : int, optional
+        The number of elements to expect for the length of the info object per event.  Used internally for indexing purposes.  Only present self.throw is run.
+
+    See Also
+    For more info about how to work with info_dtype check out HDF5's discussion of custome dtypes in O'Reilly, Python and HDF5: Chapter 7. More About Types - Compound Types
+    '''
+
+    def __init__(self, config_file,solutions = numpy.array([]),electricFieldDomain = 'time',do_beamforming = True):
         #pre_split False unless using a library already sorted into different
         #directories by solution type.
         self.config_file = config_file
         #self.config = eval(''.join(open(config_file).readlines()))
         self.config = yaml.load(open(config_file))
         self.ice = gnosim.earth.ice.Ice(self.config['detector_volume']['ice_model'])
-        #self.info_dtype = numpy.dtype([('eventid','i'),('station','i'),('antenna','i'),('has_solution','i'),('pre_triggered','i'),('triggered','i'),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('observation_angle','f'),('electric_field','f'),('electric_field_digitized','f'),('dominant_freq','f'),('a_s','f'),('a_p','f'),('SNR','f'),('signal_reduction_factor','f'),('fpga_max','i'),('seed','i')])
-        # List attributes of interest
-        #self.keys = ['t', 'd', 'theta', 'theta_0', 'a_p', 'a_s']
-        self.solutions = solutions
+        
+        #Filtering solutions to acceptable values.
+        accepted_solutions = gnosim.trace.refraction_library_beta.getAcceptedSolutions()
+        if numpy.size(solutions) == 0:
+            solutions = accepted_solutions
+        solutions = accepted_solutions[numpy.isin(accepted_solutions,solutions)]
+        if len(solutions) == 0:
+            print('Selection of solution types did not match predefined values.  Using default types.')
+            self.solutions = accepted_solutions
+            print(self.solutions)
+        else:
+            self.solutions = solutions
 
         accepted_domains = numpy.array(['time','freq'])
         electricFieldDomain = accepted_domains[numpy.isin(accepted_domains,electricFieldDomain)]
@@ -139,8 +245,6 @@ class Sim:
                     index_refraction_array = self.ice.indexOfRefraction(z_array) 
                     mean_index = numpy.mean(index_refraction_array) #used to estimate angles for each beam.
                     station.getBeams(mean_index)
-                    #colormap = pylab.cm.gist_ncar #nipy_spectral, Set1,Paired   
-                    #self.beam_colors = [colormap(i) for i in numpy.linspace(0, 1,n_beams+1)] #I put the +1 backs it was making the last beam white, hopefully if I put this then the last is still white but is never called
         
         self.n_cores = cpu_count()
         #self.lock = threading.RLock() #Hopefully fixes multithreading plotting (it didn't)
@@ -152,14 +256,111 @@ class Sim:
 
         
     #@profile 
-    def event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, anti=False,
-        include_noise = False,plot_signals=False,plot_geometry=False,summed_signals=False,
-        trigger_threshold = 0,trigger_threshold_units = 'V',plot_filetype_extension = 'svg',image_path = './', 
-        random_time_offset = 0, dc_offset = 0, do_beamforming = False, output_all_solutions = False, pre_trigger_angle = None,
-        event_seed = None, return_fig_array = False):
+    def event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, anti=False, include_noise = True, 
+            plot_signals=False, plot_geometry=False, summed_signals=True, trigger_threshold = 0.0, trigger_threshold_units = 'fpga', 
+            plot_filetype_extension = 'svg',image_path = './',  random_time_offset = 0.0, dc_offset = 0.0, do_beamforming = False, 
+            output_all_solutions = True, pre_trigger_angle = None, event_seed = None, return_fig_array = False):
         '''
         Note that the freq domain option is outdated and does not just do the same thing differently.  It does 
         what older version of the code attempted did.  Does not have a lot of the newer additions such as noise.  
+
+        Parameters
+        ----------
+        energy_neutrino : float
+            The energy of the neutrino.  This should be the raw energy of the neutrino (i.e. before inelasticity is applied).  Given in GeV.
+        phi_0 : float
+            The azimuthal spherical coordinate for the direction neutrino came from.  Given in degrees.
+        theta_0 : float
+            The polar spherical coordinate for the direction neutrino came from.  Given in degrees.
+        x_0 : float
+            The x cartesian ice frame coordinate of the neutrino interaction location.  Given in m.
+        y_0 : float
+            The y cartesian ice frame coordinate of the neutrino interaction location.  Given in m.
+        z_0 : float
+            The z cartesian ice frame coordinate of the neutrino interaction location.  Given in m.
+        eventid : int
+            The index associated with this event.
+        inelasticity : float
+            The inelasticty factor of the interaction of the neutrino in ice.  Represents the portion of energy that is actually transferred 
+            to the energy of the shower.
+        anti : bool, optional
+            Selects either a neutrino (anti == False) or anti neutrino (anti == True).  (Default is False).
+        include_noise : bool, optional
+            Enables the addition of noise to the time domain signals.  Note supported for electricFieldDomain = 'freq'.  (Default is True).
+        plot_signals : bool, optional
+            Enables plotting of the waveforms, as well as of the beam forming plots and some meta data.  Only plots for trigger events. (Default is False).
+        plot_geometry : bool, optional
+            Enables plotting of the neutrino location, rays, and antennas.  Only plots for trigger events. (Default is False).
+        summed_signals : bool, optional
+            If true, then signals resulting from different solution types are combined into a single waveform per antenna.  Otherwise
+            only the waveform of the solution type with the maximum signal per antenna will be used.  (Default is True).
+        trigger_threshold : float, optional
+            The trigger threshold to be applied on the signal or set of signals.  This should correspond to trigger_threshold_units.
+            (Default is 0.0).
+        trigger_threshold_units : str, optional
+            This selects to units used for triggering.  To see the options try getAcceptedTriggerUnits().  If this is
+            'fpga' then do_beamforming must be True.  (Default is 'fpga').
+        plot_filetype_extension : str, optional
+            Sets the file extension for any saved images.  (Default is 'svg').
+        image_path : str, optional
+            Sets the path of where any created images will be saved if enabled. (Default is './').
+        random_time_offset : float, optional
+            A small random jitter in timing to ensure that no systematic error is introduced from perfect timing in the MC simulation.  Given in ns.  (Default is 0.0).
+        dc_offset : float, optional
+            An offset to be given to any signals.  Given in V. (Default is ).
+        do_beamforming : bool, optional
+            Enables beamforming.  (Default is True).
+        output_all_solutions : bool, optional
+            Enables all solution types to be output, otherwise only the solution type with the maximum signal per antenna is output.  (Default is True).
+        pre_trigger_angle : float, optional
+            If given, then a pre trigger will be applied to the event such that calculations of Askaryan radiation/electric field will only be conducted 
+            if ANY of the possible solution types (for all antennas and stations) have an observation angle within pre_trigger_angle number of degrees to
+            the Cherenkov angle.  Essentially the Cherenkov cone must be observable within the pre trigger angular window from at least one antenna in the
+            array in order for the calculations to proceed.
+
+            i.e. if pre_trigger_angle is 10.0 degrees then signals will only be calculated if one of the solutions was emitted (observed on cone) at an
+            angle: theta_c - 10.0 deg < theta_obs < theta_c + 10.0 deg.
+
+            If ANY of the solution types of ANY of the antennas in the entire array satisfies the pre trigger, then all calculations for that event proceed, 
+            not just the solution types that independently satisfied the pre trigger threshold.  (Default is None).
+        event_seed : int, optional
+            This sets the state of the random object to be used internally for the event, allowing it to be reproducable regardless of the number of times random
+            calls were made externally.  In general this should be calculated using numpy.random.randint(numpy.iinfo(numpy.uint32).max,size=self.n_events).
+            (Default is None).
+        return_fig_array : bool, optional
+            Enables an additional ouput array containing the figure objects.  (Default is False).
+
+        Returns
+        -------
+        eventid : int
+            The index associated with this event.
+        p_interact : float
+            The probability that the neutrino interacts in a sphere containing a cubic meter of ice. 
+        p_earth : float
+            The probability of survival for the neutrino passing through the earth.
+        p_detect : bool
+            True if the event is obserable at all (i.e. has at least one solution type visible across the array).
+        event_electric_field_max : float
+            The maximum electric field measured for the event across all antennas.
+        dic_max : dict
+            Contains info about 'd', 'r', 't', 'theta', 'theta_ant', 'a_s', 'a_p', and 'z', for the solution type that resulted in event_electric_field_max. 
+        event_solution_max : str
+            The solution type that resulted in event_electric_field_max.
+        event_index_station_max : int
+            The index of the station observed event_electric_field_max.
+        event_index_antenna_max : int
+            The index of the antenna in the station that observed event_electric_field_max.
+        info : numpy.ndarray of self.info_dtype
+            Contains all meta data about the event for each antenna and solution type (if output_all_solutions == True).
+        triggered : bool
+            True if array triggers on the event.
+        signals_out : dict
+            A dictionary containing the waveforms for the event.  Each stations signals are seperated as entries in the dict,
+            but each antenna in each station is stored as row in the numpy.ndarray corresponding to that station.  The final row of
+            this ndarray is the times corresponding to the signals in every other row.  Signals are given in units of adu and times
+            in units of ns.
+        fig_array : list of figures, optional
+            A list of the figures produced during the running of this function.
         '''
         effective_energy_neutrino = energy_neutrino*inelasticity
         triggered = False
@@ -384,14 +585,11 @@ class Sim:
                                     if self.electricFieldDomain != 'freq':
                                         print('Electric field domain selection did not fit one of the\ntwo expected values.  Continuing with old method: freq.')
                                         sys.stdout.flush()
-                                    frequency = numpy.linspace(antenna.frequency_low,
-                                               antenna.frequency_high,
-                                               100) # GHz
+                                    frequency = numpy.linspace(antenna.frequency_low, antenna.frequency_high, 100) # GHz
                                     #Note below doesn't use effective_energy_neutrino because it has inelasticity as an input parameter and does that calculation internally.  This is the problem with trying to carry along old code 
                                     electric_field \
                                         = gnosim.interaction.askaryan.electricFieldFrequencyDomainRaw(frequency, temporary_info[ solution_cut ]['distance'], observation_angle,
-                                                                                    energy_neutrino, inelasticity, 
-                                                                                    'cc', index_of_refraction_at_neutrino) # V m^-1 GHz^-1, dimensionless, expects observation_angle to be in degrees
+                                                                                    energy_neutrino, inelasticity, index_of_refraction_at_neutrino) # V m^-1 GHz^-1, dimensionless, expects observation_angle to be in degrees
                                     electric_field *= signal_reduction_factor
                                     electric_array, electric_field, dominant_freq = antenna.totalElectricField(frequency, electric_field, theta_ant_deg) # V m^-1 #THIS WAS CHANGED THETA WAS ADDED
                                     SNR = -999.
@@ -760,7 +958,16 @@ class Sim:
         '''
         This function takes a set of x,y,z coordinates and determines whether each set
         is within the set of solutions. It checks the points against the
-        self.concave_hull bounding functions
+        self.concave_hull bounding functions.  Defines self.in_flag_array.
+
+        Parameters
+        ----------
+        x_query : numpy.ndarray of floats
+            The list of x cartesian coordinates in the ice frame of the neutrino interactions.
+        y_query : numpy.ndarray of floats
+            The list of y cartesian coordinates in the ice frame of the neutrino interactions.
+        z_query : numpy.ndarray of floats
+            The list of z cartesian coordinates in the ice frame of the neutrino interactions.
         '''
         in_flag_array = {}
         for index_station, station in enumerate(self.stations):
@@ -793,16 +1000,77 @@ class Sim:
                     in_flag_array[station.label][antenna.label][solution] = has_solution
         self.in_flag_array = in_flag_array
 
-    def griddata_Event(self, x_query, y_query , z_query, method = 'cubic',events_per_calc = 1000000):
+    def makeFlagDicArrayFromInfo(self,info):
         '''
-        This function takes a set of x,y,z coordinates and determines whether each set
-        is within the set of solutions.  First it checks the points against the
-        self.concave_hull bounding functions, and the locates which triangle each
-        point is within referencing the self.delaunay grid created elsewhere.  
-        Using barycentric weighting of the 3 corners of the triangle, an average
-        value is calculated to estimate the coresponding information about the pair.
-        
-        Right now this expects r_query,z_query to be centered coordinates
+        This is intended for use in offline mode.  Given the info = reader['info'][...] array
+        from a previously computed simulation, this can recreate the in_dic_array and in_flag_array
+        so they can be used to reproduce events without running a full simulation.
+
+        Parameter
+        ---------
+        info : numpy.ndarray of self.info_dtype
+            Contains all meta data about the event for each antenna and solution type (if output_all_solutions was True when this was generated).
+        '''
+        key_dict = {
+                'theta':'theta_ray',
+                'theta_ant':'theta_ant',
+                'd':'distance',
+                't':'time'}
+        if numpy.isin('a_h',list(info.dtype.fields.keys())):
+            key_dict['a_s'] = 'a_h' #Backwards compatibility for info created before relabelling.
+        elif numpy.isin('a_s',list(info.dtype.fields.keys())):
+            key_dict['a_s'] = 'a_s'
+        if numpy.isin('a_v',list(info.dtype.fields.keys())):
+            key_dict['a_p'] = 'a_v' #Backwards compatibility for info created before relabelling.
+        elif numpy.isin('a_p',list(info.dtype.fields.keys())):
+            key_dict['a_p'] = 'a_p'
+
+        in_dic_array = {}
+        in_flag_array = {}   
+        for index_station, station in enumerate(self.stations):
+            station_cut = info['station'] == index_station
+            in_dic_array[station.label] = {}
+            in_flag_array[station.label] = {}
+            for index_antenna, antenna in enumerate(station.antennas):
+                in_dic_array[station.label][antenna.label] = {}
+                in_flag_array[station.label][antenna.label] = {}
+                antenna_cut = info['antenna'] == index_antenna
+                for solution in antenna.solutions:
+                    in_dic_array[station.label][antenna.label][solution] = {}
+                    solution_cut = info['solution'] == solution.encode()
+                    cut = numpy.logical_and(solution_cut,numpy.logical_and(antenna_cut,station_cut))
+
+                    if sum(cut) != 0:
+                        in_flag_array[station.label][antenna.label][solution] = info[cut]['has_solution']
+                        
+                    else:
+                        in_flag_array[station.label][antenna.label][solution] = False
+                    for key in list(key_dict.keys()):
+                        in_dic_array[station.label][antenna.label][solution][key] = info[cut][key_dict[key]]
+        self.in_dic_array = in_dic_array
+        self.in_flag_array = in_flag_array
+
+    def griddata_Event(self, x_query, y_query , z_query, method = 'cubic',events_per_calc = 10000000):
+        '''
+        This function takes a set of x,y,z coordinates and determines whether neutrino location is observable (has a solution).  
+        It then obtains information about the neutrino event by interpolating the queried position against the ray tracing library
+        for each event, using interpolation and the scipy.interpolate.griddata function.  Solution types for each event that
+        are not observed are masked with values of -999.0.  self.in_dic_array is then populated used these interpolated values, (sorted
+        by station label -> antenna label -> solution type -> key - > eventid).
+
+        Parameters
+        ----------
+        x_query : numpy.ndarray of floats
+            The list of x cartesian coordinates in the ice frame of the neutrino interactions.
+        y_query : numpy.ndarray of floats
+            The list of y cartesian coordinates in the ice frame of the neutrino interactions.
+        z_query : numpy.ndarray of floats
+            The list of z cartesian coordinates in the ice frame of the neutrino interactions.
+        method : str, optional
+            The selected method of interpolation.  (Default is 'cubic').
+        events_per_calc : int, optional
+            Limits the number of events sent through griddata at a time.  Is present as a feature to potentially reduce memory usage.
+            (Default is 10000000).
         '''
         griddata_initate_time = time.time()
         self.makeFlagArray(x_query, y_query , z_query)
@@ -849,21 +1117,33 @@ class Sim:
                         left_event += events_per_calc
         print('Finished griddata_Event in ', time.time() - griddata_initate_time, 's')
     
-    def singleAntennaGridDataEvent(self, r_query , z_query, antenna, in_flag_array, method = 'cubic',events_per_calc = 1000000):
+    def singleAntennaGridDataEvent(self, r_query , z_query, antenna, in_flag_array, method = 'cubic',events_per_calc = 10000000):
             '''
-            This function takes a set of x,y,z coordinates and determines whether each set
-            is within the set of solutions.  First it checks the points against the
-            self.concave_hull bounding functions, and the locates which triangle each
-            point is within referencing the self.delaunay grid created elsewhere.  
-            Using barycentric weighting of the 3 corners of the triangle, an average
-            value is calculated to estimate the coresponding information about the pair.
-            
-            Right now this expects r_query,z_query to be centered coordinates
-            
-            This will do what griddata_Event does but for a single antenna at time. 
-            This is intended to be used during multiprocessing. 
+            This will do what griddata_Event does but for a single antenna at time. This is intended to be used during multithreading. 
             in_flag_array should be the dict for only that antenna.
+
+            Parameters
+            ----------
+            r_query : numpy.ndarray of floats
+                The list of polar r coordinates in cylindrical coordinates in the ice frame (centered at this particular antenna).
+            z_query : numpy.ndarray of floats
+                The list of z cartesian coordinates in the ice frame of the neutrino interactions.
+            antenna : gnosim.sim.detector.Antenna
+                The antenna object containing information about this particular antenna.
+            in_flag_array : dict
+                The in_flag_array corresponding to the particular antenna passed to this function. 
+            method : str, optional
+                The selected method of interpolation.  (Default is 'cubic').
+            events_per_calc : int, optional
+                Limits the number of events sent through griddata at a time.  Is present as a feature to potentially reduce memory usage.
+                (Default is 10000000).
+
+            Returns
+            -------
+            out_dic_array : dict
+                A dictionary containing the results of interpolation.   (Sorted by solution type -> key - > eventid).
             '''
+
             print('Running Events Through Griddata Interpolation for:', antenna.label)
             if ((type(r_query) != numpy.ndarray) or (type(z_query) != numpy.ndarray)):
                 if ((type(r_query) != list) or (type(z_query) != list)):
@@ -906,16 +1186,25 @@ class Sim:
             sys.stdout.flush()
             return out_dic_array
     
-    def multiThreadGridDataEvent(self, x_query, y_query , z_query, method = 'cubic',n_cores = 4,events_per_calc = 1000000):
+    def multiThreadGridDataEvent(self, x_query, y_query , z_query, method = 'cubic',n_cores = 4,events_per_calc = 10000000):
         '''
-        This function takes a set of x,y,z coordinates and determines whether each set
-        is within the set of solutions.  First it checks the points against the
-        self.concave_hull bounding functions, and the locates which triangle each
-        point is within referencing the self.delaunay grid created elsewhere.  
-        Using barycentric weighting of the 3 corners of the triangle, an average
-        value is calculated to estimate the coresponding information about the pair.
-        
-        Right now this expects r_query,z_query to be centered coordinates
+        This function manages the multithreading of calls to singleAntennaGridDataEvent.
+
+        Parameters
+        ----------
+        x_query : numpy.ndarray of floats
+            The list of x cartesian coordinates in the ice frame of the neutrino interactions.
+        y_query : numpy.ndarray of floats
+            The list of y cartesian coordinates in the ice frame of the neutrino interactions.
+        z_query : numpy.ndarray of floats
+            The list of z cartesian coordinates in the ice frame of the neutrino interactions.
+        method : str, optional
+            The selected method of interpolation.  (Default is 'cubic').
+        n_cores : int, optional
+            The number of cores available for multithreading.  (Default is 4).
+        events_per_calc : int, optional
+            Limits the number of events sent through griddata at a time (in a single thread).  Is present as a feature to potentially reduce memory usage.
+            (Default is 10000000).
         '''
         griddata_initate_time = time.time()
         self.makeFlagArray(x_query, y_query, z_query)
@@ -943,17 +1232,120 @@ class Sim:
     
     def throw(self, energy_neutrino=1.e9, 
               theta_0=None, phi_0=None, x_0=None, y_0=None, z_0=None, phi_vertex = None, r_vertex = None,
-              anti=False, n_events=10000, detector_volume_radius=6000., detector_volume_depth=3000., 
-              outfile=None,seed = None,pre_split = False,method = 'cubic',include_noise = False,summed_signals = False,
-              plot_geometry = False, plot_signals = False, trigger_threshold = 0,trigger_threshold_units = 'V',plot_filetype_extension = 'svg',image_path = './',
-              use_interp_threading = False,use_event_threading = False, n_beams = 15, n_baselines = 2, output_all_solutions = False,save_signals = False,
+              anti=False, n_events=100000, detector_volume_radius=6000., detector_volume_depth=3000., 
+              outfile=None,seed = None,pre_split = True, method = 'cubic', include_noise = True,summed_signals = True,
+              plot_geometry = False, plot_signals = False, trigger_threshold = 0.0,trigger_threshold_units = 'fpga',plot_filetype_extension = 'svg',image_path = './',
+              use_interp_threading = True,use_event_threading = True, n_beams = 15, n_baselines = 2, output_all_solutions = True,save_signals = True,
               pre_trigger_angle = None):
-        #'''
+        '''
+        The work horse of the simulation.  This function 'throws' (generates) neutrinos in the ice volume for the given energy, distributing them throughout the
+        ice and orienting them randomly.  This then performs calculations to determine if these neutrinos are observed by the stations defined in the config file.
+        It saves meta data about each event and can also save signal wave forms, etc. 
+        
+        energy_neutrino : numpy.ndarray of floats, optional
+            The energy that each neutrino will have.  Given in GeV.  (Default is 1.0e9).
+        theta_0 : numpy.ndarray of floats, optional
+            The polar spherical coordinates for the directions each neutrino came from.  Given in degrees.  (Default is None).
+        phi_0 : numpy.ndarray of floats, optional
+            The azimuthal spherical coordinates for the directions each neutrino came from.  Given in degrees.  (Default is None).
+        x_0 : numpy.ndarray of floats
+            The x cartesian ice frame coordinates of each neutrinos interaction location.  Given in m.  (Default is None).
+        y_0 : numpy.ndarray of floats
+            The y cartesian ice frame coordinates of each neutrinos interaction location.  Given in m.  (Default is None).
+        z_0 : numpy.ndarray of floats
+            The z cartesian ice frame coordinates of each neutrinos interaction location.  Given in m.  (Default is None).
+        phi_vertex : numpy.ndarray of floats, optional
+            The angular coordinate of each neutrino location in cylindrical coordinates in the ice frame.  Given in deg.  (Default is None).
+        r_vertex : numpy.ndarray of floats, optional
+            The radial coordinate of each neutrino location in cylindrical coordinates in the ice frame.  Given in m.  (Default is None).
+        anti : bool, optional
+            Selects either a neutrino (anti == False) or anti neutrino (anti == True).  (Default is False).
+        n_events : int, optional
+            The number of events to be thrown. 
+        detector_volume_radius : , optional
+            The radius of the 'detector' (ice to be used as detector/populated with neutrinos).  Given in m.  This should not exceed that
+            used when making the ray tracing libaries defined in the configuration file.  Making it slightly lower than that used in the 
+            ray tracing library construction can help avoid edge effects from the interpolation.
+        detector_volume_depth : , optional
+            The depth of the 'detector' (ice to be used as detector/populated with neutrinos).  Given in m.  This should not exceed that
+            used when making the ray tracing libaries defined in the configuration file.  Making it slightly lower than that used in the 
+            ray tracing library construction can help avoid edge effects from the interpolation.
+        outfile : str, optional
+            The address/name of the output file.  Only present self.throw is run.
+        seed : int, optional
+            The seed used for setting the random state of the simulation.  This will allow for testing with reproducable randomly generated neutrinos,
+            noise, etc.
+        pre_split : bool, optional
+            Determines whether to attempt to load from pre split libraries.  If true (and the pre split libraries are calculated and 
+            saved appropriately) this avoids lengthy calculations which seperate the rays ito the different solution types.  (Default is False).
+        method : str, optional
+            The selected method of interpolation.  (Default is 'cubic').
+        include_noise : bool, optional
+            Enables the addition of noise to the time domain signals.  Note supported for electricFieldDomain = 'freq'.  (Default is True).
+        summed_signals : bool, optional
+            If true, then signals resulting from different solution types are combined into a single waveform per antenna.  Otherwise
+            only the waveform of the solution type with the maximum signal per antenna will be used.  (Default is True).
+        plot_geometry : bool, optional
+            Enables plotting of the neutrino location, rays, and antennas.  Only plots for trigger events. (Default is False).
+        plot_signals : bool, optional
+            Enables plotting of the waveforms, as well as of the beam forming plots and some meta data.  Only plots for trigger events. (Default is False).
+        trigger_threshold : float, optional
+            The trigger threshold to be applied on the signal or set of signals.  This should correspond to trigger_threshold_units.
+            (Default is 0.0).
+        trigger_threshold_units : str, optional
+            This selects to units used for triggering.  To see the options try getAcceptedTriggerUnits().  If this is
+            'fpga' then do_beamforming must be True.  (Default is 'fpga').
+        plot_filetype_extension : str, optional
+            Sets the file extension for any saved images.  (Default is 'svg').
+        image_path : str, optional
+            Sets the path of where any created images will be saved if enabled. (Default is './').
+        use_interp_threading : bool, optional
+            Enables multithreading during the interpolation portion of the code.  Significantly speeds up users perception of start up time (computationally
+            this obviously still takes the same amount of time).  (Default is True).  Note that if this is enabled then live plotting is disabled, due to
+            matplotlib currently not being thread safe.  Plots can be generated after the fact. (See gnosim.analysis.testing_single_event.py).
+        use_event_threading : bool, optional
+            Enables multithreading during the interpolation portion of the code.  Significantly speeds up users perception of total run time (computationally
+            this obviously still takes the same amount of time).  (Default is True).  Note that if this is enabled then live plotting is disabled, due to
+            matplotlib currently not being thread safe.  Plots can be generated after the fact. (See gnosim.analysis.testing_single_event.py).
+        n_beams : int
+            The number of beams to be formed when creating a beam forming dictionary.  Specified in the configuration file.
+        n_baselines : int
+            This sets the number of baselines to be considered when creating the beam forming dictionary.  Currently this will automatically select the
+            n_baselines that are smallest (in m).  I.e. if you had 8 antennas seperated evenly by 1m, then n_baselines = 2 would result in both the 1m
+            and 2m baselines being used for subbeams.  If they 8 antennas were seperated evenly by 2m, then n_baselines = 2 would result in both the 2m
+            and 4m baselines being used for subbeams.  A subbeam is created for each baseline for a given beam (assuming at least 2 antennas are seperated
+            by the baseline).  Thus this parameter selects the number of subbeams to be used per beam.  Specified in the configuration file.
+            Currently the minimum time shift is assigned to the smallest baseline.  Thus every other timeshift resulting from larger baselines must be a 
+            multiple of the minimum baseline. i.e. all subbeam baselines must be in integer multiples of  the minimum baseline.  Currently requires all 
+            other baselines to be an integer multiple of the minimum baseline.
+        output_all_solutions : bool, optional
+            Enables all solution types to be output, otherwise only the solution type with the maximum signal per antenna is output.  (Default is True).
+        save_signals : bool, optional
+            Enables saving the waveforms for triggered events.  Waveforms are saved in the output file as a dictionary under the 'signals' header.
+            This dictionary is organized at the top level by event, then branching to station label. 
+            The signals from a station are in the form of a numpy.ndarray which contains the signals for all antennas in the station.
+            Each antenna in each station is stored as row in the numpy.ndarray corresponding to that station.  The final row of
+            this ndarray is the times corresponding to the signals in every other row.  Signals are given in units of adu and times
+            in units of ns.
+            # TODO: Add a script that converts these to be in the same format as real data taken from an ARA station.
+        pre_trigger_angle : float, optional
+            If given, then a pre trigger will be applied to the event such that calculations of Askaryan radiation/electric field will only be conducted 
+            if ANY of the possible solution types (for all antennas and stations) have an observation angle within pre_trigger_angle number of degrees to
+            the Cherenkov angle.  Essentially the Cherenkov cone must be observable within the pre trigger angular window from at least one antenna in the
+            array in order for the calculations to proceed.
+
+            i.e. if pre_trigger_angle is 10.0 degrees then signals will only be calculated if one of the solutions was emitted (observed on cone) at an
+            angle: theta_c - 10.0 deg < theta_obs < theta_c + 10.0 deg.
+
+            If ANY of the solution types of ANY of the antennas in the entire array satisfies the pre trigger, then all calculations for that event proceed, 
+            not just the solution types that independently satisfied the pre trigger threshold.  (Default is None).
+        '''
+
         if numpy.logical_and(numpy.logical_or(plot_geometry,plot_signals),numpy.logical_or(use_event_threading,use_interp_threading)):
             print('Note: Pylab/Matplotlib are not threadig safe, so plotting will be disabled while threading is enabled.')
             plot_geometry = False
             plot_signals = False
-        #'''
+
         self.throw_start_time = time.time()
         
         self.pre_split = pre_split
@@ -1359,56 +1751,18 @@ class Sim:
         print('Time interpolating with griddata: %0.3f s'%(griddata_time- general_prep_time))
         print('Time in event calculations:  %0.3f s'%(current_time - griddata_time))
 
-    def makeFlagDicArrayFromInfo(self,info):
-        '''
-        This is intended for use in offline mode.  Given the info = reader['info'][...] array
-        from a previously computed simulation, this can recreate the in_dic_array and in_flag_array
-        so they can be used to reproduce events without running a full simulation.
-        '''
-        key_dict = {
-                'theta':'theta_ray',
-                'theta_ant':'theta_ant',
-                'd':'distance',
-                't':'time'}
-        if numpy.isin('a_h',list(info.dtype.fields.keys())):
-            key_dict['a_s'] = 'a_h' #Backwards compatibility for info created before relabelling.
-        elif numpy.isin('a_s',list(info.dtype.fields.keys())):
-            key_dict['a_s'] = 'a_s'
-        if numpy.isin('a_v',list(info.dtype.fields.keys())):
-            key_dict['a_p'] = 'a_v' #Backwards compatibility for info created before relabelling.
-        elif numpy.isin('a_p',list(info.dtype.fields.keys())):
-            key_dict['a_p'] = 'a_p'
-
-        in_dic_array = {}
-        in_flag_array = {}   
-        for index_station, station in enumerate(self.stations):
-            station_cut = info['station'] == index_station
-            in_dic_array[station.label] = {}
-            in_flag_array[station.label] = {}
-            for index_antenna, antenna in enumerate(station.antennas):
-                in_dic_array[station.label][antenna.label] = {}
-                in_flag_array[station.label][antenna.label] = {}
-                antenna_cut = info['antenna'] == index_antenna
-                for solution in antenna.solutions:
-                    in_dic_array[station.label][antenna.label][solution] = {}
-                    solution_cut = info['solution'] == solution.encode()
-                    cut = numpy.logical_and(solution_cut,numpy.logical_and(antenna_cut,station_cut))
-
-                    if sum(cut) != 0:
-                        in_flag_array[station.label][antenna.label][solution] = info[cut]['has_solution']
-                        
-                    else:
-                        in_flag_array[station.label][antenna.label][solution] = False
-                    for key in list(key_dict.keys()):
-                        in_dic_array[station.label][antenna.label][solution][key] = info[cut][key_dict[key]]
-        self.in_dic_array = in_dic_array
-        self.in_flag_array = in_flag_array
-        
 def makeIndexHTML(path = './',filetype = 'svg'):
     '''
-    Makes a crude html image browser of the created images.
-    filytpe should not have the .
-    Path should have / at the end
+    Makes a crude html image browser of the created images to be loaded in a web browser. Image filytpe should not have the . and Path should have / at the end
+
+    Parameters
+    ----------
+    path : str, optional
+        The path to the folder containing all of the images to be indexed.  Should not contain a forward slash at the end.
+    filetye : str, optional
+        The file type extension of the images to be indexed.  Should not contain the '.'. 
+
+
     '''
     header = os.path.realpath(path).split('/')[-1]
     infiles = glob.glob('%s*%s'%(path,filetype))
@@ -1430,69 +1784,70 @@ def makeIndexHTML(path = './',filetype = 'svg'):
     #print(image_list)
     
     
-    template = """<!DOCTYPE html>
-    <html>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
-    <style>
-    .mySlides {display:none;}
-    </style>
-    <body>
-    
-    <head>
-    <title> RCC KICP | Dan Southall </title>
-    </head>
-    <p><strong> Dan Southall </strong> | <a href="https://kicp.uchicago.edu/people/profile/daniel_southall.html"> KICP Profile </a> | <a href="../../index.html"> Home </a></p>
-    
-    <h2 class="w3-center"><strong> """ + header + """</strong></h2>
-    
-    <input id="slide_index" size="4" value="1" onchange="showDivs(parseInt(document.getElementById('slide_index').value))">
-    
-    <div class="w3-content w3-display-container"> 
-    """ + image_list + """
-    </div>
-    
-    <button class="w3-button w3-black w3-display-left" onclick="plusDivs(-1)">&#10094;</button>
-    <button class="w3-button w3-black w3-display-right" onclick="plusDivs(1)">&#10095;</button>
-    
-    </div>
-    <script>
-    var slideIndex = 1;
-    showDivs(slideIndex);
+    template =  '''
+                <!DOCTYPE html>
+                <html>
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+                <style>
+                .mySlides {display:none;}
+                </style>
+                <body>
+                
+                <head>
+                <title> RCC KICP | Dan Southall </title>
+                </head>
+                <p><strong> Dan Southall </strong> | <a href="https://kicp.uchicago.edu/people/profile/daniel_southall.html"> KICP Profile </a> | <a href="../../index.html"> Home </a></p>
+                
+                <h2 class="w3-center"><strong> """ + header + """</strong></h2>
+                
+                <input id="slide_index" size="4" value="1" onchange="showDivs(parseInt(document.getElementById('slide_index').value))">
+                
+                <div class="w3-content w3-display-container"> 
+                """ + image_list + """
+                </div>
+                
+                <button class="w3-button w3-black w3-display-left" onclick="plusDivs(-1)">&#10094;</button>
+                <button class="w3-button w3-black w3-display-right" onclick="plusDivs(1)">&#10095;</button>
+                
+                </div>
+                <script>
+                var slideIndex = 1;
+                showDivs(slideIndex);
 
-    function plusDivs(n) {
-      showDivs(slideIndex += n);
-    }
+                function plusDivs(n) {
+                  showDivs(slideIndex += n);
+                }
 
-    function showDivs(n) {
-      var i;
-      var x = document.getElementsByClassName("mySlides");
-      slideIndex =n;
-      if (n > x.length) {slideIndex = 1}    
-      if (n < 1) {slideIndex = x.length}
-      for (i = 0; i < x.length; i++) {
-         x[i].style.display = "none";  
-      }
-      x[slideIndex-1].style.display = "block"; 
-      document.getElementById("slide_index").value = slideIndex;
-      location.hash = "#" + slideIndex;
-      document.getElementById("filename").innerHTML = x[slideIndex-1].getAttribute("src");
-    }
-    
-    function load() 
-    {
-      var maybe = parseInt(location.hash.slice(1));
-      if (!isNaN(maybe)) 
-      {
-        showDivs(maybe); 
-      }
-      else showDivs(1); 
-    }
-    </script>
+                function showDivs(n) {
+                  var i;
+                  var x = document.getElementsByClassName("mySlides");
+                  slideIndex =n;
+                  if (n > x.length) {slideIndex = 1}    
+                  if (n < 1) {slideIndex = x.length}
+                  for (i = 0; i < x.length; i++) {
+                     x[i].style.display = "none";  
+                  }
+                  x[slideIndex-1].style.display = "block"; 
+                  document.getElementById("slide_index").value = slideIndex;
+                  location.hash = "#" + slideIndex;
+                  document.getElementById("filename").innerHTML = x[slideIndex-1].getAttribute("src");
+                }
+                
+                function load() 
+                {
+                  var maybe = parseInt(location.hash.slice(1));
+                  if (!isNaN(maybe)) 
+                  {
+                    showDivs(maybe); 
+                  }
+                  else showDivs(1); 
+                }
+                </script>
 
-    </body>
-    </html>
-    """
+                </body>
+                </html>
+                '''
     print(template)
     outfile_name = path + 'index'
     if os.path.isfile(outfile_name +'.html'):
@@ -1507,7 +1862,7 @@ def makeIndexHTML(path = './',filetype = 'svg'):
 
 ############################################################
 
-if __name__ == "__main__":
+if __name__ == '__main__':
 
     config_file = sys.argv[1]
     energy_neutrino = float(sys.argv[2]) # GeV
@@ -1568,11 +1923,10 @@ if __name__ == "__main__":
     
     #Creating Sim and throwing events
     my_sim = Sim(config_file, solutions=solutions,electricFieldDomain = 'time',do_beamforming = True)
-    #trigger_threshold_units should be one of 'adu', 'V', or 'fpga'.  If neither is assumes 'V'
-    #adu is in digitized units where noise rms is set to 3 (hardcoded, search noise_rms).  If noise is turned off this still scales as if noise were present to 3.
-    #V is volts of signal
-    #fpga uses the magnitude of a beamformed-powersummed signal.  The magnitude of this is not as intuitive as adu or V but is more like what is done at Pole.
-    #all of these assume time domain, as the freq domain portion of the code is not maintained. 
+    
+    '''
+    To see information of the trigger threshold and units look to getAcceptedTriggerUnits for help.
+    '''
     
     #Used for testing: 10 adu, 11500 fpga, 11342 fpga for 10Hz noise triggering
     sys.stdout.flush()

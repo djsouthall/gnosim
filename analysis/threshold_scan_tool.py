@@ -20,6 +20,7 @@ sys.path.append("/home/dsouthall/Projects/GNOSim/")
 from matplotlib import gridspec
 import pandas
 import gnosim.sim.antarcticsim
+import gnosim.utils.misc
 pylab.ion()
 ############################################################
 
@@ -191,8 +192,7 @@ if __name__ == "__main__":
             hits[beam_index,:] = numpy.sum(numpy.greater_equal(numpy.tile(beam,(len(threshold_array),1)),numpy.tile(threshold_array,(len(beam),1)).T),axis = 1)
         all_hits = numpy.sum(hits, axis=0)
 
-        colormap = pylab.cm.gist_ncar #nipy_spectral, Set1,Paired   
-        beam_colors = [colormap(i) for i in numpy.linspace(0, 1,len(station.beam_dict['beams'].keys())+1)] #I put the +1 backs it was making the last beam white, hopefully if I put this then the last is still white but is never called
+        beam_colors = gnosim.utils.misc.getColorMap(len(station.beam_dict['beams'].keys()))
 
         if plot_summed_beams == True:
             fig = pylab.figure(figsize=(16.,11.2)) #my screensize

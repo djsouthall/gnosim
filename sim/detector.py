@@ -12,70 +12,9 @@ import pylab
 import types
 import gnosim.trace.refraction_library_beta
 import gnosim.interaction.polarization
+import gnosim.utils.quat
+import gnosim.utils.misc
 ############################################################
-# ORIENTATION TOOLS
-
-def xRotationMatrix(theta_rad):
-    '''
-    Returns a 3x3 rotation matrix for rotating theta radians about the x axis.
-    '''
-    R = numpy.array([   [1,0,0],
-                        [0,numpy.cos(theta_rad),-numpy.sin(theta_rad)],
-                        [0,numpy.sin(theta_rad),numpy.cos(theta_rad)]   ])
-    return R
-
-def yRotationMatrix(theta_rad):
-    '''
-    Returns a 3x3 rotation matrix for rotating theta radians about the y axis.
-    '''
-    R = numpy.array([   [numpy.cos(theta_rad),0,numpy.sin(theta_rad)],
-                        [0,1,0],
-                        [-numpy.sin(theta_rad),0,numpy.cos(theta_rad)]   ])
-    return R
-    
-def zRotationMatrix(theta_rad):
-    '''
-    Returns a 3x3 rotation matrix for rotating theta radians about the x axis.
-    '''
-    R = numpy.array([   [numpy.cos(theta_rad),-numpy.sin(theta_rad),0],
-                        [numpy.sin(theta_rad),numpy.cos(theta_rad),0],
-                        [0,0,1]   ])
-    return R
-
-def eulerRotationMatrix(alpha_rad, beta_rad, gamma_rad):
-    '''
-    This creates the rotation matrix R using the given Euler angles and a
-    z-x-z extrinsic rotation.
-    '''
-    Rz1 = zRotationMatrix(gamma_rad)
-    Rx1 = xRotationMatrix(beta_rad)
-    Rz2 = zRotationMatrix(alpha_rad)
-    R = numpy.dot(Rz2,numpy.dot(Rx1,Rz1))
-    return R
-    
-def antennaFrameCoefficients(R, in_vector, pre_inv = False):
-    '''
-    R should be calculated in advance using R = eulerRotationMatrix(alpha_rad, beta_rad, gamma_rad)
-    and passed to this function.  Not internally calculated because it is the same for a given antenna
-    for each in_vector and does not need to be redundently calculated.  The inversion of the matrix
-    also only needs to be done once, so there is an option to pass this function the previously 
-    inverted R.  
-    
-    This is intended to perform the extrinsic rotation of a vector
-    using the Euler angles alpha, beta, gamma.  I intend for the output vector
-    to be in the frame in the basis frame defined by the given Euler angles.
-    
-    This returns the coefficients of the vector in the antenna frame.  
-    I.e. if the vector u, given in the ice basis (x,y,z) as u = a x + b y + c z 
-    is represented in the ice frame, this returns the coefficients A,B,C of the
-    antenna frame basis (X,Y,Z), such that u = A X + B Y + C Z = a x + b y + c z  
-    '''
-    if pre_inv == True:
-        out_vector = numpy.dot(R,in_vector)
-    else:
-        out_vector = numpy.dot(numpy.linalg.inv(R),in_vector)
-    
-    return out_vector   
     
 def plotArrayFromConfig(config,solutions,only_station = 'all',verbose = False):
     '''
@@ -84,7 +23,22 @@ def plotArrayFromConfig(config,solutions,only_station = 'all',verbose = False):
     only_station should either be 'all', to plot all stations, or a single index, 
     to plot a single station.  The index should be base 0. 
 
-    #Eventually this should be added as a method to the station class.
+    TODO: Eventually this should be added as a method to the station class.
+    
+    Parameters
+    ----------
+    config : dict
+        The configuration dictionary loaded from a config file.
+    solutions : numpy.ndarray of str
+        A list of the solution types used when creating the stations.
+    only_station: str or int
+        If 'all' then this will plot each station.  Otherwise it must be an integer index for a station.
+    verbose : bool, optional
+        Enables more print statements (Default is False).
+
+    See Also
+    --------
+    gnosim.trace.refraction_library_beta
     '''
     from matplotlib import markers
     fig = pylab.figure(figsize=(16,11.2))
@@ -96,7 +50,6 @@ def plotArrayFromConfig(config,solutions,only_station = 'all',verbose = False):
     
     marker_exclusions = ['.']
     ms = numpy.array(list(markers.MarkerStyle.markers))[~numpy.isin(list(markers.MarkerStyle.markers),marker_exclusions)]
-
 
     stations = []
     for ii in range(0, config['stations']['n']):
@@ -122,7 +75,7 @@ def plotArrayFromConfig(config,solutions,only_station = 'all',verbose = False):
                     print('x = ', antenna.x, 'm')
                     print('y = ', antenna.y, 'm')
                     print('z = ', antenna.z, 'm')
-                R = eulerRotationMatrix(numpy.deg2rad(alpha_deg), numpy.deg2rad(beta_deg), numpy.deg2rad(gamma_deg))
+                R = gnosim.utils.quat.eulerRotationMatrix(numpy.deg2rad(alpha_deg), numpy.deg2rad(beta_deg), numpy.deg2rad(gamma_deg))
                 basis_X = R[:,0] #x basis vector of the antenna frame in the ice basis
                 basis_Y = R[:,1] #y basis vector of the antenna frame in the ice basis
                 basis_Z = R[:,2] #z basis vector of the antenna frame in the ice basis
@@ -149,18 +102,113 @@ def plotArrayFromConfig(config,solutions,only_station = 'all',verbose = False):
 ############################################################
 
 class Station:
+    '''
+    Stores the attributes, information, and functions for a station of antennas.
+    
+    Parameters
+    ----------
+    x : float
+        The x coordinate for the position of the station in the ice frame.  Given in m.
+    y : float
+        The y coordinate for the position of the station in the ice frame.  Given in m.
+    z : float
+        The z coordinate for the position of the station in the ice frame.  Given in m.
+    config : dict
+        The configuration dictionary loaded from a config file.
+    station_label : str
+        A label for the station, often used as a key in dictionaries during the simulation.  Should be unique for a
+        particualar simulation (i.e. 'dipole0', 'dipole1', ... rather than just 'dipole').
+    solutions : numpy.ndarray of str, optional
+        A list of the solution types to load.  Often either all accepted solution types (the Default), or the same list omitting
+        the _2 strings, which represent libraries of solution that reflect of the bottom of the ice.
+    electricFieldDomain : str, optional
+        Selects the type of Askaryan radiation calculation to use.  
+        Options:    'time'  for the newer time domain calculation that allows many more options in the simulation and is more maintained, 
+                    'freq'  which is the old Askaryan calculation method which does the calculation solely in the frequency domain and 
+                            is no longer maintined. 
+        (Default is 'time').
 
-    def __init__(self, x, y, z, config, station_label, solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']),electricFieldDomain = 'time'):
-        """
-        
-        """
+
+    Attributes
+    ----------
+    x : float
+        The x coordinate for the position of the station in the ice frame.  Given in m.
+    y : float
+        The y coordinate for the position of the station in the ice frame.  Given in m.
+    z : float
+        The z coordinate for the position of the station in the ice frame.  Given in m.
+    config : dict
+        The configuration dictionary loaded from a config file.
+    label : str
+        A label for the station, often used as a key in dictionaries during the simulation.  Should be unique for a
+        particualar simulation (i.e. 'dipole0', 'dipole1', ... rather than just 'dipole').
+    accepted_solutions : numpy.ndarray of str, optional
+        A list of the possible allowable solution types to load.
+    solutions : numpy.ndarray of str, optional
+        A list of the solution types to load.  Often either all accepted solution types (the Default), or the same list omitting
+        the _2 strings, which represent libraries of solution that reflect of the bottom of the ice.
+    electricFieldDomain : str, optional
+        Selects the type of Askaryan radiation calculation to use.  
+        Options:    'time'  for the newer time domain calculation that allows many more options in the simulation and is more maintained, 
+                    'freq'  which is the old Askaryan calculation method which does the calculation solely in the frequency domain and 
+                            is no longer maintined. 
+        (Default is 'time').
+    power_calculation_sum_length : int
+        This sets the width (in bins of voltage data points) of a particular power sum window.  This is used in the beamforming calculation 
+        during the power sum.  Specified in the configuration file.
+    power_calculation_interval : int
+        This sets the number of bins between successive sums in the power sum.  If this is less than power_calculation_sum_length then successive
+        bins will overlap.  The common use case when this was written was to have the interval set to half of the sum length, so successive sums
+        contain half of their values in common with the previous sum.  This is used in the beamforming calculation during the power sum.  
+        Specified in the configuration file.
+    beamforming_power_sum_byte_cap : int
+        This sets number of bytes to cap the power sum calculation (which will have units of adu^2).  This is used in gnosim.sim.fpgaBeamForming.
+        Specified in the configuration file.
+    n_beams : int
+        The number of beams to be formed when creating a beam forming dictionary.  Specified in the configuration file.
+    n_baselines : int
+        This sets the number of baselines to be considered when creating the beam forming dictionary.  Currently this will automatically select the
+        n_baselines that are smallest (in m).  I.e. if you had 8 antennas seperated evenly by 1m, then n_baselines = 2 would result in both the 1m
+        and 2m baselines being used for subbeams.  If they 8 antennas were seperated evenly by 2m, then n_baselines = 2 would result in both the 2m
+        and 4m baselines being used for subbeams.  A subbeam is created for each baseline for a given beam (assuming at least 2 antennas are seperated
+        by the baseline).  Thus this parameter selects the number of subbeams to be used per beam.  Specified in the configuration file.
+        Currently the minimum time shift is assigned to the smallest baseline.  Thus every other timeshift resulting from larger baselines must be a 
+        multiple of the minimum baseline. i.e. all subbeam baselines must be in integer multiples of  the minimum baseline.  Currently requires all 
+        other baselines to be an integer multiple of the minimum baseline.
+    sampling_rate : float
+        This is the sampling rate of the fpga digitizer.  It will sample from the electric fields at this rate, returning digitized signals.
+        Given in GHz.  Specified in the configuration file.
+    digital_sampling_period : float
+        This is the sampling period of the fpga digitizer.  It will sample from the electric fields at this period, returning digitized signals.  
+        Given in ns.  Calculated from sampling_rate.
+    sampling_bits : 
+        This sets the number of voltage bins for a digitized signal.  Signals will be digitized asymmetrically about 0 to this bit size with values
+        ranging from -2**(sampling_bits-1)+1 to 2**(sampling_bits-1).
+    scale_noise_to : 
+        This scales the calculated 'analog' Askaryan calculations (in V) such that he noise_rms value is scale_noise_to adu.  The common use case
+        is to set noise_rms to 3 adu.
+    antennas : list of Antenna objects
+        A list containing all of the Antenna objects corresponding to this particular station.
+    noise_rms : numpy.ndarray float, optional
+        The rms of the noise calculated for each antenna antenna.  Given in V.  Not present unless self.calculateNoiseRMS is run.
+    beam_dict : dict, optional
+        A dictionary containing all of the beam forming information for use by the gnosim.sim.fpga module.  Not present unless self.getBeams is run.
+    beam_colors : dict, optional
+        A dictionary containing colors corresponding to each beam for plotting purposes.  Not present unless self.getBeams is run.
+
+    See Also
+    --------
+    Antenna
+    gnosim.sim.fpga
+    '''
+    def __init__(self, x, y, z, config, station_label, solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']), electricFieldDomain = 'time'):
         self.label = station_label
         self.config = config
         self.x = x
         self.y = y
         self.z = z
         self.electricFieldDomain = electricFieldDomain
-        self.accepted_solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2'])
+        self.accepted_solutions = gnosim.trace.refraction_library_beta.getAcceptedSolutions()
         self.power_calculation_sum_length = config['DAQ']['power_calculation_sum_length']
         self.power_calculation_interval = config['DAQ']['power_calculation_interval']
         self.beamforming_power_sum_byte_cap = config['DAQ']['beamforming_power_sum_byte_cap']
@@ -179,11 +227,14 @@ class Station:
         else:
             self.solutions = solutions
 
-        self.antennas = [] #In the future might want 2 types of antennas, those in the phased array and those in the reconstruction array.  Prefereably stored seperately.
-        self.buildStation() #Does not load libraries.  Call loadLib() for that. 
+        self.antennas = [] # TODO: In the future might want 2 types of antennas, those in the phased array and those in the reconstruction array.  Prefereably stored seperately.
+        self.buildStation() 
 
     def buildStation(self):
-        #In the future might want 2 types of antennas, those in the phased array and those in the reconstruction array.  Prefereably stored seperately.
+        '''
+        Creates an Antenna object for each antenna specified in the configuration file.  Does not load the ray tracing libraries.  Call loadLib() for that.
+        '''
+        # TODO: In the future might want 2 types of antennas, those in the phased array and those in the reconstruction array.  Prefereably stored seperately.
         for key in list(self.config['antenna_definitions'].keys()):
             x_antenna, y_antenna, z_antenna = self.config['antenna_definitions'][key]['position']
             if numpy.isin('orientations',list(self.config['antenna_definitions'][key].keys())) == True:                                   
@@ -207,15 +258,51 @@ class Station:
 
             self.antennas.append(antenna)
 
+    def loadLib(self,pre_split = False,build_lib = True):
+        '''
+        Calls the Antenna.loadLib function for each antenna which loads the gnosim.trace.refraction_library_beta.RefractionLibrary 
+        object corresponding to said antenna after cross checking the desired solutions are valid options.  If build_lib is True 
+        then this will load the full ray tracing library, otherwise it just creates the RefractionLirary object which contains some 
+        meta data about the library but not the actual ray tracing data.
+        
+        Parameters
+        ----------
+        pre_split : bool, optional
+            Determines whether to attempt to load from pre split libraries.  If true (and the pre split libraries are calculated and 
+            saved appropriately) this avoids lengthy calculations which seperate the rays ito the different solution types.  (Default is False).
+        build_lib : bool, optional
+            Must be called to actually populate most library information (such as the rays), however is left as an option such that 
+            the rest of the library can be worked with as a less bulky object when necessary.  (Default is True).
+        See Also
+        --------
+        gnosim.trace.refraction_library_beta
+        '''
+        for antenna in self.antennas:
+            antenna.loadLib(pre_split,build_lib = build_lib)
+            self.solutions = self.solutions[numpy.isin(self.solutions,antenna.lib.solutions)] #will catch any inconsistencies between solutions present in library and intended list of solutions. 
 
     def deleteLib(self,verbose=False):
         '''
-        This is intended to delete the library after it is used for interpolation to free up ram.
+        Calls the Antenna.deleteLib function for each antenna which deletes the library object from memory 
+        (to the best of its ability).  It is used after interpolation to free up RAM.
+        
+        Parameters
+        ----------
+        verbose : bool, optional
+            Enables more print statements (Default is False).
+
+        See Also
+        --------
+        gnosim.trace.refraction_library_beta
         '''
         import gc
         
         if verbose == True:
             def memTools():
+                '''
+                Is a quickly included function to print some information about the freed up RAM.  This was straight from a stackExchange forum
+                and is not exactly what I wanted, but was present for a quick test.
+                '''
                 mem=str(os.popen('free -t -m').readlines())
                 print('%s'%mem[0])
                 """
@@ -278,27 +365,37 @@ class Station:
             print('Memory info after deleting:')
             memTools()  
 
-    def loadLib(self,pre_split = False,build_lib = True):
-        for antenna in self.antennas:
-            antenna.loadLib(pre_split,build_lib = build_lib)
-            self.solutions = self.solutions[numpy.isin(self.solutions,antenna.lib.solutions)] #will catch any inconsistencies between solutions present in library and intended list of solutions. 
     def loadConcaveHull(self):
+        '''
+        Calls the Antenna.loadConcaveHull() function for each antenna.
+        
+        See Also
+        --------
+        Antenna.loadConcaveHull
+        '''
         for antenna in self.antennas:
             antenna.loadConcaveHull()
 
     def getBeams(self, n , verbose = False):
+
         '''
-        The goal of this function is to determine the beam and subbeam time delays 
-        semiautomatically for the station.
-        
-        Currently the minimum time shift is assigned to the smallest baseline.  Thus
-        every other timeshift resulting from larger baselines must be a multiple of the
-        minimum baseline. i.e. all subbeam baselines must be in integer multiples of 
-        the minimum baseline.  
-        Currently requires all other baselines to be an integer multiple of the minimum baseline
-        
-        n should be average index of refraction of array (used for angle estimates)
-        self.digital_sampling_periodshould be in nanoseconds (used for angle estimates)
+        This creates a dictionary containing all of the beam forming information for use by the gnosim.sim.fpga module. The goal of this 
+        function is to determine the beam and subbeam time delays semiautomatically for the station. Currently the minimum time shift 
+        is assigned to the smallest baseline.  Thus every other timeshift resulting from larger baselines must be a multiple of the 
+        minimum baseline. i.e. all subbeam baselines must be in integer multiples of  the minimum baseline.  Currently requires all 
+        other baselines to be an integer multiple of the minimum baseline.
+
+        Parameters
+        ----------
+        n : float
+            The index of refraction for the station (often an average of the various antenna location indices of refraction).
+            This is used in calculations estimating the point direction of the beams.
+        verbose : bool, optional
+            Enables more print statements (Default is False).
+
+        See Also
+        --------
+        gnosim.sim.fpga
         '''
         print('Using:\npower_calculation_sum_length = %i\npower_calculation_interval = %i\nn_baselines = %i'%(self.power_calculation_sum_length,self.power_calculation_interval,self.n_baselines))
         n_antennas = len(self.antennas)
@@ -380,10 +477,16 @@ class Station:
                         print(beam_dict['beams'][k][key])
 
         self.beam_dict = beam_dict
-        colormap = pylab.cm.gist_ncar #nipy_spectral, Set1,Paired   
-        self.beam_colors = [colormap(i) for i in numpy.linspace(0, 1,self.n_beams+1)]
+        self.beam_colors = gnosim.utils.misc.getColorMap(self.n_beams)
 
     def calculateNoiseRMS(self):
+        '''
+        Calls the Antenna.calculateNoiseRMS() function for each antenna.  Creates the self.noise_rms array.
+        
+        See Also
+        --------
+        Antenna.calculateNoiseRMS
+        '''
         noise_rms = []
         for antenna in self.antennas:
             antenna.calculateNoiseRMS()
@@ -392,16 +495,148 @@ class Station:
 
 ############################################################
 
-class Antenna:
-    #Currently this class is drastically underutilized.  Should transition to having this contain antenna orientations, etc. 
-    #Most antenna information is currently carried through the config file which is clunky. 
+def getAcceptedAntennaTypes():
+    '''
+    Returns a list of the currently supported antenna types.  If you add a new antenna type
+    you should put the label in the list such that it is recognized.
+    
+    Returns
+    -------
+    accepted_types : numpy.ndarray of floats
+        A list of the accepted antenna types (labels).
+    '''
+    accepted_types = numpy.array(['simple', 'dipole','old_dipole'])
+    return accepted_types
 
+class Antenna:
+    '''
+    Stores the attributes, information, and functions for an Antenna.
+    
+    Parameters
+    ----------
+    x : float
+        The x coordinate for the position of the antenna in the ice frame.  Given in m.
+    y : float
+        The y coordinate for the position of the antenna in the ice frame.  Given in m.
+    z : float
+        The z coordinate for the position of the antenna in the ice frame.  Given in m.
+    alpha_deg : float
+        The alpha euler angle coordinate for choosig the orientation of the antenna in the ice frame.
+        Given in degrees.  These angles will be used with a rotation to orient the axis of the antenna.
+        For additional information see the EulerAngleDefiniton.pdf file located in the sim folder.
+    beta_deg : float
+        The beta euler angle coordinate for choosig the orientation of the antenna in the ice frame.
+        Given in degrees.  These angles will be used with a rotation to orient the axis of the antenna.
+        For additional information see the EulerAngleDefiniton.pdf file located in the sim folder.
+    gamma_deg : float
+        The gamma euler angle coordinate for choosig the orientation of the antenna in the ice frame.
+        Given in degrees.  These angles will be used with a rotation to orient the axis of the antenna.
+        For additional information see the EulerAngleDefiniton.pdf file located in the sim folder.
+    antenna_type : str
+        This is the label of a particular antenna type defined in the code.  This will select how the antenna
+        behaves, i.e. beam patterns, polarization sensitivity, etc.  To see current supported antenna types 
+        try gnosim.sim.detector.getAcceptedAntennaTypes().
+    noise_temperature : float
+        The temperature to be used in the noise calculation.  Given in K.
+        Note that the noise is also processed by the system response, which may be scaled to obtain a particular noise
+        level for a certain temperature.
+    resistance : float
+        The resistance to be used in the noise calculation.  Given in Ohms. 
+        Note that the noise is also processed by the system response, which may be scaled to obtain a particular noise
+        level for a certain temperature.
+    lib_dir : str
+        The location of the ray tracing library corresponding to an antenna at this location.
+    label : str
+        A label for the antenna, often used as a key in dictionaries during the simulation.  Should be unique for a
+        particualar simulation (i.e. 'dipole0', 'dipole1', ... rather than just 'dipole').
+    solutions : numpy.ndarray of str, optional
+        A list of the solution types to load.  Often either all accepted solution types (the Default), or the same list omitting
+        the _2 strings, which represent libraries of solution that reflect of the bottom of the ice.
+
+
+    Attributes
+    ----------
+    x : float
+        The x coordinate for the position of the antenna in the ice frame.  Given in m.
+    y : float
+        The y coordinate for the position of the antenna in the ice frame.  Given in m.
+    z : float
+        The z coordinate for the position of the antenna in the ice frame.  Given in m.
+    alpha_deg : float
+        The alpha euler angle coordinate for choosig the orientation of the antenna in the ice frame.
+        Given in degrees.  These angles will be used with a rotation to orient the axis of the antenna.
+        For additional information see the EulerAngleDefiniton.pdf file located in the sim folder.
+    beta_deg : float
+        The beta euler angle coordinate for choosig the orientation of the antenna in the ice frame.
+        Given in degrees.  These angles will be used with a rotation to orient the axis of the antenna.
+        For additional information see the EulerAngleDefiniton.pdf file located in the sim folder.
+    gamma_deg : float
+        The gamma euler angle coordinate for choosig the orientation of the antenna in the ice frame.
+        Given in degrees.  These angles will be used with a rotation to orient the axis of the antenna.
+        For additional information see the EulerAngleDefiniton.pdf file located in the sim folder.
+    antenna_type : str
+        This is the label of a particular antenna type defined in the code.  This will select how the antenna
+        behaves, i.e. beam patterns, polarization sensitivity, etc.  To see current supported antenna types 
+        try gnosim.sim.detector.getAcceptedAntennaTypes().
+    noise_temperature : float
+        The temperature to be used in the noise calculation.  Given in K.
+        Note that the noise is also processed by the system response, which may be scaled to obtain a particular noise
+        level for a certain temperature.
+    resistance : float
+        The resistance to be used in the noise calculation.  Given in Ohms. 
+        Note that the noise is also processed by the system response, which may be scaled to obtain a particular noise
+        level for a certain temperature.
+    lib_dir : str
+        The location of the ray tracing library corresponding to an antenna at this location.
+    label : str
+        A label for the antenna, often used as a key in dictionaries during the simulation.  Should be unique for a
+        particualar simulation (i.e. 'dipole0', 'dipole1', ... rather than just 'dipole').
+    accepted_solutions : numpy.ndarray of str, optional
+        A list of the possible allowable solution types to load.
+    solutions : numpy.ndarray of str, optional
+        A list of the solution types to load.  Often either all accepted solution types (the Default), or the same list omitting
+        the _2 strings, which represent libraries of solution that reflect of the bottom of the ice.
+    R : numpy.ndarray
+        The Euler rotation matrix coresponding to the given alpha, beta, and gamma, euler angles.
+    R_inv : numpy.ndarray
+        The inverse of the Euler rotation matrix coresponding to the given alpha, beta, and gamma, euler angles.  Used when representing
+        a vector in the ice frame in terms of the antenna's defined (by alpha,beta, and gamma) reference frame.
+    frequency_low : float, optional
+        The lower frequency bound for the old and unsupported frequency domain calculation of the Askaryan radiation.  Only present if the
+        selected time domain for the calculation is 'freq'.
+    frequency_high : float, optional
+        The upper frequency bound for the old and unsupported frequency domain calculation of the Askaryan radiation.  Only present if the
+        selected time domain for the calculation is 'freq'.
+    lib : dict
+        Contains the gnosim.trace.refraction_library_beta.RefractionLibrary object corresponding to this antenna.
+        This is only loaded if self.loadLib is run, as it takes a lot of memory.  Often only loaded while grid interpolation
+        is occuring.
+    concave_hull : dict, optional
+        Contains the information about the concave hull (corresponding to lib), and relavent funtions/limits.  Only loaded if 
+        self.loadConcaveHull() is run.
+    antenna_response_dir : str, optional
+        The directory/file containing the antenna response. Only present if self.addTimingInfo() is run.
+    system_response_dir : str, optional
+        The directory/file containing the system response. Only present if self.addTimingInfo() is run.
+    h_fft : numpy.ndarray of cfloat, optional
+        The values for the antenna response. (Should have units of m, i.e. effective height). Only present if self.addTimingInfo() is run.
+    sys_fft : numpy.ndarray of cfloat, optional
+        The values for the syste response. (Should be unitless). Only present if self.addTimingInfo() is run.
+    freqs_response : numpy.ndarray of float, optional
+        The values for the frequencies corresponding to the above responses. Only present if self.addTimingInfo() is run.
+    signal_times : numpy.ndarray of floats, optional
+        The observer times for which to calculate the Askaryan radiation.  Should span both negative and positive times 
+        to get the full details of the pulse.  Given in ns.  Only present if self.addTimingInfo() is run.
+    noise_rms : float
+        The rms of the noise calculated for this particular antenna.  Given in V.
+
+    See Also
+    --------
+    Station
+    gnosim.interaction.askaryan
+    gnosim.sim:EulerAngleDefiniton.pdf
+    '''
     def __init__(self, x, y, z, alpha_deg, beta_deg, gamma_deg, antenna_type, noise_temperature, resistance, lib_dir, label, solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2'])):
-        """
-        x, y, z given relative to station center
-        #When this is called in antarcticsim.py it uses the input x_antenna + x_station, y_antenna + y_station, z_antenna + z_station
-        #which does not seem to me to be be a relative position, as it adds the station position?
-        """
         self.x = x
         self.y = y
         self.z = z
@@ -413,10 +648,10 @@ class Antenna:
         self.noise_temperature = noise_temperature
         self.resistance = resistance 
 
-        self.R = eulerRotationMatrix(numpy.deg2rad(self.alpha_deg), numpy.deg2rad(self.beta_deg), numpy.deg2rad(self.gamma_deg))
+        self.R = gnosim.utils.quat.eulerRotationMatrix(numpy.deg2rad(self.alpha_deg), numpy.deg2rad(self.beta_deg), numpy.deg2rad(self.gamma_deg))
         self.R_inv = numpy.linalg.inv(self.R)     
 
-        accepted_types = numpy.array(['simple', 'dipole'])
+        accepted_types = getAcceptedAntennaTypes() #MAKE SURE TO UPDATE IF YOU ADD NEW ANTENNA TYPES.
         if numpy.isin(antenna_type,accepted_types):
             self.antenna_type = antenna_type
         else:
@@ -424,7 +659,8 @@ class Antenna:
             self.antenna_type = accepted_types[0]
             print(self.antenna_type)
 
-        self.accepted_solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2'])
+        self.accepted_solutions = gnosim.trace.refraction_library_beta.getAcceptedSolutions()
+
         # List attributes of interest
         solutions = self.accepted_solutions[numpy.isin(self.accepted_solutions,solutions)]
         if len(solutions) == 0:
@@ -441,6 +677,13 @@ class Antenna:
         This gives the antenna class the necessary features to be backwards compatable, but also confines
         all of the old code to a single function so that I can delete it when I decide to remove the
         frequency domain support. 
+        
+        Parameters
+        ----------
+        frequency_low : float, optional
+            The lower frequency bound for the old and unsupported frequency domain calculation of the Askaryan radiation.  
+        frequency_high : float, optional
+            The upper frequency bound for the old and unsupported frequency domain calculation of the Askaryan radiation.  
         '''
         self.frequency_low = frequency_low
         self.frequency_high = frequency_high
@@ -462,22 +705,49 @@ class Antenna:
 
     def loadLib(self,pre_split = False,build_lib = True):
         '''
-        if numpy.isin('lib',list(self.__dict__.keys())):
-            print('Antenna library already loaded.')
-        else:
+        This loads the gnosim.trace.refraction_library_beta.RefractionLibrary object corresponding to this antenna after 
+        cross checking the desired solutions are valid options.  If build_lib is True then this will load the full ray
+        tracing library, otherwise it just creates the RefractionLirary object which contains some meta data about the library
+        but not the actual ray tracing data.
+        
+        Parameters
+        ----------
+        pre_split : bool, optional
+            Determines whether to attempt to load from pre split libraries.  If true (and the pre split libraries are calculated and 
+            saved appropriately) this avoids lengthy calculations which seperate the rays ito the different solution types.  (Default is False).
+        build_lib : bool, optional
+            Must be called to actually populate most library information (such as the rays), however is left as an option such that 
+            the rest of the library can be worked with as a less bulky object when necessary.  (Default is True).
+        See Also
+        --------
+        gnosim.trace.refraction_library_beta
         '''
         if numpy.logical_and(pre_split == False,numpy.logical_not(len(self.solutions) == len(self.accepted_solutions))):
             print('Limiting Solution Types Currently only works for pre_split = True, using default solution types.')
             self.solutions = self.accepted_solutions
         self.lib = gnosim.trace.refraction_library_beta.RefractionLibrary(self.lib_dir,solutions=self.solutions,pre_split = pre_split,build_lib = build_lib)
         self.solutions = self.lib.solutions #Catches mistakes if the refraction library has a varying number of antennas.
+
     def deleteLib(self,verbose=False):
         '''
-        This is intended to delete the library after it is used for interpolation to free up ram.
+        This deletes the library object from memory (to the best of its ability).  It is used after interpolation to free up RAM.
+        
+        Parameters
+        ----------
+        verbose : bool, optional
+            Enables more print statements (Default is False).
+
+        See Also
+        --------
+        gnosim.trace.refraction_library_beta
         '''
         import gc
         if verbose == True:
             def memTools():
+                '''
+                Is a quickly included function to print some information about the freed up RAM.  This was straight from a stackExchange forum
+                and is not exactly what I wanted, but was present for a quick test.
+                '''
                 mem=str(os.popen('free -t -m').readlines())
                 """
                 Get a whole line of memory output, it will be something like below
@@ -540,6 +810,13 @@ class Antenna:
                 memTools()  
 
     def loadConcaveHull(self):
+        '''
+        This loads the concave hull within the gnosim.trace.refraction_library_beta.RefractionLibrary object corresponding to this antenna.
+        
+        See Also
+        --------
+        gnosim.trace.refraction_library_beta
+        '''
         print('Loading Hull For:',self.lib_dir)
         self.concave_hull = {}
         indir = self.lib_dir.replace('*.h5','concave_hull')
@@ -556,7 +833,21 @@ class Antenna:
 
     def addTimingInfo(self, system_response_dir, antenna_response_dir):
         '''
-        Expects the timing info that is calculated by   
+        This loads the system response, antenna response, and corresponding frequencies, 
+        and additionally calculates the times for which the Askaryan calculation will be calculated.  
+
+        If a new response is added, you should ensure it can be loaded correctly with this funciton.
+
+        Parameters
+        ----------
+        antenna_response_dir : str
+            The directory/file containing the antenna response.
+        system_response_dir : str
+            The directory/file containing the system response.
+
+        See Also
+        --------
+        gnosim.sim.response
         '''
         self.antenna_response_dir = antenna_response_dir
         self.system_response_dir = system_response_dir
@@ -575,6 +866,15 @@ class Antenna:
 
 
     def calculateNoiseRMS(self):
+        '''
+        The rms of the noise calculated for this particular antenna.  Done by producing signals for events with 0 neutrino energy such 
+        that all that is returned is noise, but calculated identically to how it is generated for each event.  This is done for many events
+        and the overall noise rms is taken.  This is usually used for scaling digitized signals.
+
+        See Also
+        --------
+        gnosim.interaction.askaryan
+        '''
         noise_signal  = numpy.array([])
         for i in range(100):
             #Values below are mostly just filler to get just the noise (As calculated for the Askaryan pulse).  I am doing this
@@ -587,13 +887,58 @@ class Antenna:
             noise_signal = numpy.append(noise_signal,noise_signal_i)
         self.noise_rms = numpy.std(noise_signal)
 
+    def antennaFrameCoefficients(self,in_vector):
+        '''
+        Takes a vector in ice frame coordinates and converts returns the coefficients for the antenna frame.
+
+        R should be calculated in advance using R = gnosim.utils.quat.eulerRotationMatrix(alpha_rad, beta_rad, gamma_rad), and stored
+        with its inverse as self.R and self.R_inv.  
+        
+        This is intended to perform the extrinsic rotation of a vector
+        using the Euler angles alpha, beta, gamma.  The output vector is intended
+        to be in the frame in the basis frame defined by the given Euler angles.
+        
+        This returns the coefficients of the vector in the antenna frame.  
+        I.e. if the vector u, given in the ice basis (x,y,z) as u = a x + b y + c z 
+        is represented in the ice frame, this returns the coefficients A,B,C of the
+        antenna frame basis (X,Y,Z), such that u = A X + B Y + C Z = a x + b y + c z  
+        
+        Parameters
+        ----------
+        in_vector : numpy.ndarray of floats
+            The 3 dimensional vector defined in the ice frame to be represented in the antenna frame.  
+            From the above example this would be: 
+            in_vector  = numpy.array([a,b,c]) 
+            such that:
+            u = a*x + b*y + c*z 
+            where:
+            x,y,z are the units vectors in the ice frame (defined to be x = numpy.array([1,0,0]), y = numpy.array([0,1,0]), z = numpy.array([0,0,1]))
+
+        Returns
+        -------
+        out_vector : numpy.ndarray of floats
+            The 3 dimensional vector defined in the antenna frame.  
+            From the above example this would be: 
+            out_vector  = numpy.array([A,B,C])
+            such that:
+            u = A*X + B*Y + C*Z
+            where:
+            X, Y, and Z are the unit vectors for the antenna frame.  The vector u points in the same direction, but is just represented in the new frame.
+        '''
+        out_vector = numpy.dot(self.R_inv,in_vector)
+        return out_vector 
+
     def getAntennaResponseFactor(self,theta_ray_from_ant_at_neutrino , phi_ray_from_ant_at_neutrino , theta_ray_from_ant_at_antenna , phi_ray_from_ant_at_antenna , theta_neutrino_source_dir , phi_neutrino_source_dir , a_s , a_p):
         '''
-        This will hopefully create whatever is needed for a given antenna type, including beam pattern, polarization sensitivity, etc.
-        As this is intended to do a fair bit I am not quite yet sure how to handle it.
-        This will get the unit vector the travelling radiation along the ray towards the antenna.
+        This calculates the net reduction in signal seen by the antenna (before system response).  Includes effects from 
+        beam pattern, polarization sensitivity, etc. depending on the antenna type chosen.
 
-        Parameters:
+        This is where new antenna types (different beam patterns, polarization sensitivities, etc.) should be added.
+        Currently the output of this function is a single float.  As the specific types antennas that might be added
+        in the future is hard to predict I have attempted to leave this general enough to support whatever calculations
+        may be needed.  If an antenna is added, ensure to add the antenna_type label to getAcceptedAntennaTypes.
+
+        Parameters
         ----------
         theta_ray_from_ant_at_neutrino : float
             Zenith theta of vector of ray from antenna along path to neutrino (degrees).
@@ -624,20 +969,15 @@ class Antenna:
             Currently only numpy.real(a_p) is returned from refraction_libray_beta.makeLibrary,
             so a real float is expected here.
 
-        Returns:
-        ----------
+        Returns
+        -------
         signal_reduction_factor : float
-            This is the reduction factor that should be multiplied with the antenna response
-        '''
-        '''
-        print('theta_ray_from_ant_at_neutrino ',theta_ray_from_ant_at_neutrino )
-        print('phi_ray_from_ant_at_neutrino ',phi_ray_from_ant_at_neutrino)
-        print('theta_ray_from_ant_at_antenna ',theta_ray_from_ant_at_antenna)
-        print('phi_ray_from_ant_at_antenna ',phi_ray_from_ant_at_antenna)
-        print('theta_neutrino_source_dir ',theta_neutrino_source_dir)
-        print('phi_neutrino_source_dir ',phi_neutrino_source_dir)
-        print('a_s ',a_s)
-        print('a_p',a_p)
+            This is the reduction factor that should be multiplied with the antenna response.  This is typically used as the 
+            signal_reduction_factor input parameter of the gnosim.interaction.askaryan.quickSignalSingle calculation.
+
+        See Also
+        --------
+        gnosim.interaction.askaryan
         '''
         if self.antenna_type == 'simple':
             #This is attenuation from attenuation length, and for a p polarized light.  Most like what was done with simple before.  No beam pattern.
@@ -652,8 +992,9 @@ class Antenna:
             #polarization_vector_0_ice_frame, k_0_ice_frame, vec_neutrino_travel_dir_ice_frame = getInitialPolarization(theta_ray_from_ant_at_neutrino,phi_ray_from_ant_at_neutrino,theta_neutrino_source_dir,phi_neutrino_source_dir)
             polarization_vector_1_ice_frame, k_1_ice_frame = gnosim.interaction.polarization.getPolarizationAtAntenna(theta_ray_from_ant_at_neutrino,phi_ray_from_ant_at_neutrino,theta_ray_from_ant_at_antenna,phi_ray_from_ant_at_antenna,theta_neutrino_source_dir,phi_neutrino_source_dir, a_s, a_p, return_k_1 = True)            #This is for a vpol antenna. which is sensitive at polls, 
             #Note k_0 and k_1 are the wave vectors along the ray TOWARDS the antenna (from emission), with k_0 being at emission, and k_1 being at antenna
-            polarization_vector_1_antenna_frame = antennaFrameCoefficients(self.R_inv, polarization_vector_1_ice_frame, pre_inv = True)
-            k_1_antenna_frame = antennaFrameCoefficients(self.R_inv, k_1_ice_frame, pre_inv = True)
+            #polarization_vector_1_antenna_frame = antennaFrameCoefficients(self.R_inv, polarization_vector_1_ice_frame, pre_inv = True)
+            polarization_vector_1_antenna_frame = self.antennaFrameCoefficients(polarization_vector_1_ice_frame)
+            k_1_antenna_frame = self.antennaFrameCoefficients(k_1_ice_frame)
             #Below you should define how your particular antenna interacts with polarization, as well as the beam pattern. 
             #Antennas can be rotated, so be sure to do the calculations in the correct frame.
             
@@ -686,9 +1027,10 @@ class Antenna:
                 #polarization_vector_0_ice_frame, k_0_ice_frame, vec_neutrino_travel_dir_ice_frame = getInitialPolarization(theta_ray_from_ant_at_neutrino,phi_ray_from_ant_at_neutrino,theta_neutrino_source_dir,phi_neutrino_source_dir)
                 polarization_vector_1_ice_frame, k_1_ice_frame = gnosim.interaction.polarization.getPolarizationAtAntenna(theta_ray_from_ant_at_neutrino,phi_ray_from_ant_at_neutrino,theta_ray_from_ant_at_antenna,phi_ray_from_ant_at_antenna,theta_neutrino_source_dir,phi_neutrino_source_dir, a_s, a_p, return_k_1 = True)            #This is for a vpol antenna. which is sensitive at polls, 
                 #Note k_0 and k_1 are the wave vectors along the ray TOWARDS the antenna (from emission), with k_0 being at emission, and k_1 being at antenna
-                polarization_vector_1_antenna_frame = antennaFrameCoefficients(self.R_inv, polarization_vector_1_ice_frame, pre_inv = True)
-                
-                k_1_antenna_frame = antennaFrameCoefficients(self.R_inv, k_1_ice_frame, pre_inv = True)
+                #polarization_vector_1_antenna_frame = antennaFrameCoefficients(self.R_inv, polarization_vector_1_ice_frame, pre_inv = True)
+                polarization_vector_1_antenna_frame = self.antennaFrameCoefficients(polarization_vector_1_ice_frame)
+                #k_1_antenna_frame = antennaFrameCoefficients(self.R_inv, k_1_ice_frame, pre_inv = True)
+                k_1_antenna_frame = self.antennaFrameCoefficients(k_1_ice_frame)
                 
                 k_1_phi_antenna, k_1_theta_antenna = gnosim.utils.quat.vecToAng(k_1_antenna_frame)
                 
@@ -717,7 +1059,8 @@ class Antenna:
         elif self.antenna_type == 'old_dipole':
             #This is how is was calculated before the polarization was added. 
             k_1_ice_frame = gnosim.interaction.polarization.getWaveVector(theta_ray_from_ant_at_antenna,phi_ray_from_ant_at_antenna) #Note for many beam patterns likely want vector point TO observation, i.e. negative of this. But for this calculation is doesn't matter.
-            k_1_antenna_frame = antennaFrameCoefficients(self.R_inv, k_1_ice_frame, pre_inv = True)
+            #k_1_antenna_frame = antennaFrameCoefficients(self.R_inv, k_1_ice_frame, pre_inv = True)
+            k_1_antenna_frame = self.antennaFrameCoefficients(k_1_ice_frame)
             beam_pattern_factor = 1.0 - k_1_antenna_frame[2]**2.0 #where r is assumed to be 1 because working with unit vectors
             
             signal_reduction_factor = numpy.abs(a_p)*beam_pattern_factor
@@ -731,12 +1074,6 @@ class Antenna:
             
             return signal_reduction_factor
 
-class test:
-    def __init__(self,x):
-        self.x = x
-
-    def delX(self):
-        del self.__dict__['x']
 ############################################################
 
 

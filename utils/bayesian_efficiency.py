@@ -1,6 +1,6 @@
-"""
-Documentation.
-"""
+'''
+This module contains some functions relating to statistics.
+'''
 
 import scipy.special
 import numpy
@@ -8,18 +8,35 @@ import numpy
 ############################################################
 
 def gammalnStirling(z):
-    """
+    '''
     Uses Stirling's approximation for the log-gamma function suitable for large arguments.
-    """
+
+    Parameters
+    ----------
+    z : float
+        Input value
+    Returns
+    ouput : float
+        The Striling's approximation for the log-gamma function of z.
+    '''
     return (0.5 * (numpy.log(2. * numpy.pi) - numpy.log(z))) \
            + (z * (numpy.log(z + (1. / ((12. * z) - (1. / (10. * z))))) - 1.))
 
 ############################################################
 
 def confidenceInterval(n, k, alpha = 0.68):
-    """
+    '''
     Given n tests and k successes, return efficiency and confidence interval.
-    """
+
+    Parameters
+    ----------
+    n : int
+        Number of tests.
+    k : int
+        Number of successes.
+    alpha : float, optional
+        Significance level.
+    '''
     e = float(k) / float(n)
     bins = 1000001
     dx = 1. / bins

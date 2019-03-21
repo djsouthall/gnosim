@@ -1,9 +1,9 @@
-"""
+''' 
 Nucleon interaction cross sections for high-energy neutrinos from 10^4 GeV to 10^12 GeV. 
 Both charged current (CC) and neutral current (NC) cross sections for neutrinos and anti-neutrinos are implemented.
 
 Source: Connolly et al. 2011, arXiv:1102.0691
-"""
+''' 
 
 import numpy
 import pylab
@@ -26,19 +26,38 @@ pylab.ion()
 
 ############################################################
 
-def inelasticityArray(energy_neutrino, mode):
-    """
-    energy_neutrino = neutrino energy (GeV) (an array)
-    mode = specifies the neutrino type (nu or anti-nu) and interaction type (charged current or neutral current)
-    
-    Returns:
-    inelasticity
-    """
-    
+def inelasticityArray(energy_neutrino, mode, random_local = None):
+    ''' 
+    Calculates the inelasticity of the neutrino interaction.  This version is compatable with array input for energy_neutrino.
+
+    Parameters
+    ----------
+    energy_neutrino : numpy.ndarray of floats or float
+        The energy of the neutrino.  Given in GeV.
+    mode : str
+        Chooses the type of neutrino interaction to consider.  Options are 'cc', 'cc_anti', 'cc','nc_anti', and 'nc'.
+        Where cc is charge current, nc is neutralcurrent, and _anti means an anti neutrino.
+    random_local : numpy.random.RandomState, optional
+        A prevously seeded random object, to avoid issues with consistency in seeding of events.  Should be set in 
+        gnosim.sim.antarcticsim.Sim.event using random_local = numpy.random.RandomState(seed = event_seed).  (Default is None).
+    Returns
+    -------
+    y_0 : float
+        The inelasticity of the neutrino interaction.
+    ''' 
+    mode_dict = {'cc_anti': [-0.0026, 0.085, 4.1, 1.7],                                                                                        
+                 'cc': [-0.008, 0.26, 3.0, 1.7],                                                                                        
+                 'nc_anti': [-0.005, 0.23, 3.0, 1.7],                                                                                   
+                 'nc': [-0.005, 0.23, 3.0, 1.7]}
+
     epsilon = numpy.log10(energy_neutrino) # Neutrino energy in GeV
 
-    r_1 = numpy.random.random(numpy.size(energy_neutrino))
-    r_2 = numpy.random.random(numpy.size(energy_neutrino))
+    if random_local == None:
+        r_1 = numpy.random.random(numpy.size(energy_neutrino))
+        r_2 = numpy.random.random(numpy.size(energy_neutrino))
+    else:
+        r_1 = random_local.random(numpy.size(energy_neutrino))
+        r_2 = random_local.random(numpy.size(energy_neutrino))
 
     f_0 = 0.128
     f_1 = -0.197
@@ -78,10 +97,6 @@ def inelasticityArray(energy_neutrino, mode):
 
         else:
             # High-inelasticity region
-            mode_dict = {'cc_anti': [-0.0026, 0.085, 4.1, 1.7],                                                                                        
-                         'cc': [-0.008, 0.26, 3.0, 1.7],                                                                                        
-                         'nc_anti': [-0.005, 0.23, 3.0, 1.7],                                                                                   
-                         'nc': [-0.005, 0.23, 3.0, 1.7]}
             a_0, a_1, a_2, a_3 = mode_dict[mode]
 
             y_min = 1.e-3
@@ -122,10 +137,6 @@ def inelasticityArray(energy_neutrino, mode):
 
         #else:
         # High-inelasticity region
-        mode_dict = {'cc_anti': [-0.0026, 0.085, 4.1, 1.7],                                                                                        
-                     'cc': [-0.008, 0.26, 3.0, 1.7],                                                                                        
-                     'nc_anti': [-0.005, 0.23, 3.0, 1.7],                                                                                   
-                     'nc': [-0.005, 0.23, 3.0, 1.7]}
         a_0, a_1, a_2, a_3 = mode_dict[mode]
 
         y_min = 1.e-3
@@ -136,18 +147,34 @@ def inelasticityArray(energy_neutrino, mode):
         y_0[~r_1_less_cut] = ((y_max - c_1)**r_2[~r_1_less_cut] / (y_min - c_1)**(r_2[~r_1_less_cut] - 1.)) + c_1
 
         return y_0
-def inelasticity(energy_neutrino, mode):
-    """
-    energy_neutrino = neutrino energy (GeV)
-    mode = specifies the neutrino type (nu or anti-nu) and interaction type (charged current or neutral current)
-    
-    Returns:
-    inelasticity
-    """
+
+def inelasticity(energy_neutrino, mode, random_local = None):
+    ''' 
+    Calculates the inelasticity of the neutrino interaction.  This version is NOT compatable with array input for energy_neutrino.
+    This was the original version.
+
+    Parameters
+    ----------
+    energy_neutrino : float
+        The energy of the neutrino.  Given in GeV.
+    mode : str
+        Chooses the type of neutrino interaction to consider.  Options are 'cc', 'cc_anti', 'cc','nc_anti', and 'nc'.
+        Where cc is charge current, nc is neutralcurrent, and _anti means an anti neutrino.
+    random_local : numpy.random.RandomState, optional
+        A prevously seeded random object, to avoid issues with consistency in seeding of events.  Should be set in 
+        gnosim.sim.antarcticsim.Sim.event using random_local = numpy.random.RandomState(seed = event_seed).  (Default is None).
+    Returns
+    -------
+    y_0 : float
+        The inelasticity of the neutrino interaction.
+    ''' 
     
     epsilon = numpy.log10(energy_neutrino) # Neutrino energy in GeV
 
-    r_1, r_2 = numpy.random.random(2)
+    if random_local == None:
+        r_1, r_2 = numpy.random.random(2)
+    else:
+        r_1,r_2 = random_local.random(2)
 
     f_0 = 0.128
     f_1 = -0.197
@@ -191,7 +218,7 @@ def inelasticity(energy_neutrino, mode):
 
 ############################################################
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     
     E = numpy.ones(100)*3e9
     y_0 = inelasticityArray(E, mode='cc')
