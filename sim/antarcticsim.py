@@ -1250,14 +1250,22 @@ class Sim:
             The azimuthal spherical coordinates for the directions each neutrino came from.  Given in degrees.  (Default is None).
         x_0 : numpy.ndarray of floats
             The x cartesian ice frame coordinates of each neutrinos interaction location.  Given in m.  (Default is None).
+            x_0 and y_0 are only used if both are specified, otherwise it will default to randomized values.  These inputs are
+            mutually exclusive with phi_vertex and r_vertex.  If both sets are given then the coordinates given by phi_vertex, r_vertex are used.
         y_0 : numpy.ndarray of floats
             The y cartesian ice frame coordinates of each neutrinos interaction location.  Given in m.  (Default is None).
+            x_0 and y_0 are only used if both are specified, otherwise it will default to randomized values.  These inputs are
+            mutually exclusive with phi_vertex and r_vertex.  If both sets are given then the coordinates given by phi_vertex, r_vertex are used.
         z_0 : numpy.ndarray of floats
             The z cartesian ice frame coordinates of each neutrinos interaction location.  Given in m.  (Default is None).
         phi_vertex : numpy.ndarray of floats, optional
             The angular coordinate of each neutrino location in cylindrical coordinates in the ice frame.  Given in deg.  (Default is None).
+            phi_vertex and r_vertex are only used if both are specified, otherwise it will default to randomized values.  These inputs are
+            mutually exclusive with x_0 and y_0.  If both sets are given then the coordinates given by phi_vertex, r_vertex are used.
         r_vertex : numpy.ndarray of floats, optional
             The radial coordinate of each neutrino location in cylindrical coordinates in the ice frame.  Given in m.  (Default is None).
+            phi_vertex and r_vertex are only used if both are specified, otherwise it will default to randomized values.  These inputs are
+            mutually exclusive with x_0 and y_0.  If both sets are given then the coordinates given by phi_vertex, r_vertex are used.
         anti : bool, optional
             Selects either a neutrino (anti == False) or anti neutrino (anti == True).  (Default is False).
         n_events : int, optional
