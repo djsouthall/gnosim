@@ -34,7 +34,7 @@ def getWaveVector(theta_ray_from_ant,phi_ray_from_ant):
     
     See Also
     --------
-    gnosim.sim.detector
+    gnosim.detector.detector
     '''
     vec_ray_from_ant = numpy.array([numpy.sin(numpy.deg2rad(theta_ray_from_ant))*numpy.cos(numpy.deg2rad(phi_ray_from_ant)),numpy.sin(numpy.deg2rad(theta_ray_from_ant))*numpy.sin(numpy.deg2rad(phi_ray_from_ant)),numpy.cos(numpy.deg2rad(theta_ray_from_ant))])
     vec_ray_to_ant = - vec_ray_from_ant #Vector from neutrino location to observation along ray
@@ -59,7 +59,7 @@ def getNeutrinoMomentumVector(theta_neutrino_source_dir,phi_neutrino_source_dir)
     
     See Also
     --------
-    gnosim.sim.detector
+    gnosim.detector.detector
     '''
     vec_neutrino_source_dir = numpy.array([numpy.sin(numpy.deg2rad(theta_neutrino_source_dir))*numpy.cos(numpy.deg2rad(phi_neutrino_source_dir)),numpy.sin(numpy.deg2rad(theta_neutrino_source_dir))*numpy.sin(numpy.deg2rad(phi_neutrino_source_dir)),numpy.cos(numpy.deg2rad(theta_neutrino_source_dir))])
     vec_neutrino_travel_dir = - vec_neutrino_source_dir
@@ -95,7 +95,7 @@ def getInitialPolarization(theta_ray_from_ant,phi_ray_from_ant,theta_neutrino_so
     
     See Also
     --------
-    gnosim.sim.detector
+    gnosim.detector.detector
     '''
     vec_neutrino_travel_dir = getNeutrinoMomentumVector(theta_neutrino_source_dir,phi_neutrino_source_dir)
     vec_ray_to_ant = getWaveVector(theta_ray_from_ant,phi_ray_from_ant) #Vector from neutrino location to observation along ray
@@ -124,7 +124,7 @@ def calculateSPUnitVectors(wave_vector):
     
     See Also
     --------
-    gnosim.sim.detector
+    gnosim.detector.detector
     '''
     s_vector   = gnosim.utils.quat.normalize(numpy.cross(wave_vector,numpy.array([0,0,1])))
     p_vector   = gnosim.utils.quat.normalize(numpy.cross(s_vector,wave_vector))
@@ -174,7 +174,7 @@ def getPolarizationAtAntenna(theta_ray_from_ant_at_neutrino , phi_ray_from_ant_a
     
     See Also
     --------
-    gnosim.sim.detector
+    gnosim.detector.detector
     '''
     polarization_vector_0, k_0, vec_neutrino_travel_dir = getInitialPolarization(theta_ray_from_ant_at_neutrino,phi_ray_from_ant_at_neutrino,theta_neutrino_source_dir,phi_neutrino_source_dir)
     k_1 = getWaveVector(theta_ray_from_ant_at_antenna,phi_ray_from_ant_at_antenna)

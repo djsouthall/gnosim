@@ -35,8 +35,9 @@ import gnosim.earth.ice
 import gnosim.trace.refraction_library_beta
 #from gnosim.trace.refraction_library_beta import *
 import gnosim.interaction.askaryan
-import gnosim.sim.detector
-import gnosim.sim.fpga
+import gnosim.detector.detector
+import gnosim.detector.fpga
+import gnosim.utils.misc
 pylab.ion() #this turns interactive mode on.  I should test with this off
 
 ############################################################
@@ -218,7 +219,7 @@ class Sim:
         for ii in range(0, self.config['stations']['n']):
             station_label = 'station'+str(ii)
             x_station, y_station, z_station = self.config['stations']['positions'][ii]
-            station = gnosim.sim.detector.Station(x_station, y_station, z_station, self.config, station_label,solutions = self.solutions)
+            station = gnosim.detector.detector.Station(x_station, y_station, z_station, self.config, station_label,solutions = self.solutions)
             self.stations.append(station)
             
         self.n_antenna = sum([len(self.stations[s].antennas) for s in range(len(self.stations))])
@@ -577,7 +578,7 @@ class Sim:
                                         electric_array = V_noiseless
                                     
                                     electric_field = numpy.max(numpy.abs(electric_array))#maybe shouldn't be abs.  Need to change some lines that comapre to this if made not abs here.  
-                                    electric_field_digitized = gnosim.sim.fpga.digitizeSignal([0,1],numpy.array([electric_field,electric_field]),[0.5],station.sampling_bits,antenna.noise_rms,station.scale_noise_to, dc_offset = 0, plot = False)[0] #I don't like this workaround.... :(
+                                    electric_field_digitized = gnosim.detector.fpga.digitizeSignal([0,1],numpy.array([electric_field,electric_field]),[0.5],station.sampling_bits,antenna.noise_rms,station.scale_noise_to, dc_offset = 0, plot = False)[0] #I don't like this workaround.... :(
                                     
                                     V_analog[station.label][antenna.label][solution] = electric_array
                                     time_analog[station.label][antenna.label][solution] = u
@@ -678,7 +679,7 @@ class Sim:
                                     else:
                                         u_out = numpy.array(time_analog[station.label][antenna.label][max_E_val_solution_type])
                                         V_out = numpy.array(V_analog[station.label][antenna.label][max_E_val_solution_type])
-                                    Vd_out, ud_out = gnosim.sim.fpga.digitizeSignal(u_out,V_out,digital_sample_times,station.sampling_bits,antenna.noise_rms,station.scale_noise_to, dc_offset = dc_offset, plot = False)
+                                    Vd_out, ud_out = gnosim.detector.fpga.digitizeSignal(u_out,V_out,digital_sample_times,station.sampling_bits,antenna.noise_rms,station.scale_noise_to, dc_offset = dc_offset, plot = False)
                                     
                                 else:
                                     V_out = numpy.array([])
@@ -700,8 +701,8 @@ class Sim:
                         if do_beamforming == True:
                             #Here is where I perform the beamforming algorithms. 
                             
-                            Vd_out_sync, ud_out_sync  = gnosim.sim.fpga.syncSignals(time_digital[station.label],V_digital[station.label], min_time, max_time, dt)
-                            formed_beam_powers, beam_powersums = gnosim.sim.fpga.fpgaBeamForming(ud_out_sync, Vd_out_sync, station.beam_dict , plot1 = False, plot2 = False, save_figs = False, cap_bytes = station.beamforming_power_sum_byte_cap)
+                            Vd_out_sync, ud_out_sync  = gnosim.detector.fpga.syncSignals(time_digital[station.label],V_digital[station.label], min_time, max_time, dt)
+                            formed_beam_powers, beam_powersums = gnosim.detector.fpga.fpgaBeamForming(ud_out_sync, Vd_out_sync, station.beam_dict , plot1 = False, plot2 = False, save_figs = False, cap_bytes = station.beamforming_power_sum_byte_cap)
                             #Getting max values
                             keep_top = 3
                             
@@ -734,7 +735,7 @@ class Sim:
                                 if numpy.any(V_out > trigger_threshold):
                                     triggered = True
                         if numpy.logical_and(do_beamforming == False, triggered == True):
-                            Vd_out_sync, ud_out_sync  = gnosim.sim.fpga.syncSignals(time_digital[station.label],V_digital[station.label], min_time, max_time, dt)
+                            Vd_out_sync, ud_out_sync  = gnosim.detector.fpga.syncSignals(time_digital[station.label],V_digital[station.label], min_time, max_time, dt)
                     else:
                         triggered = False    
                             
@@ -1128,7 +1129,7 @@ class Sim:
                 The list of polar r coordinates in cylindrical coordinates in the ice frame (centered at this particular antenna).
             z_query : numpy.ndarray of floats
                 The list of z cartesian coordinates in the ice frame of the neutrino interactions.
-            antenna : gnosim.sim.detector.Antenna
+            antenna : gnosim.detector.detector.Antenna
                 The antenna object containing information about this particular antenna.
             in_flag_array : dict
                 The in_flag_array corresponding to the particular antenna passed to this function. 
@@ -1759,114 +1760,6 @@ class Sim:
         print('Time interpolating with griddata: %0.3f s'%(griddata_time- general_prep_time))
         print('Time in event calculations:  %0.3f s'%(current_time - griddata_time))
 
-def makeIndexHTML(path = './',filetype = 'svg'):
-    '''
-    Makes a crude html image browser of the created images to be loaded in a web browser. Image filytpe should not have the . and Path should have / at the end
-
-    Parameters
-    ----------
-    path : str, optional
-        The path to the folder containing all of the images to be indexed.  Should not contain a forward slash at the end.
-    filetye : str, optional
-        The file type extension of the images to be indexed.  Should not contain the '.'. 
-
-
-    '''
-    header = os.path.realpath(path).split('/')[-1]
-    infiles = glob.glob('%s*%s'%(path,filetype))
-    
-    infiles_num = []
-    
-    for infile in infiles:
-        if len(infile.split('-event')) > 1:
-            infiles_num.append(int(infile.split('-event')[-1].replace('.' + filetype,'')))
-        else:
-            infiles_num.append(-1) #will put all non-conforming files at front before sorted event files.
-    infiles = numpy.array(infiles)[numpy.argsort(infiles_num)] #sorts files in index by event number
-        
-    #I want to sort by event number here!
-    image_list = ''
-    for infile in infiles:
-        image_list = image_list + '\t<img class="mySlides" src="' + infile.split('/')[-1] + '" style="width:100%">\n'
-    
-    #print(image_list)
-    
-    
-    template =  '''
-                <!DOCTYPE html>
-                <html>
-                <meta name="viewport" content="width=device-width, initial-scale=1">
-                <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
-                <style>
-                .mySlides {display:none;}
-                </style>
-                <body>
-                
-                <head>
-                <title> RCC KICP | Dan Southall </title>
-                </head>
-                <p><strong> Dan Southall </strong> | <a href="https://kicp.uchicago.edu/people/profile/daniel_southall.html"> KICP Profile </a> | <a href="../../index.html"> Home </a></p>
-                
-                <h2 class="w3-center"><strong> """ + header + """</strong></h2>
-                
-                <input id="slide_index" size="4" value="1" onchange="showDivs(parseInt(document.getElementById('slide_index').value))">
-                
-                <div class="w3-content w3-display-container"> 
-                """ + image_list + """
-                </div>
-                
-                <button class="w3-button w3-black w3-display-left" onclick="plusDivs(-1)">&#10094;</button>
-                <button class="w3-button w3-black w3-display-right" onclick="plusDivs(1)">&#10095;</button>
-                
-                </div>
-                <script>
-                var slideIndex = 1;
-                showDivs(slideIndex);
-
-                function plusDivs(n) {
-                  showDivs(slideIndex += n);
-                }
-
-                function showDivs(n) {
-                  var i;
-                  var x = document.getElementsByClassName("mySlides");
-                  slideIndex =n;
-                  if (n > x.length) {slideIndex = 1}    
-                  if (n < 1) {slideIndex = x.length}
-                  for (i = 0; i < x.length; i++) {
-                     x[i].style.display = "none";  
-                  }
-                  x[slideIndex-1].style.display = "block"; 
-                  document.getElementById("slide_index").value = slideIndex;
-                  location.hash = "#" + slideIndex;
-                  document.getElementById("filename").innerHTML = x[slideIndex-1].getAttribute("src");
-                }
-                
-                function load() 
-                {
-                  var maybe = parseInt(location.hash.slice(1));
-                  if (!isNaN(maybe)) 
-                  {
-                    showDivs(maybe); 
-                  }
-                  else showDivs(1); 
-                }
-                </script>
-
-                </body>
-                </html>
-                '''
-    print(template)
-    outfile_name = path + 'index'
-    if os.path.isfile(outfile_name +'.html'):
-        print('Outfile Name %s is taken, saving in current directory and appending \'_new\' if necessary'%(outfile_name))
-        outfile_name = outfile_name + '_new'
-        while os.path.isfile(outfile_name+'.html'):
-            outfile_name = outfile_name + '_new'
-    outfile = open(outfile_name + '.html','w')
-    outfile.write(template)
-    outfile.close()
-
 
 ############################################################
 
@@ -1952,7 +1845,7 @@ if __name__ == '__main__':
     
     print('Trying to print station geometry and antenna orientations')
     try:
-        fig = gnosim.sim.detector.plotArrayFromConfig(my_sim.config,solutions,only_station = 'all',verbose = False)
+        fig = gnosim.detector.detector.plotArrayFromConfig(my_sim.config,solutions,only_station = 'all',verbose = False)
         fig.savefig('%s%s_array_geometry.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),image_extension),bbox_inches='tight')
         pylab.close(fig)
     except Exception as e:
@@ -1961,7 +1854,7 @@ if __name__ == '__main__':
     
     print('Trying to create index.html file for new images')
     try:
-        makeIndexHTML(path = image_path ,filetype = image_extension)
+        gnosim.utils.misc.makeIndexHTML(path = image_path ,filetype = image_extension)
     except Exception as e:
         print('Something went wrong in making index.html')
         print(e)

@@ -18,7 +18,7 @@ import math
 import scipy.signal
 import gnosim.utils.constants
 import gnosim.interaction.inelasticity
-import gnosim.sim.fpga
+import gnosim.detector.fpga
 pylab.ion()
 
 ############################################################
@@ -72,7 +72,7 @@ def electricFieldFrequencyDomainRaw(frequency, d, angle, Energy_GeV, inelasticit
 def loadSignalResponse(mode='vpol'):
     '''
     This loads the system response, antenna response, and corresponding frequencies.  This is no longer being used
-    as loading has become part of the antenna type definition in gnosim.sim.detector.Antenna.addTimingInfo().
+    as loading has become part of the antenna type definition in gnosim.detector.detector.Antenna.addTimingInfo().
     The responses are returned in the frequency domain.
     
     Parameters
@@ -91,7 +91,7 @@ def loadSignalResponse(mode='vpol'):
 
     See Also
     --------
-    gnosim.sim.detector.Antenna.addTimingInfo
+    gnosim.detector.detector.Antenna.addTimingInfo
     '''
     if mode == 'vpol':
         print('Loading Signal Response vpol')
@@ -709,7 +709,7 @@ def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode=N
     This loads (if not given) the system response, antenna response, and corresponding frequencies, 
     and additionally calculates the times for which the Askaryan calculation will be calculated.  
     This is no longer being used as loading has become part of the  antenna type definition in 
-    gnosim.sim.detector.Antenna.addTimingInfo(). The responses are returned in the frequency domain.
+    gnosim.detector.detector.Antenna.addTimingInfo(). The responses are returned in the frequency domain.
 
     ***
     This function is NOT maintained or used.  It's contents have been moved to quickSignalSingle which
@@ -745,7 +745,7 @@ def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode=N
     See Also
     --------
     gnosim.sim.response.upsample_response
-    gnosim.sim.detector.Antenna.addTimingInfo()
+    gnosim.detector.detector.Antenna.addTimingInfo()
     '''
 
     '''
@@ -806,18 +806,18 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
         An offset in time to apply to the output times.  Given in ns.
     signal_reduction_factor : float
         This is the reduction factor that should be multiplied with the antenna response.  This should be calculated
-        using gnosim.sim.detector.Antenna.getAntennaResponseFactor
+        using gnosim.detector.detector.Antenna.getAntennaResponseFactor
     u : numpy.ndarray of floats
         The times for which to calculate the vector potential.  Given in ns.
     h_fft : numpy.ndarray of cfloat
         The values for the antenna response. (Should have units of m, i.e. effective height).
-        Should be loaded using gnosim.sim.detector.Antenna.addTimingInfo
+        Should be loaded using gnosim.detector.detector.Antenna.addTimingInfo
     sys_fft : numpy.ndarray of cfloat
         The values for the syste response. (Should be unitless).
-        Should be loaded using gnosim.sim.detector.Antenna.addTimingInfo
+        Should be loaded using gnosim.detector.detector.Antenna.addTimingInfo
     freqs : numpy.ndarray of float
         The values for the frequencies corresponding to the above responses.
-        Should be loaded using gnosim.sim.detector.Antenna.addTimingInfo
+        Should be loaded using gnosim.detector.detector.Antenna.addTimingInfo
     fp_fft : numpy.ndarray of float, optional
         The frequency domain version of the form factor.  This is the same for a particular neutrino event, so
         can be calculated in advance and passed to this function to save computation time.  (Default is None).
@@ -858,7 +858,7 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
 
     See Also
     --------
-    gnosim.sim.detector.Antenna
+    gnosim.detector.detector.Antenna
     '''
 
     t_step = u[1]-u[0] #ns
@@ -1184,8 +1184,8 @@ if __name__ == "__main__":
     
     random_time_offset = numpy.random.uniform(-5.0,5.0) #ns
     dc_offset = 0.0 #V
-    sample_times=gnosim.sim.fpga.calculateDigitalTimes(u[0],u[-1],sampling_rate,  random_time_offset = random_time_offset)
-    V_bit, sampled_times = gnosim.sim.fpga.digitizeSignal(u,V_noise,sample_times,bytes,scale_noise_from,scale_noise_to, dc_offset = dc_offset, plot = False)
+    sample_times=gnosim.detector.fpga.calculateDigitalTimes(u[0],u[-1],sampling_rate,  random_time_offset = random_time_offset)
+    V_bit, sampled_times = gnosim.detector.fpga.digitizeSignal(u,V_noise,sample_times,bytes,scale_noise_from,scale_noise_to, dc_offset = dc_offset, plot = False)
     dt = sampled_times[1] - sampled_times[0]
     #################################################################
 

@@ -54,7 +54,7 @@ def plotArrayFromConfig(config,solutions,only_station = 'all',verbose = False):
     stations = []
     for ii in range(0, config['stations']['n']):
         x_station, y_station, z_station = config['stations']['positions'][ii]
-        station = gnosim.sim.detector.Station(x_station, y_station, z_station,config,solutions)
+        station = gnosim.detector.detector.Station(x_station, y_station, z_station,config,solutions)
         #station.loadLib(pre_split = True)
         self.stations.append(station)
 
@@ -162,7 +162,7 @@ class Station:
         contain half of their values in common with the previous sum.  This is used in the beamforming calculation during the power sum.  
         Specified in the configuration file.
     beamforming_power_sum_byte_cap : int
-        This sets number of bytes to cap the power sum calculation (which will have units of adu^2).  This is used in gnosim.sim.fpgaBeamForming.
+        This sets number of bytes to cap the power sum calculation (which will have units of adu^2).  This is used in gnosim.detector.fpga.fpgaBeamForming.
         Specified in the configuration file.
     n_beams : int
         The number of beams to be formed when creating a beam forming dictionary.  Specified in the configuration file.
@@ -192,14 +192,14 @@ class Station:
     noise_rms : numpy.ndarray float, optional
         The rms of the noise calculated for each antenna antenna.  Given in V.  Not present unless self.calculateNoiseRMS is run.
     beam_dict : dict, optional
-        A dictionary containing all of the beam forming information for use by the gnosim.sim.fpga module.  Not present unless self.getBeams is run.
+        A dictionary containing all of the beam forming information for use by the gnosim.detector.fpga module.  Not present unless self.getBeams is run.
     beam_colors : dict, optional
         A dictionary containing colors corresponding to each beam for plotting purposes.  Not present unless self.getBeams is run.
 
     See Also
     --------
     Antenna
-    gnosim.sim.fpga
+    gnosim.detector.fpga
     '''
     def __init__(self, x, y, z, config, station_label, solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']), electricFieldDomain = 'time'):
         self.label = station_label
@@ -379,7 +379,7 @@ class Station:
     def getBeams(self, n , verbose = False):
 
         '''
-        This creates a dictionary containing all of the beam forming information for use by the gnosim.sim.fpga module. The goal of this 
+        This creates a dictionary containing all of the beam forming information for use by the gnosim.detector.fpga module. The goal of this 
         function is to determine the beam and subbeam time delays semiautomatically for the station. Currently the minimum time shift 
         is assigned to the smallest baseline.  Thus every other timeshift resulting from larger baselines must be a multiple of the 
         minimum baseline. i.e. all subbeam baselines must be in integer multiples of  the minimum baseline.  Currently requires all 
@@ -395,7 +395,7 @@ class Station:
 
         See Also
         --------
-        gnosim.sim.fpga
+        gnosim.detector.fpga
         '''
         print('Using:\npower_calculation_sum_length = %i\npower_calculation_interval = %i\nn_baselines = %i'%(self.power_calculation_sum_length,self.power_calculation_interval,self.n_baselines))
         n_antennas = len(self.antennas)
@@ -535,7 +535,7 @@ class Antenna:
     antenna_type : str
         This is the label of a particular antenna type defined in the code.  This will select how the antenna
         behaves, i.e. beam patterns, polarization sensitivity, etc.  To see current supported antenna types 
-        try gnosim.sim.detector.getAcceptedAntennaTypes().
+        try gnosim.detector.detector.getAcceptedAntennaTypes().
     noise_temperature : float
         The temperature to be used in the noise calculation.  Given in K.
         Note that the noise is also processed by the system response, which may be scaled to obtain a particular noise
@@ -577,7 +577,7 @@ class Antenna:
     antenna_type : str
         This is the label of a particular antenna type defined in the code.  This will select how the antenna
         behaves, i.e. beam patterns, polarization sensitivity, etc.  To see current supported antenna types 
-        try gnosim.sim.detector.getAcceptedAntennaTypes().
+        try gnosim.detector.detector.getAcceptedAntennaTypes().
     noise_temperature : float
         The temperature to be used in the noise calculation.  Given in K.
         Note that the noise is also processed by the system response, which may be scaled to obtain a particular noise

@@ -4,8 +4,8 @@ import pylab
 import matplotlib
 import collections
 
-import gnosim.sim.acceptance
-import gnosim.sim.fold_spectrum
+import gnosim.analysis.acceptance
+import gnosim.analysis.fold_spectrum
 
 pylab.ion()
 
@@ -51,7 +51,7 @@ icecube_acceptance_raw = 10**numpy.array([[5.678513731825525, 0.2536945812807882
                                           [11.00611187597985, 4.362068965517241]])
 icecube_energy = numpy.array(zip(*icecube_acceptance_raw)[0])
 icecube_acceptance = 4. * numpy.pi * numpy.array(zip(*icecube_acceptance_raw)[1]) # m^2 sr
-icecube_volumetric_acceptance = gnosim.sim.acceptance.acceptanceToVolumetricAcceptance(icecube_acceptance, icecube_energy) # km^3 sr
+icecube_volumetric_acceptance = gnosim.analysis.acceptance.acceptanceToVolumetricAcceptance(icecube_acceptance, icecube_energy) # km^3 sr
 
 # Single flavor
 icecube_acceptance_contained_raw = 10**numpy.array([[4.299401197604791, -2.9891107078039925],
@@ -68,7 +68,7 @@ icecube_acceptance_contained_raw = 10**numpy.array([[4.299401197604791, -2.98911
                                                     [7.000000000000001, 1.551724137931034]])
 icecube_energy_contained = numpy.array(zip(*icecube_acceptance_contained_raw)[0])
 icecube_acceptance_contained = 3. * 4. * numpy.pi * numpy.array(zip(*icecube_acceptance_contained_raw)[1]) # m^2 sr
-icecube_volumetric_acceptance_contained = gnosim.sim.acceptance.acceptanceToVolumetricAcceptance(icecube_acceptance_contained, icecube_energy_contained) # km^3 sr
+icecube_volumetric_acceptance_contained = gnosim.analysis.acceptance.acceptanceToVolumetricAcceptance(icecube_acceptance_contained, icecube_energy_contained) # km^3 sr
 
 ############################################################
 
@@ -178,7 +178,7 @@ for key in dic_configurations:
             dic_data[key]['volumetric_acceptance_error_high'][ii], \
             dic_data[key]['acceptance'][ii], \
             dic_data[key]['acceptance_error_low'][ii], \
-            dic_data[key]['acceptance_error_high'][ii] = gnosim.sim.acceptance.acceptance(infile, 
+            dic_data[key]['acceptance_error_high'][ii] = gnosim.analysis.acceptance.acceptance(infile, 
                                                                                           electric_field_threshold=dic_threshold[key], 
                                                                                           mode_reflections='all') # all, direct, reflect
 
@@ -266,7 +266,7 @@ for key in dic_configurations:
         dic_data[key]['volumetric_acceptance_error_high'], \
         dic_data[key]['acceptance'], \
         dic_data[key]['acceptance_error_low'], \
-        dic_data[key]['acceptance_error_high'] = gnosim.sim.acceptance.acceptance(infile,
+        dic_data[key]['acceptance_error_high'] = gnosim.analysis.acceptance.acceptance(infile,
                                                                                   cos_theta_bins=cos_theta_bins,
                                                                                   electric_field_threshold=1.e-4,
                                                                                   mode_reflections='all') # all, direct, reflect
@@ -300,7 +300,7 @@ for key_model in dic_model.keys():
     pylab.xscale('log')
     pylab.yscale('log')
     for key in order:
-        energy_plot, rate_threshold_plot, rate_plot = gnosim.sim.fold_spectrum.foldSpectrum(energy_neutrino_array, dic_adjust[key] * dic_time[key] * dic_data[key]['acceptance'], model_key=key_model)
+        energy_plot, rate_threshold_plot, rate_plot = gnosim.analysis.fold_spectrum.foldSpectrum(energy_neutrino_array, dic_adjust[key] * dic_time[key] * dic_data[key]['acceptance'], model_key=key_model)
         #pylab.plot(energy_plot, rate_threshold_plot, label=dic_configurations[key])
         pylab.plot(energy_plot, rate_plot, label=dic_configurations[key])
 
@@ -326,7 +326,7 @@ for key_model in dic_model.keys():
     pylab.xscale('log')
     pylab.yscale('log')
     for key in order:
-        energy_plot, rate_threshold_plot, rate_plot = gnosim.sim.fold_spectrum.foldSpectrum(energy_neutrino_array, dic_adjust[key] * dic_time[key] * dic_data[key]['acceptance'], model_key=key_model)
+        energy_plot, rate_threshold_plot, rate_plot = gnosim.analysis.fold_spectrum.foldSpectrum(energy_neutrino_array, dic_adjust[key] * dic_time[key] * dic_data[key]['acceptance'], model_key=key_model)
         pylab.plot(energy_plot, rate_threshold_plot, label=dic_configurations[key])                                                                                                                       
         #pylab.plot(energy_plot, rate_plot, label=dic_configurations[key])
 
@@ -375,7 +375,7 @@ for key_model in dic_model.keys():
     print '\n===== %s =====\n'%(key_model)
 
     for key in order:
-        energy_plot, rate_threshold_plot, rate_plot = gnosim.sim.fold_spectrum.foldSpectrum(energy_neutrino_array, dic_adjust[key] * dic_time[key] * dic_data[key]['acceptance'], model_key=key_model)
+        energy_plot, rate_threshold_plot, rate_plot = gnosim.analysis.fold_spectrum.foldSpectrum(energy_neutrino_array, dic_adjust[key] * dic_time[key] * dic_data[key]['acceptance'], model_key=key_model)
         #pylab.plot(energy_plot, rate_threshold_plot, label=dic_configurations[key])                                                                                                                       
         #pylab.plot(energy_plot, rate_plot, label=dic_configurations[key])
         values = pylab.hist(1.e-6 * energy_plot, bins=1.e-6 * energy_bins, weights=rate_plot, label=dic_configurations[key], color=dic_color[key], zorder=dic_zorder[key])[0]
@@ -430,7 +430,7 @@ pylab.yscale('log')
 
 for key_model in dic_model_linestyle.keys():
     print key_model
-    energy, e2dNdE = zip(*gnosim.sim.fold_spectrum.model_dict[key_model])
+    energy, e2dNdE = zip(*gnosim.analysis.fold_spectrum.model_dict[key_model])
     energy = numpy.array(energy)
     if 'iron' in key_model:
         color = 'red'
