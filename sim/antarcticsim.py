@@ -32,8 +32,8 @@ sys.path.append('/home/dsouthall/Projects/GNOSim/')
 import gnosim.utils.quat
 import gnosim.earth.earth
 import gnosim.earth.ice
-import gnosim.trace.refraction_library_beta
-#from gnosim.trace.refraction_library_beta import *
+import gnosim.trace.refraction_library
+#from gnosim.trace.refraction_library import *
 import gnosim.interaction.askaryan
 import gnosim.detector.detector
 import gnosim.detector.fpga
@@ -116,7 +116,7 @@ class Sim:
     solutions : numpy.ndarray of str, optional
         A list of the solution types to load.  Often either all accepted solution types (the Default), or the same list omitting
         the _2 strings, which represent libraries of solution that reflect of the bottom of the ice.  Too see acceptable solution
-        types use gnosim.trace.refraction_library_beta.getAcceptedSolutions().  (Default is numpy.array([]) which will result in
+        types use gnosim.trace.refraction_library.getAcceptedSolutions().  (Default is numpy.array([]) which will result in
         all solution types being used).
     electricFieldDomain : str, optional
         Selects the type of Askaryan radiation calculation to use.  
@@ -196,7 +196,7 @@ class Sim:
         self.ice = gnosim.earth.ice.Ice(self.config['detector_volume']['ice_model'])
         
         #Filtering solutions to acceptable values.
-        accepted_solutions = gnosim.trace.refraction_library_beta.getAcceptedSolutions()
+        accepted_solutions = gnosim.trace.refraction_library.getAcceptedSolutions()
         if numpy.size(solutions) == 0:
             solutions = accepted_solutions
         solutions = accepted_solutions[numpy.isin(accepted_solutions,solutions)]
@@ -755,7 +755,7 @@ class Sim:
                                 self.lock.acquire()
                                 try:
                                     print('Plotting Signals Acquired a lock')
-                                    fig = gnosim.trace.refraction_library_beta.plotGeometry(self.stations,neutrino_loc,phi_0,temporary_info[numpy.logical_and(temporary_info['has_solution'] == True,temporary_info['station'] == index_station)],self.ice)
+                                    fig = gnosim.trace.refraction_library.plotGeometry(self.stations,neutrino_loc,phi_0,temporary_info[numpy.logical_and(temporary_info['has_solution'] == True,temporary_info['station'] == index_station)],self.ice)
                                     if return_fig_array == True:
                                         fig_array.append(fig)
 

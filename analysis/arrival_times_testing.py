@@ -18,7 +18,7 @@ from matplotlib.colors import LogNorm
 sys.path.append('/home/dsouthall/Projects/GNOSim/')
 import gnosim.utils.constants
 import gnosim.utils.bayesian_efficiency
-import gnosim.trace.refraction_library_beta
+import gnosim.trace.refraction_library
 from matplotlib.colors import LogNorm
 pylab.ion()
 import matplotlib.colors
@@ -44,7 +44,7 @@ config2 = yaml.load(open(configfilepath + configfile2))
 '''
 lib2 = {}
 for key in config2['antenna_definitions'].keys():
-    lib2[key] = gnosim.trace.refraction_library_beta.RefractionLibrary(config2['antenna_definitions'][key]['lib'])
+    lib2[key] = gnosim.trace.refraction_library.RefractionLibrary(config2['antenna_definitions'][key]['lib'])
 
 #Saving Lib
 with open('Pickled_Library_Double.pkl','wb') as f:
@@ -57,7 +57,7 @@ with open('Pickled_Library_Double.pkl','wb') as f:
 #Making Lib
 lib = {}
 for key in config['antenna_definitions'].keys():
-    lib[key] = gnosim.trace.refraction_library_beta.RefractionLibrary(config['antenna_definitions'][key]['lib'])
+    lib[key] = gnosim.trace.refraction_library.RefractionLibrary(config['antenna_definitions'][key]['lib'])
 
 #Saving Lib
 with open('Pickled_Library.pkl','wb') as f:
@@ -77,7 +77,7 @@ with open('Pickled_Library.pkl','rb') as f:
 '''
 lib = {}
 for key in config['antenna_definitions'].keys():
-    lib[key] = gnosim.trace.refraction_library_beta.RefractionLibrary(config['antenna_definitions'][key]['lib'])
+    lib[key] = gnosim.trace.refraction_library.RefractionLibrary(config['antenna_definitions'][key]['lib'])
 
 with open('Pickled_Library_Double.pkl','rb') as f2:
    lib2 = pickle.load(f2)
@@ -794,14 +794,14 @@ def findBetterRay(origin, r_match, z_match, theta_ant_lower, theta_ant_upper, ic
     t_step = t_steps[0]
     attempt = -1
     #theta_ant_lower = 0.7*theta_ant_lower
-    x_lower, y_lower, z_lower, t_lower, d_lower, phi_lower, theta_lower, a_p_lower, a_s_lower, index_reflect_air_lower, index_reflect_water_lower = gnosim.trace.refraction_library_beta.rayTrace(origin, phi_0, theta_ant_lower,ice, t_max=t_max, r_limit = max(100,1.01*r_match), t_step=t_step)
+    x_lower, y_lower, z_lower, t_lower, d_lower, phi_lower, theta_lower, a_p_lower, a_s_lower, index_reflect_air_lower, index_reflect_water_lower = gnosim.trace.refraction_library.rayTrace(origin, phi_0, theta_ant_lower,ice, t_max=t_max, r_limit = max(100,1.01*r_match), t_step=t_step)
     r_lower = numpy.sqrt( (x_lower)**2 + (y_lower)**2)
     sep_lower = numpy.sqrt( (r_lower - r_match)**2 + (z_lower - z_match)**2)
     lower_min_index = min(numpy.where(sep_lower == min(sep_lower))[0])
     l_lower = returnLine(r_lower[lower_min_index],z_lower[lower_min_index],theta_lower[lower_min_index])
     
     #theta_ant_upper = min(180.,1.3*theta_ant_upper)
-    x_upper, y_upper, z_upper, t_upper, d_upper, phi_upper, theta_upper, a_p_upper, a_s_upper, index_reflect_air_upper, index_reflect_water_upper = gnosim.trace.refraction_library_beta.rayTrace(origin, phi_0, theta_ant_upper,ice, t_max=t_max, r_limit = max(100,1.01*r_match), t_step=t_step)
+    x_upper, y_upper, z_upper, t_upper, d_upper, phi_upper, theta_upper, a_p_upper, a_s_upper, index_reflect_air_upper, index_reflect_water_upper = gnosim.trace.refraction_library.rayTrace(origin, phi_0, theta_ant_upper,ice, t_max=t_max, r_limit = max(100,1.01*r_match), t_step=t_step)
     r_upper = numpy.sqrt( (x_upper)**2 + (y_upper)**2)
     sep_upper = numpy.sqrt( (r_upper - r_match)**2 + (z_upper - z_match)**2)
     #print('r',r_match,'z',z_match)
@@ -862,7 +862,7 @@ def findBetterRay(origin, r_match, z_match, theta_ant_lower, theta_ant_upper, ic
         if verbose == True:
             print('[%.2f]On attempt %i with bounds %f to %f'%(time.perf_counter() - time_start, attempt, theta_ant_lower , theta_ant_upper))
         theta_ant_mid = (theta_ant_lower + theta_ant_upper) / 2.0
-        x, y, z, t, d, phi, theta, a_p, a_s, index_reflect_air, index_reflect_water = gnosim.trace.refraction_library_beta.rayTrace(origin, phi_0, theta_ant_mid,ice, t_max=t_max, r_limit = max(100,1.01*r_match), t_step=t_step)
+        x, y, z, t, d, phi, theta, a_p, a_s, index_reflect_air, index_reflect_water = gnosim.trace.refraction_library.rayTrace(origin, phi_0, theta_ant_mid,ice, t_max=t_max, r_limit = max(100,1.01*r_match), t_step=t_step)
         r = numpy.sqrt( (x)**2 + (y)**2)
         sep = numpy.sqrt( (r - r_match)**2 + (z - z_match)**2)
         min_sep = min(sep)
@@ -897,7 +897,7 @@ def findBetterRay(origin, r_match, z_match, theta_ant_lower, theta_ant_upper, ic
                 if (attempt+1 == max_attempts):
                     print('[%.2f]Max attempts reached'%(time.perf_counter() - time_start))
                 print('[%.2f]Making final adjustment'%(time.perf_counter() - time_start))
-            x, y, z, t, d, phi, theta, a_p, a_s, index_reflect_air, index_reflect_water = gnosim.trace.refraction_library_beta.rayTrace(origin, phi_0, theta_ant_mid,ice, t_max=t_max, r_limit = max(100.0,1.01*r_match), t_step=t_step/2.0)
+            x, y, z, t, d, phi, theta, a_p, a_s, index_reflect_air, index_reflect_water = gnosim.trace.refraction_library.rayTrace(origin, phi_0, theta_ant_mid,ice, t_max=t_max, r_limit = max(100.0,1.01*r_match), t_step=t_step/2.0)
             r = numpy.sqrt( (x)**2 + (y)**2)
             sep = numpy.sqrt( (r - r_match)**2 + (z - z_match)**2)
             if plot == True:
@@ -1001,13 +1001,13 @@ def findBetterRay(origin, r_match, z_match, theta_ant_lower, theta_ant_upper, ic
                         #single reflect
                         theta_ant_lower = numpy.min([180.0,theta_ant_lower + 0.5])
                 
-            x_lower, y_lower, z_lower, t_lower, d_lower, phi_lower, theta_lower, a_p_lower, a_s_lower, index_reflect_air_lower, index_reflect_water_lower = gnosim.trace.refraction_library_beta.rayTrace(origin, phi_0, theta_ant_lower,ice, t_max=t_max, r_limit = max(100,1.01*r_match), t_step=t_step)
+            x_lower, y_lower, z_lower, t_lower, d_lower, phi_lower, theta_lower, a_p_lower, a_s_lower, index_reflect_air_lower, index_reflect_water_lower = gnosim.trace.refraction_library.rayTrace(origin, phi_0, theta_ant_lower,ice, t_max=t_max, r_limit = max(100,1.01*r_match), t_step=t_step)
             r_lower = numpy.sqrt( (x_lower)**2 + (y_lower)**2)
             sep_lower = numpy.sqrt( (r_lower - r_match)**2 + (z_lower - z_match)**2)
             lower_min_index = min(numpy.where(sep_lower == min(sep_lower))[0])
             l_lower = returnLine(r_lower[lower_min_index],z_lower[lower_min_index],theta_lower[lower_min_index])
             
-            x_upper, y_upper, z_upper, t_upper, d_upper, phi_upper, theta_upper, a_p_upper, a_s_upper, index_reflect_air_upper, index_reflect_water_upper = gnosim.trace.refraction_library_beta.rayTrace(origin, phi_0, theta_ant_upper,ice, t_max=t_max, r_limit = max(100,1.01*r_match), t_step=t_step)
+            x_upper, y_upper, z_upper, t_upper, d_upper, phi_upper, theta_upper, a_p_upper, a_s_upper, index_reflect_air_upper, index_reflect_water_upper = gnosim.trace.refraction_library.rayTrace(origin, phi_0, theta_ant_upper,ice, t_max=t_max, r_limit = max(100,1.01*r_match), t_step=t_step)
             r_upper = numpy.sqrt( (x_upper)**2 + (y_upper)**2)
             sep_upper = numpy.sqrt( (r_upper - r_match)**2 + (z_upper - z_match)**2)
             upper_min_index = min(numpy.where(sep_upper == min(sep_upper))[0])

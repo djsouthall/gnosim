@@ -10,7 +10,7 @@ from matplotlib import gridspec
 from mpl_toolkits.mplot3d import Axes3D
 import pylab
 import types
-import gnosim.trace.refraction_library_beta
+import gnosim.trace.refraction_library
 import gnosim.interaction.polarization
 import gnosim.utils.quat
 import gnosim.utils.misc
@@ -38,7 +38,7 @@ def plotArrayFromConfig(config,solutions,only_station = 'all',verbose = False):
 
     See Also
     --------
-    gnosim.trace.refraction_library_beta
+    gnosim.trace.refraction_library
     '''
     from matplotlib import markers
     fig = pylab.figure(figsize=(16,11.2))
@@ -208,7 +208,7 @@ class Station:
         self.y = y
         self.z = z
         self.electricFieldDomain = electricFieldDomain
-        self.accepted_solutions = gnosim.trace.refraction_library_beta.getAcceptedSolutions()
+        self.accepted_solutions = gnosim.trace.refraction_library.getAcceptedSolutions()
         self.power_calculation_sum_length = config['DAQ']['power_calculation_sum_length']
         self.power_calculation_interval = config['DAQ']['power_calculation_interval']
         self.beamforming_power_sum_byte_cap = config['DAQ']['beamforming_power_sum_byte_cap']
@@ -260,7 +260,7 @@ class Station:
 
     def loadLib(self,pre_split = False,build_lib = True):
         '''
-        Calls the Antenna.loadLib function for each antenna which loads the gnosim.trace.refraction_library_beta.RefractionLibrary 
+        Calls the Antenna.loadLib function for each antenna which loads the gnosim.trace.refraction_library.RefractionLibrary 
         object corresponding to said antenna after cross checking the desired solutions are valid options.  If build_lib is True 
         then this will load the full ray tracing library, otherwise it just creates the RefractionLirary object which contains some 
         meta data about the library but not the actual ray tracing data.
@@ -275,7 +275,7 @@ class Station:
             the rest of the library can be worked with as a less bulky object when necessary.  (Default is True).
         See Also
         --------
-        gnosim.trace.refraction_library_beta
+        gnosim.trace.refraction_library
         '''
         for antenna in self.antennas:
             antenna.loadLib(pre_split,build_lib = build_lib)
@@ -293,7 +293,7 @@ class Station:
 
         See Also
         --------
-        gnosim.trace.refraction_library_beta
+        gnosim.trace.refraction_library
         '''
         import gc
         
@@ -608,7 +608,7 @@ class Antenna:
         The upper frequency bound for the old and unsupported frequency domain calculation of the Askaryan radiation.  Only present if the
         selected time domain for the calculation is 'freq'.
     lib : dict
-        Contains the gnosim.trace.refraction_library_beta.RefractionLibrary object corresponding to this antenna.
+        Contains the gnosim.trace.refraction_library.RefractionLibrary object corresponding to this antenna.
         This is only loaded if self.loadLib is run, as it takes a lot of memory.  Often only loaded while grid interpolation
         is occuring.
     concave_hull : dict, optional
@@ -659,7 +659,7 @@ class Antenna:
             self.antenna_type = accepted_types[0]
             print(self.antenna_type)
 
-        self.accepted_solutions = gnosim.trace.refraction_library_beta.getAcceptedSolutions()
+        self.accepted_solutions = gnosim.trace.refraction_library.getAcceptedSolutions()
 
         # List attributes of interest
         solutions = self.accepted_solutions[numpy.isin(self.accepted_solutions,solutions)]
@@ -705,7 +705,7 @@ class Antenna:
 
     def loadLib(self,pre_split = False,build_lib = True):
         '''
-        This loads the gnosim.trace.refraction_library_beta.RefractionLibrary object corresponding to this antenna after 
+        This loads the gnosim.trace.refraction_library.RefractionLibrary object corresponding to this antenna after 
         cross checking the desired solutions are valid options.  If build_lib is True then this will load the full ray
         tracing library, otherwise it just creates the RefractionLirary object which contains some meta data about the library
         but not the actual ray tracing data.
@@ -720,12 +720,12 @@ class Antenna:
             the rest of the library can be worked with as a less bulky object when necessary.  (Default is True).
         See Also
         --------
-        gnosim.trace.refraction_library_beta
+        gnosim.trace.refraction_library
         '''
         if numpy.logical_and(pre_split == False,numpy.logical_not(len(self.solutions) == len(self.accepted_solutions))):
             print('Limiting Solution Types Currently only works for pre_split = True, using default solution types.')
             self.solutions = self.accepted_solutions
-        self.lib = gnosim.trace.refraction_library_beta.RefractionLibrary(self.lib_dir,solutions=self.solutions,pre_split = pre_split,build_lib = build_lib)
+        self.lib = gnosim.trace.refraction_library.RefractionLibrary(self.lib_dir,solutions=self.solutions,pre_split = pre_split,build_lib = build_lib)
         self.solutions = self.lib.solutions #Catches mistakes if the refraction library has a varying number of antennas.
 
     def deleteLib(self,verbose=False):
@@ -739,7 +739,7 @@ class Antenna:
 
         See Also
         --------
-        gnosim.trace.refraction_library_beta
+        gnosim.trace.refraction_library
         '''
         import gc
         if verbose == True:
@@ -811,11 +811,11 @@ class Antenna:
 
     def loadConcaveHull(self):
         '''
-        This loads the concave hull within the gnosim.trace.refraction_library_beta.RefractionLibrary object corresponding to this antenna.
+        This loads the concave hull within the gnosim.trace.refraction_library.RefractionLibrary object corresponding to this antenna.
         
         See Also
         --------
-        gnosim.trace.refraction_library_beta
+        gnosim.trace.refraction_library
         '''
         print('Loading Hull For:',self.lib_dir)
         self.concave_hull = {}

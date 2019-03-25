@@ -138,7 +138,7 @@ def testFresnelSign(n_1 = 1.5,n_2 = 1.0):
     r_s = []
     r_p = []
     for i in numpy.arange(91.):
-        r_s_i,r_p_i = gnosim.trace.refraction_library_beta.fresnelAmplitude(n_1, n_2, i, mode)
+        r_s_i,r_p_i = fresnelAmplitude(n_1, n_2, i, mode)
         r_s.append(r_s_i)
         r_p.append(r_p_i)
 
@@ -151,7 +151,7 @@ def testFresnelSign(n_1 = 1.5,n_2 = 1.0):
     r_s = []
     r_p = []
     for i in numpy.arange(91.):
-        r_s_i,r_p_i = gnosim.trace.refraction_library_beta.fresnelAmplitude(n_1, n_2, i, mode)
+        r_s_i,r_p_i = fresnelAmplitude(n_1, n_2, i, mode)
         r_s.append(r_s_i)
         r_p.append(r_p_i)
 
@@ -167,7 +167,7 @@ def testFresnelSign(n_1 = 1.5,n_2 = 1.0):
     r_s = []
     r_p = []
     for i in numpy.arange(91.):
-        r_s_i,r_p_i = gnosim.trace.refraction_library_beta.fresnelAmplitude(n_1, n_2, i, mode)
+        r_s_i,r_p_i = fresnelAmplitude(n_1, n_2, i, mode)
         r_s.append(r_s_i)
         r_p.append(r_p_i)
 
@@ -180,7 +180,7 @@ def testFresnelSign(n_1 = 1.5,n_2 = 1.0):
     r_s = []
     r_p = []
     for i in numpy.arange(91.):
-        r_s_i,r_p_i = gnosim.trace.refraction_library_beta.fresnelAmplitude(n_1, n_2, i, mode)
+        r_s_i,r_p_i = fresnelAmplitude(n_1, n_2, i, mode)
         r_s.append(r_s_i)
         r_p.append(r_p_i)
 

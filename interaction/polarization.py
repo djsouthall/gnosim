@@ -7,7 +7,7 @@ This file is used for the development of poarization capabilities for interactio
 import numpy
 import pylab
 import math
-import gnosim.trace.refraction_library_beta
+import gnosim.trace.refraction_library
 pylab.ion()
 import gnosim.earth.ice
 from mpl_toolkits.mplot3d import Axes3D
@@ -155,13 +155,13 @@ def getPolarizationAtAntenna(theta_ray_from_ant_at_neutrino , phi_ray_from_ant_a
         This is the attenuation factor of the s-polarization.  It should contain both the
         attenuation resulting from attenuation length, as well as the net effect of the
         fresnel amplitudes over the corse of the ray's path to the antenna.
-        Currently only numpy.real(a_s) is returned from refraction_libray_beta.makeLibrary,
+        Currently only numpy.real(a_s) is returned from refraction_library.makeLibrary,
         so a real float is expected here.
     a_p : float
         This is the attenuation factor of the p-polarization.  It should contain both the
         attenuation resulting from attenuation length, as well as the net effect of the
         fresnel amplitudes over the corse of the ray's path to the antenna.
-        Currently only numpy.real(a_p) is returned from refraction_libray_beta.makeLibrary,
+        Currently only numpy.real(a_p) is returned from refraction_library.makeLibrary,
         so a real float is expected here.
 
     Returns
@@ -206,7 +206,7 @@ def testPolarization():
     theta_ant = 5.0 #deg #will set the depth ultimately (found from ray tracing below)
     r_neutrino_pos = 50.0 #m    
     phi_neutrino_pos = 30.0 #Deg
-    x, y, z, t, d, phi, theta, a_p, a_s, index_reflect_air, index_reflect_water = gnosim.trace.refraction_library_beta.rayTrace(antenna_loc, phi_neutrino_pos, theta_ant ,ice, r_limit = 1.0000001*r_neutrino_pos)
+    x, y, z, t, d, phi, theta, a_p, a_s, index_reflect_air, index_reflect_water = gnosim.trace.refraction_library.rayTrace(antenna_loc, phi_neutrino_pos, theta_ant ,ice, r_limit = 1.0000001*r_neutrino_pos)
     theta_ray_from_ant_at_neutrino = theta[-1] #deg
     phi_ray_from_ant_at_neutrino = phi[-1] #deg
     theta_ray_from_ant_at_antenna = theta[0] #deg
