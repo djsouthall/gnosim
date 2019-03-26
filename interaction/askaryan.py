@@ -1178,14 +1178,15 @@ if __name__ == "__main__":
     noise_rms = numpy.std(quickSignalSingle(0,R,inelasticity*energy_neutrino,n,R,0,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)[3])
     V_noiseless, u, dominant_freq, V_noise,  SNR = quickSignalSingle(numpy.deg2rad(50),R,inelasticity*energy_neutrino,n,2500,0.7,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)
     sampling_rate = 1.5 #GHz
-    bytes = 7
+    sampling_period = 1.0/sampling_rate
+    bits = 7
     scale_noise_from = noise_rms
     scale_noise_to = 3
     
     random_time_offset = numpy.random.uniform(-5.0,5.0) #ns
     dc_offset = 0.0 #V
-    sample_times=gnosim.detector.fpga.calculateDigitalTimes(u[0],u[-1],sampling_rate,  random_time_offset = random_time_offset)
-    V_bit, sampled_times = gnosim.detector.fpga.digitizeSignal(u,V_noise,sample_times,bytes,scale_noise_from,scale_noise_to, dc_offset = dc_offset, plot = False)
+    sample_times = numpy.arange(u[0],u[-1],sampling_period) + random_time_offset 
+    V_bit, sampled_times = gnosim.detector.fpga.digitizeSignal(u,V_noise,sample_times,bits,scale_noise_from,scale_noise_to, dc_offset = dc_offset, plot = False)
     dt = sampled_times[1] - sampled_times[0]
     #################################################################
 

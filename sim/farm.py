@@ -22,21 +22,11 @@ dont_do = numpy.array(['results_2018_Aug_config_simple_-2_low_50MHz_high_200MHz_
 
 '''
 username = 'dsouthall'
-'''
-config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_simple_-1_polar_BW_160-600MHz.py',\
-                     '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_simple_-1_polar_BW_450-750MHz.py',\
-                     '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_simple_-2_polar_BW_160-600MHz.py',\
-                     '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_simple_-2_polar_BW_450-750MHz.py']
-'''
-'''
-config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_simple_-1_polar_BW_450-750MHz.py',\
-                     '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_simple_-2_polar_BW_450-750MHz.py']
-'''
 
-config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/real_config_antarctica_180_rays_signed_fresnel.py']
+config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/detector/station_config/real_config_antarctica_180_rays_signed_fresnel.py']
 '''
-config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/real_config.py',\
-                     '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_dipole_octo_-200_polar_120_rays.py']
+config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/detector/station_config/real_config.py',\
+                     '/home/dsouthall/Projects/GNOSim/gnosim/detector/station_config/config_dipole_octo_-200_polar_120_rays.py']
 '''
 #energy_neutrino_array = 10**numpy.arange(4., 4.4, 0.5) # GeV
 

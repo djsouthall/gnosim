@@ -27,15 +27,13 @@ pylab.ion()
 if __name__ == "__main__":
     pylab.close('all')
     #Paremeters
-    config_file = '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_dipole_octo_-200_polar_120_rays.py'
-    #config_file = '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/test.py'
+    config_file = '/home/dsouthall/Projects/GNOSim/gnosim/detector/station_config/config_dipole_octo_-200_polar_120_rays.py'
+    #config_file = '/home/dsouthall/Projects/GNOSim/gnosim/detector/station_config/test.py'
     config = yaml.load(open(config_file))
     solutions = numpy.array(['direct', 'cross', 'reflect'])
     
     random_roll = True
 
-    trim_sums = False #This only returns the regions of powersumming where zeros are not being added, as well as additional windowing
-    trim_amount = 100
     cut_zeros = False
     
     noise_length_multiplier = 100 #for the noise used in the triggering
@@ -168,7 +166,7 @@ if __name__ == "__main__":
                 pylab.ylabel('Sig (adu)')
                 pylab.xlabel('Times (ns)')
     
-        formed_beam_powers, beam_powersums = gnosim.detector.fpga.fpgaBeamForming(noise_digital_times, noise_digital_signals, station.beam_dict , plot1 = False, plot2 = False, save_figs = False, cap_bytes = station.beamforming_power_sum_byte_cap,trim_sums = trim_sums,trim_amount = trim_amount)
+        formed_beam_powers, beam_powersums = gnosim.detector.fpga.fpgaBeamForming(noise_digital_signals,noise_digital_times, station.beam_dict , plot1 = False, plot2 = False, save_figs = False, cap_bits = station.beamforming_power_sum_bit_cap)
         if cut_zeros == True:
             #'''###
             beam_cut = numpy.zeros((len(beam_powersums.keys()),len(beam_powersums[list(beam_powersums.keys())[0]])))

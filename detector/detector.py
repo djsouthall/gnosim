@@ -56,7 +56,7 @@ def plotArrayFromConfig(config,solutions,only_station = 'all',verbose = False):
         x_station, y_station, z_station = config['stations']['positions'][ii]
         station = gnosim.detector.detector.Station(x_station, y_station, z_station,config,solutions)
         #station.loadLib(pre_split = True)
-        self.stations.append(station)
+        stations.append(station)
 
     for index_station, station in enumerate(stations):
         # Loop over station antennas
@@ -161,8 +161,8 @@ class Station:
         bins will overlap.  The common use case when this was written was to have the interval set to half of the sum length, so successive sums
         contain half of their values in common with the previous sum.  This is used in the beamforming calculation during the power sum.  
         Specified in the configuration file.
-    beamforming_power_sum_byte_cap : int
-        This sets number of bytes to cap the power sum calculation (which will have units of adu^2).  This is used in gnosim.detector.fpga.fpgaBeamForming.
+    beamforming_power_sum_bit_cap : int
+        This sets number of bits to cap the power sum calculation (which will have units of adu^2).  This is used in gnosim.detector.fpga.fpgaBeamForming.
         Specified in the configuration file.
     n_beams : int
         The number of beams to be formed when creating a beam forming dictionary.  Specified in the configuration file.
@@ -181,10 +181,10 @@ class Station:
     digital_sampling_period : float
         This is the sampling period of the fpga digitizer.  It will sample from the electric fields at this period, returning digitized signals.  
         Given in ns.  Calculated from sampling_rate.
-    sampling_bits : 
+    sampling_bits : int
         This sets the number of voltage bins for a digitized signal.  Signals will be digitized asymmetrically about 0 to this bit size with values
         ranging from -2**(sampling_bits-1)+1 to 2**(sampling_bits-1).
-    scale_noise_to : 
+    scale_noise_to : int
         This scales the calculated 'analog' Askaryan calculations (in V) such that he noise_rms value is scale_noise_to adu.  The common use case
         is to set noise_rms to 3 adu.
     antennas : list of Antenna objects
@@ -211,7 +211,7 @@ class Station:
         self.accepted_solutions = gnosim.trace.refraction_library.getAcceptedSolutions()
         self.power_calculation_sum_length = config['DAQ']['power_calculation_sum_length']
         self.power_calculation_interval = config['DAQ']['power_calculation_interval']
-        self.beamforming_power_sum_byte_cap = config['DAQ']['beamforming_power_sum_byte_cap']
+        self.beamforming_power_sum_bit_cap = config['DAQ']['beamforming_power_sum_bit_cap']
         self.n_beams = self.config['DAQ']['n_beams']
         self.n_baselines = self.config['DAQ']['n_baselines']
         self.sampling_rate = self.config['DAQ']['sampling_rate_GHz']
@@ -1086,7 +1086,7 @@ if __name__ == "__main__":
     gamma_deg = 0.0
     antenna_type = 'dipole'
     import yaml
-    config_file = '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/real_config.py'
+    config_file = '/home/dsouthall/Projects/GNOSim/gnosim/detector/station_config/real_config.py'
     config = yaml.load(open(config_file))
     lib_filler = config['antenna_definitions']['dipole0']['lib']
     frequency_low = 30

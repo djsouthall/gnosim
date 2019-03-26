@@ -8,14 +8,14 @@
             'n_baselines':2,
             'power_calculation_sum_length':16,  #How long each power sum window is
             'power_calculation_interval':8, #How frequent each power sum window begins
-            'beamforming_power_sum_byte_cap':5 #FPGA does beamforming with only 5 bits despite signals being at 7, so they are capped here:
+            'beamforming_power_sum_bit_cap':5 #FPGA does beamforming with only 5 bits despite signals being at 7, so they are capped here:
             },  
  'stations': {'n': 1,
               'positions': [[0., 0., -173.]]},
  'antenna_definitions': {
                         'dipole0': {
                                     'antenna_type':'dipole',
-                                    'lib': '/home/dsouthall/Projects/GNOSim/library_-173_polar_180_rays/*.h5',
+                                    'lib': '/home/dsouthall/Projects/GNOSim/library_-173_antarctica_180_rays_signed_fresnel/*.h5',
                                     'position':[0.0,0.0,-0.0],
                                     'orientation':[0.0,0.0,0.0], #alpha, beta, gamma Euler angles in degrees for zxz rotation, all zeros to match ice frame
                                     'system_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_vpol.npy',
@@ -27,7 +27,7 @@
                                     },
                         'dipole1': {
                                     'antenna_type':'dipole',
-                                    'lib': '/home/dsouthall/Projects/GNOSim/library_-174_polar_180_rays/*.h5',
+                                    'lib': '/home/dsouthall/Projects/GNOSim/library_-174_antarctica_180_rays_signed_fresnel/*.h5',
                                     'position':[0.0,0.0,-1.0],
                                     'orientation':[0.0,0.0,0.0],
                                     'system_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_vpol.npy',
@@ -39,7 +39,7 @@
                                     },
                         'dipole2': {
                                     'antenna_type':'dipole',
-                                    'lib': '/home/dsouthall/Projects/GNOSim/library_-175_polar_180_rays/*.h5',
+                                    'lib': '/home/dsouthall/Projects/GNOSim/library_-175_antarctica_180_rays_signed_fresnel/*.h5',
                                     'position':[0.0,0.0,-2.0],
                                     'orientation':[0.0,0.0,0.0],
                                     'system_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_vpol.npy',
@@ -51,7 +51,7 @@
                                     },
                         'dipole3': {
                                     'antenna_type':'dipole',
-                                    'lib': '/home/dsouthall/Projects/GNOSim/library_-176_polar_180_rays/*.h5',
+                                    'lib': '/home/dsouthall/Projects/GNOSim/library_-176_antarctica_180_rays_signed_fresnel/*.h5',
                                     'position':[0.0,0.0,-3.0],
                                     'orientation':[0.0,0.0,0.0],
                                     'system_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_vpol.npy',
@@ -63,7 +63,7 @@
                                     },
                         'dipole4': {
                                     'antenna_type':'dipole',
-                                    'lib': '/home/dsouthall/Projects/GNOSim/library_-177_polar_180_rays/*.h5',
+                                    'lib': '/home/dsouthall/Projects/GNOSim/library_-177_antarctica_180_rays_signed_fresnel/*.h5',
                                     'position':[0.0,0.0,-4.0],
                                     'orientation':[0.0,0.0,0.0],
                                     'system_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_vpol.npy',
@@ -75,7 +75,7 @@
                                     },
                         'dipole5': {
                                     'antenna_type':'dipole',
-                                    'lib': '/home/dsouthall/Projects/GNOSim/library_-179_polar_180_rays/*.h5',
+                                    'lib': '/home/dsouthall/Projects/GNOSim/library_-179_antarctica_180_rays_signed_fresnel/*.h5',
                                     'position':[0.0,0.0,-6.0],
                                     'orientation':[0.0,0.0,0.0],
                                     'system_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_vpol.npy',
@@ -87,7 +87,7 @@
                                     },
                         'dipole6': {
                                     'antenna_type':'dipole',
-                                    'lib': '/home/dsouthall/Projects/GNOSim/library_-181_polar_180_rays/*.h5',
+                                    'lib': '/home/dsouthall/Projects/GNOSim/library_-181_antarctica_180_rays_signed_fresnel/*.h5',
                                     'position':[0.0,0.0,-8.0],
                                     'orientation':[0.0,0.0,0.0],
                                     'system_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_vpol.npy',

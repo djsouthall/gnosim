@@ -308,7 +308,7 @@ class Sim:
         random_time_offset : float, optional
             A small random jitter in timing to ensure that no systematic error is introduced from perfect timing in the MC simulation.  Given in ns.  (Default is 0.0).
         dc_offset : float, optional
-            An offset to be given to any signals.  Given in V. (Default is ).
+            An offset to be given to any signals.  Given in V. (Default is 0.0).
         do_beamforming : bool, optional
             Enables beamforming.  (Default is True).
         output_all_solutions : bool, optional
@@ -701,8 +701,8 @@ class Sim:
                         if do_beamforming == True:
                             #Here is where I perform the beamforming algorithms. 
                             
-                            Vd_out_sync, ud_out_sync  = gnosim.detector.fpga.syncSignals(time_digital[station.label],V_digital[station.label], min_time, max_time, dt)
-                            formed_beam_powers, beam_powersums = gnosim.detector.fpga.fpgaBeamForming(ud_out_sync, Vd_out_sync, station.beam_dict , plot1 = False, plot2 = False, save_figs = False, cap_bytes = station.beamforming_power_sum_byte_cap)
+                            Vd_out_sync, ud_out_sync  = gnosim.detector.fpga.syncSignals(V_digital[station.label],time_digital[station.label], min_time, max_time, dt)
+                            formed_beam_powers, beam_powersums = gnosim.detector.fpga.fpgaBeamForming(Vd_out_sync,ud_out_sync, station.beam_dict , plot1 = False, plot2 = False, save_figs = False, cap_bits = station.beamforming_power_sum_bit_cap)
                             #Getting max values
                             keep_top = 3
                             
@@ -735,7 +735,7 @@ class Sim:
                                 if numpy.any(V_out > trigger_threshold):
                                     triggered = True
                         if numpy.logical_and(do_beamforming == False, triggered == True):
-                            Vd_out_sync, ud_out_sync  = gnosim.detector.fpga.syncSignals(time_digital[station.label],V_digital[station.label], min_time, max_time, dt)
+                            Vd_out_sync, ud_out_sync  = gnosim.detector.fpga.syncSignals(V_digital[station.label],time_digital[station.label], min_time, max_time, dt)
                     else:
                         triggered = False    
                             
@@ -1236,7 +1236,7 @@ class Sim:
               anti=False, n_events=100000, detector_volume_radius=6000., detector_volume_depth=3000., 
               outfile=None,seed = None,pre_split = True, method = 'cubic', include_noise = True,summed_signals = True,
               plot_geometry = False, plot_signals = False, trigger_threshold = 0.0,trigger_threshold_units = 'fpga',plot_filetype_extension = 'svg',image_path = './',
-              use_interp_threading = True,use_event_threading = True, n_beams = 15, n_baselines = 2, output_all_solutions = True,save_signals = True,
+              use_interp_threading = True,use_event_threading = True, output_all_solutions = True,save_signals = True,
               pre_trigger_angle = None):
         '''
         The work horse of the simulation.  This function 'throws' (generates) neutrinos in the ice volume for the given energy, distributing them throughout the
@@ -1316,17 +1316,6 @@ class Sim:
             Enables multithreading during the interpolation portion of the code.  Significantly speeds up users perception of total run time (computationally
             this obviously still takes the same amount of time).  (Default is True).  Note that if this is enabled then live plotting is disabled, due to
             matplotlib currently not being thread safe.  Plots can be generated after the fact. (See gnosim.analysis.testing_single_event.py).
-        n_beams : int
-            The number of beams to be formed when creating a beam forming dictionary.  Specified in the configuration file.
-        n_baselines : int
-            This sets the number of baselines to be considered when creating the beam forming dictionary.  Currently this will automatically select the
-            n_baselines that are smallest (in m).  I.e. if you had 8 antennas seperated evenly by 1m, then n_baselines = 2 would result in both the 1m
-            and 2m baselines being used for subbeams.  If they 8 antennas were seperated evenly by 2m, then n_baselines = 2 would result in both the 2m
-            and 4m baselines being used for subbeams.  A subbeam is created for each baseline for a given beam (assuming at least 2 antennas are seperated
-            by the baseline).  Thus this parameter selects the number of subbeams to be used per beam.  Specified in the configuration file.
-            Currently the minimum time shift is assigned to the smallest baseline.  Thus every other timeshift resulting from larger baselines must be a 
-            multiple of the minimum baseline. i.e. all subbeam baselines must be in integer multiples of  the minimum baseline.  Currently requires all 
-            other baselines to be an integer multiple of the minimum baseline.
         output_all_solutions : bool, optional
             Enables all solution types to be output, otherwise only the solution type with the maximum signal per antenna is output.  (Default is True).
         save_signals : bool, optional
@@ -1769,11 +1758,6 @@ if __name__ == '__main__':
     energy_neutrino = float(sys.argv[2]) # GeV
     n_events = int(sys.argv[3])
     index = int(sys.argv[4])
-    #solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2'])
-    solutions = numpy.array(['direct', 'cross', 'reflect'])
-    #solutions = numpy.array(['cross'])
-    #detector_volume_radius = float(sys.argv[5]) # m, 1200 for Ross surface, 51000 for Minna bluff, >6000 for subterranean
-    #detector_volume_depth = float(sys.argv[6]) # m, 500 for Ross and Minna, 3000 for subterranean
     if len(sys.argv) == 6:
         seed = int(sys.argv[5])
         print('Using seed from sys.argv[5]: ', seed)
@@ -1783,24 +1767,26 @@ if __name__ == '__main__':
             print('Using no seed')
         else:
             print('Using internally (antarcticsim.py) defined seed: ', seed)
-    #SEED FOR TESTNG:
-    #seed = 1#None
-    config_file_fix = config_file.replace('/home/dsouthall/Projects/GNOSim/','')
-    config_file_fix = config_file_fix.replace('gnosim/sim/ConfigFiles/Config_dsouthall/','')
-    config_file_fix = config_file_fix.replace('./','')
+
+    sim_config = yaml.load(open(config_file))
+    station_config_file = sim_config['station_config_file']
+
+    station_config_file_fix = station_config_file.split('/')[-1].replace('.py','')
+
     if (seed != None):
-        outfile = '/home/dsouthall/scratch-midway2/results_2019_Mar_%s_%.2e_GeV_%i_events_%i_seed_%i.h5'%(config_file_fix.replace('.py', ''),
+        outfile = sim_config['outfile_dir'] + 'results_2019_Mar_%s_%.2e_GeV_%i_events_%i_seed_%i.h5'%(station_config_file_fix,
                                                                     energy_neutrino,
                                                                     n_events,
                                                                     seed,
                                                                     index)
         print('\n\n!!!Using Seed!!! \n\n Seed: ', seed, '\nOutfile Name: \n', outfile)
     else:
-        outfile = '/home/dsouthall/scratch-midway2/results_2019_Mar_%s_%.2e_GeV_%i_events_%i.h5'%(config_file_fix.replace('.py', ''),
+        outfile = sim_config['outfile_dir'] + 'results_2019_Mar_%s_%.2e_GeV_%i_events_%i.h5'%(station_config_file_fix,
                                                                 energy_neutrino,
                                                                 n_events,
                                                                 index)
         print('Outfile Name: \n', outfile)
+
     if os.path.isfile(outfile):
         print('Outfile Name %s is taken, saving in current directory and appending \'_new\' if necessary'%(outfile))
         outfile = './' + outfile.split('/')[-1]
@@ -1808,8 +1794,7 @@ if __name__ == '__main__':
             outfile = outfile.replace('.h5','_new.h5')
     
     #making image directory
-    image_extension = 'svg'
-    image_path = '/home/dsouthall/public_html/images/' + outfile.replace('.h5','').split('/')[-1] #should end with a / before inputting into throw
+    image_path = sim_config['image_path_root'] + outfile.replace('.h5','').split('/')[-1] #should end with a / before inputting into throw
     if os.path.exists(image_path):
         print('Image Directory Name %s is taken, saving in current directory and appending \'_new\' if necessary'%(image_path))
         image_path = image_path + '_new'
@@ -1823,45 +1808,47 @@ if __name__ == '__main__':
     
     
     #Creating Sim and throwing events
-    my_sim = Sim(config_file, solutions=solutions,electricFieldDomain = 'time',do_beamforming = True)
+    my_sim = Sim(station_config_file, solutions=numpy.array(sim_config['solutions']),electricFieldDomain = sim_config['electricFieldDomain'],do_beamforming = sim_config['do_beamforming'])
     
-    '''
-    To see information of the trigger threshold and units look to getAcceptedTriggerUnits for help.
-    '''
-    
-    #Used for testing: 10 adu, 11500 fpga, 11342 fpga for 10Hz noise triggering
     sys.stdout.flush()
-    my_sim.throw(energy_neutrino, n_events=n_events,
-                 detector_volume_radius=my_sim.config['detector_volume']['radius'],
-                 detector_volume_depth=my_sim.config['detector_volume']['depth'],
-                 outfile=outfile,seed=seed,include_noise = True,summed_signals = True, pre_split = True,
-                 plot_geometry = False, plot_signals = False, trigger_threshold = 11500, trigger_threshold_units = 'fpga',
-                 plot_filetype_extension = image_extension,image_path = image_path,use_interp_threading = True,use_event_threading = True,
-                 n_beams = 15, n_baselines = 2,output_all_solutions = True,save_signals = False,
-                 pre_trigger_angle = 10.0)
+    my_sim.throw(   energy_neutrino,
+                    n_events                = n_events,
+                    detector_volume_radius  = my_sim.config['detector_volume']['radius'],
+                    detector_volume_depth   = my_sim.config['detector_volume']['depth'],
+                    outfile                 = outfile,
+                    seed                    = seed, 
+                    include_noise           = sim_config['include_noise'],
+                    summed_signals          = sim_config['summed_signals'],
+                    pre_split               = sim_config['pre_split'],
+                    plot_geometry           = sim_config['plot_geometry'],
+                    plot_signals            = sim_config['plot_signals'],
+                    trigger_threshold       = sim_config['trigger_threshold'],
+                    trigger_threshold_units = sim_config['trigger_threshold_units'],
+                    plot_filetype_extension = sim_config['image_extension'],
+                    image_path              = image_path,
+                    use_interp_threading    = sim_config['use_event_threading'],
+                    use_event_threading     = sim_config['use_event_threading'],
+                    output_all_solutions    = sim_config['output_all_solutions'],
+                    save_signals            = sim_config['save_signals'],
+                    pre_trigger_angle       = sim_config['pre_trigger_angle'] )
     sys.stdout.flush()
-    #For pulser location that Kaeli is looking at:
-    #r_vertex = numpy.array([5214.0]), phi_vertex = numpy.array([0.0]), z_0 = numpy.array([-1450.0])
     
     print('Trying to print station geometry and antenna orientations')
     try:
-        fig = gnosim.detector.detector.plotArrayFromConfig(my_sim.config,solutions,only_station = 'all',verbose = False)
-        fig.savefig('%s%s_array_geometry.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),image_extension),bbox_inches='tight')
+        fig = gnosim.detector.detector.plotArrayFromConfig(my_sim.config,my_sim.solutions,only_station = 'all',verbose = False)
+        fig.savefig('%s%s_array_geometry.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),sim_config['image_extension']),bbox_inches='tight')
         pylab.close(fig)
     except Exception as e:
-        print('Failed to save image %s%s_array_geometry.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),image_extension))
+        print('Failed to save image %s%s_array_geometry.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),sim_config['image_extension']))
         print(e)
     
     print('Trying to create index.html file for new images')
     try:
-        gnosim.utils.misc.makeIndexHTML(path = image_path ,filetype = image_extension)
+        gnosim.utils.misc.makeIndexHTML(path = image_path ,filetype = sim_config['image_extension'])
     except Exception as e:
         print('Something went wrong in making index.html')
         print(e)
     sys.stdout.flush()
-    #python /home/dsouthall/Projects/GNOSim/sim/antarcticsim.py config energy n_events index 
-    #python /home/dsouthall/Projects/GNOSim/gnosim/sim/antarcticsim.py /home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_octo_-200_polar_120_rays.py 1.0e8 50000 1 
-    #f.close()
 
 ############################################################
 

@@ -34,6 +34,56 @@ def getAcceptedSolutions():
     solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2'])
     return solutions
 
+def getConcaveHullStarter():
+    '''
+    Returns the initial dictionary to be used for calculating the concave hull.  Values for the number of bins per solution type
+    can be adjusted here.  Below is information regarding the concave hull (pulled form the READEME).
+
+    The set of points created by the ray tracing library will ultimately populate the r-z plane of the ice (flattened cylindrical coordinates)
+    in such a way as to have a concave hull (i.e. the polygon that would surround all points is concave).  The hull is characterized be an envelope
+    function which is used to determine which portion of the r-z plane has possible ray tracing solutions for each of the solution types.  e.g. does
+    a point at (r,z) have any reflected solutions connecting the point to the antenna.  The accuracy of the hull is important for maximizing the 
+    imageable volume, without falsely classifying points resulting in poor interpolation.
+
+    It turns out that generating a concave hull is significantly harder than calculating a convex hull.  Efforts were made in 2018 to update the hull
+    algoritms (previously only concave hulls).  The problem was solved sufficiently, and prioritization did not enable further development of how the
+    hull is calculated.  Because of this the hull calculation is not quite as automated as would be preferable, and may require slight adjustments if
+    the number of rays thrown in a library vary significantly from the values used in development (often 180 rays).  More on this later.
+
+    The information describing the concave hull is calculated and stored in the dictionary concave_hull.  Calculations with the hull use a combination
+    of two limits:
+    -  Upper and lower depth bounds (denoted as z_min, z_max in concave_hull)
+    -  A set of radial boundary functions, which interpolate values stored in the dictionary.  'z_inner_r_bound' & 'r_inner_r_bound' described in
+       inner boundary (low values of r), and 'z_outer_r_bound' & 'r_outer_r_bound' describe the out boundary (high values of r).
+    For a solution to be identified as in a particular hull, the depth must be within the depth range defined by z_min and z_max, and within the 
+    range specified by the inner and outer radial bounding interpolation functions evaluated at that depth. 
+
+    The part that requires some attention is how these values for 'z_inner_r_bound','r_inner_r_bound','z_outer_r_bound', and 'r_outer_r_bound' are
+    obtained.  Essentially the total depth of the simulation is broken up into bins (with the number of bins being specified in the dictionary as
+    discussed below).  For each bin, the minimum and maximum radii are stored in 'r_inner_r_bound' and 'r_outer_r_bound', while depth values are stored
+    as 'z_inner_r_bound' and 'z_outer_r_bound'. 
+
+    The size of these bins defines how well approximates the concave hull is.  If the bins are too fine then the hull can appear jagged at the boundary,
+    jutting inward to points that would clearly have counterparts at further radii if more rays were thrown, if the bins are too coarse then the hull
+    becomes innacurate/convex, and can include regions such as the shadow that should not be included in the hull.  The number of bins needed for
+    preferable accurary depends on the solution type, and thus in practice is included in the definition of the concave_hull dictionary in the 
+    refraction_library.py module: See gnosim.trace.refraction_library.getConcaveHullStarter().
+
+    Below is how the hull is defined presently, with the number of bins being set to values that worked well for 180 rays throw in a volume of 3000m depth
+    and a radius of 6300m.
+
+    concave_hull = {'direct':{'n_bins':1000},'cross':{'n_bins':1500},'reflect':{'n_bins':2000},'direct_2':{'n_bins':500},'cross_2':{'n_bins':400},'reflect_2':{'n_bins':2000}} # worked for 120 rays
+
+    If significant changes are made to the number of rays thrown, or the dimensions of the ice, then please consult this line of code and adjust it as
+    required.  The hulls/envelopes can be plotted and referenced to guide your adjustment of the number of bins.
+
+    Returns
+    -------
+    concave_hull : dict
+        The initial dictionary used for concave hull creation. 
+    '''
+    concave_hull = {'direct':{'n_bins':1000},'cross':{'n_bins':1500},'reflect':{'n_bins':2000},'direct_2':{'n_bins':500},'cross_2':{'n_bins':400},'reflect_2':{'n_bins':2000}} # worked for 120 rays
+    return concave_hull
 
 def fresnelAmplitude(n_1, n_2, incidence_angle, mode, return_power = False):
     '''
@@ -985,7 +1035,7 @@ class RefractionLibrary:
         out_dir = out_dir + '/concave_hull'
         os.mkdir(out_dir)
         legend_locs = {'direct':'upper right','cross':'upper right','reflect':'upper right','direct_2':'lower right','cross_2':'lower right','reflect_2':'lower right'}        
-        concave_hull = {'direct':{'n_bins':1000},'cross':{'n_bins':1500},'reflect':{'n_bins':2000},'direct_2':{'n_bins':500},'cross_2':{'n_bins':400},'reflect_2':{'n_bins':2000}} # worked for 120 rays
+        concave_hull = getConcaveHullStarter()
             
         for solution in self.solutions:
             if verbose:
@@ -1251,34 +1301,37 @@ class RefractionLibrary:
 ############################################################
 
 if __name__ == '__main__':
-    make_library = True
-    split_library = True
-    plot_library = False
-    save_envelope = True
-    plot_envelope = False
-    z_array = numpy.array([-173.0,-174.0,-175.0,-176.0,-177.0,-179.0,-181.0])
-    #z_array = [-200.,-201.,-202.,-203.,-204.,-205.,-206.,-207.]
-    n_rays = 180
-    r_limit = None #Note if this is NOT None, then all thrown rays will quit once they read this particular radius.  Use with care.  If you want a simulation with r = 6300m, it might be advisable to make r_limit = 7000 so the boundaries of hulls are still well defined
-    ice_model = 'antarctica'
+
+    # Parameters
+    # ----------
+
+    make_library = True     #If True, will compute the libraries and save them.  Otherwise just loads from previously saved libraries if available. (False is useful for plotting previously generated libraries).
+    split_library = True    #If True, will split the libaries by solution type and save them.
+    plot_library = False    #If True, will plot the ray tracing libraries as they are created (or loaded if make_library == False).
+    save_envelope = True    #If True, will calculate the envelope for the ray tracing library and save it.  Advisable to do in advance when ray tracing library is created.
+    plot_envelope = False   #If True, will plot the envelope.
+    z_array = numpy.array([-173.0,-174.0,-175.0,-176.0,-177.0,-179.0,-181.0]) #The list of depths for which to throw rays (or load libraries if make_library == False).
+    n_rays = 180            #The number of rays to be thrown per depth.
+    r_limit = None          #Note if this is NOT None, then all thrown rays will quit once they read this particular radius.  Use with care.  
+                            #If you want a simulation with r = 6300m, it might be advisable to make r_limit = 7000 so the boundaries of hulls are still well defined
+    ice_model = 'antarctica' #The ice model to use when throwing rays.  To see available options see gnosim.earth.ice.getAcceptedIceModels().
+    plot_solution_list = numpy.array(['direct','cross','reflect','direct_2','cross_2','reflect_2']) #The list of solutions types to plot.  To see options see gnosim.trace.refraction_library.getAcceptedSolutions(). 
+    
+    #Note, it is recommended that you look below the for Library Name Formatting to ensure it is what you want.
 
     ############################################
 
+    # Library Builder
+    # ---------------
 
     ice_model = gnosim.earth.ice.checkIceModel(ice_model) #Checks if ice model exists and replaces as necessary.
     for z_0 in z_array:
-        library_dir = 'library_%i_%s_%i_rays_signed_fresnel'%(int(z_0),ice_model,n_rays)
-        
-        #print ('ice model = %s'%(ice_model))
+
+        #Library Name Formatting
+        library_dir = 'library_%i_%s_%i_rays'%(int(z_0),ice_model,n_rays)
        
-        theta_array = numpy.linspace(0., 180., n_rays) # 60, Trying double the density
-        #Below is an attemopt to enure more rays are thrown in the region surrounding the reflect/cross hull partition.
-        #theta_reflect = numpy.rad2deg(numpy.arcsin(ice.indexOfRefraction(-0.01)/ice.indexOfRefraction(z_0)))
-        #theta_array = numpy.append(theta_array,0.99*theta_reflect)
-        #theta_array = numpy.append(theta_array,1.01*theta_reflect)
-        
-        solution_list = numpy.array(['direct','cross','reflect','direct_2','cross_2','reflect_2'])
-        #solution_list = numpy.array(['direct','cross','reflect'])
+        theta_array = numpy.linspace(0., 180., n_rays) 
+
         if make_library == True:
             if os.path.isdir(library_dir):
                 print('Output directory Name %s is taken, saving in current directory and appending \'_new\' if necessary'%(library_dir))
@@ -1334,7 +1387,7 @@ if __name__ == '__main__':
         if plot_library == True: 
             color_key = {'direct':'r', 'cross':'darkgreen', 'reflect':'blue', 'direct_2':'gold', 'cross_2':'lawngreen', 'reflect_2':'purple'}           
             pylab.figure()
-            for solution in solution_list:
+            for solution in plot_solution_list:
                 if numpy.logical_and(len(test_lib.data[solution]['r']) > 0, len(test_lib.data[solution]['z']) > 0):
                     pylab.scatter( test_lib.data[solution]['r'], test_lib.data[solution]['z'],label=solution,color=color_key[solution],s=1)
             pylab.legend(loc='upper right')
@@ -1357,7 +1410,7 @@ if __name__ == '__main__':
             fig,ax = pylab.subplots()
             for infile in infiles:
                 solution = (infile.split('concave_hull_data_')[-1]).replace('.h5','')
-                if numpy.isin(solution,solution_list):
+                if numpy.isin(solution,plot_solution_list):
                     concave_hull[solution] ={}
                     reader = h5py.File(infile, 'r')
                     z = numpy.linspace(reader.attrs['z_min'],reader.attrs['z_max'],3000)

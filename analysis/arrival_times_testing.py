@@ -35,7 +35,7 @@ infile2 = 'results_2018_Sep_config_octo_-200_polar_120_rays_1.00e+08_GeV_100_eve
 
 infilepath = '/home/dsouthall/Projects/GNOSim/Output/'
 configfile = 'config_octo_-200_polar_360_rays.py' #just the file (no /'s), put directory below
-configfilepath = '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/' #file directory
+configfilepath = '/home/dsouthall/Projects/GNOSim/gnosim/detector/station_config/' #file directory
 config = yaml.load(open(configfilepath + configfile))
 
 configfile2 = 'config_octo_-200_polar_120_rays.py'

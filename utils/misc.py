@@ -4,6 +4,9 @@ Misc functions that might be useful to reuse.
 
 import numpy
 import pylab
+import os
+import os.path
+import glob
 
 
 def getColorMap(n):

@@ -1,7 +1,7 @@
-"""
+'''
 Practical and Accurate Calculations of Askaryan Radiation
 Source: Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283
-"""
+'''
 
 import numpy
 import pylab
@@ -31,7 +31,7 @@ pylab.ion()
 import cProfile, pstats, io
 
 def profile(fnc):
-    """
+    '''
     A decorator that uses cProfile to profile a function
     This is lifted from https://osf.io/upav8/
     
@@ -40,7 +40,21 @@ def profile(fnc):
     
     To use, decorate function of interest by putting @profile above
     its definition.
-    """
+    
+    Meanings:
+    ncalls  - for the number of calls.  When there are two numbers (for example 3/1), 
+              it means that the function recursed. The second value is the number 
+              of primitive calls and the former is the total number of calls. Note 
+              that when the function does not recurse, these two values are the same, 
+              and only the single figure is printed.
+    tottime - for the total time spent in the given function (and excluding time made 
+              in calls to sub-functions)
+    percall - is the quotient of tottime divided by ncalls
+    cumtime - is the cumulative time spent in this and all subfunctions (from invocation 
+              till exit). This figure is accurate even for recursive functions.
+    percall - is the quotient of cumtime divided by primitive calls
+    filename:lineno(function) - provides the respective data of each function
+    '''
     
     def inner(*args, **kwargs):
         
@@ -58,45 +72,54 @@ def profile(fnc):
 
     return inner
 
-def calculateDigitalTimes(u_min,u_max,sampling_period,random_time_offset = 0):
-    '''
-    This calculates the times to sample a signal given some u_min and u_max. 
-    
-    This should be the same for every antenna (i.e. it is on the array clock).
-    
-    So I shouldbe able to create it in advance for a wide window, and then sample
-    signals later for the subset of time that they occupy. 
-    
-    This probably doesn't need to be a function.
-    '''
-    sample_times = numpy.arange(u_min,u_max,sampling_period) + random_time_offset
-    #sample_times = sample_times[numpy.logical_and(sample_times <= u[-1],sample_times >= u[1])] 
-    return sample_times
-    
-def digitizeSignal(u,V,sample_times,digitizer_bytes,scale_noise_from,scale_noise_to, dc_offset = 0, plot = False):
-    '''
-    This function is meant to act as the ADC for the simulation.  It will sample
-    the signal using the provided sampling rate.  The value of
-    digitizer_bytes sets the number of voltage bins, those will be distributed from 
-    -2**(digitizer_bytes-1)+1 to 2**(digitizer_bytes-1).  The input V will be sampled and scaled linearly
-    using a linear scaling with V_new = (scale_noise_to/scale_noise_from) * V_sampled
-    And then V_sampled is scaled to be one of the byte values using a floor.  Everything
-    outside of the max will be rounded.  
-    
-    Sampleing rate should be in GHz
 
+def digitizeSignal(u,V,sample_times,digitizer_bits,scale_noise_from,scale_noise_to, dc_offset = 0, plot = False):
+    '''
+    This function is meant to act as the ADC for the simulation.  It will sample the signal using the provided sampling rate.  
+    The value of digitizer_bits sets the number of voltage bins, those will be distributed from  -2**(digitizer_bits-1)+1 to 2**(digitizer_bits-1).  
+    The input V will be sampled and scaled linearly using a linear scaling with V_new = (scale_noise_to/scale_noise_from) * V_sampled And then 
+    V_sampled is scaled to be one of the bit values using a floor.  Everything outside of the max will be rounded.   Sampling rate should be in GHz
+    
+    Parameters
+    ----------
+    u : numpy.ndarray of floats
+        Contains the times corresponding to V.  Given in ns.
+    V : numpy.ndarray of floats
+        The electric field to be digitized.  Given in V.
+    sample_times : numpy.ndarray of float
+        The pre calculated times for which to sample the signle V (which will be interpolated).
+    digitizer_bits : int
+        This sets the number of voltage bins for a digitized signal.  Signals will be digitized asymmetrically about 0 to this bit size with values
+        ranging from -2**(digitizer_bits-1)+1 to 2**(digitizer_bits-1).
+    scale_noise_from : float
+        This should be the noise from 'analog' Askaryan calculations, which will be used to determine scaling of signal during digitization.  A signal
+        of this value will be at scale_noise_to in adu.  Given in V.
+    scale_noise_to : int
+        This scales the calculated 'analog' Askaryan calculations (in V) such that he noise_rms value is scale_noise_to adu.  The common use case
+        is to set noise_rms to 3 adu.
+    dc_offset : float, optional
+        An offset to be given to any signals.  Given in V. (Default is 0).
+    plot : bool, optional
+        Enables plotting.  (Default is False).
 
+    Returns
+    -------
+    V_bit : numpy.ndarray
+        The output digitized signal.  Given in adu.
+    sample_times : numpy.ndarray
+        The corresponding output times that the signal was sampled.
     '''
     V = V + dc_offset
     #sampling_period = 1.0 / sampling_rate #ns
     #sample_times = numpy.arange(u[1],u[-1],sampling_period) + random_time_offset
     #sample_times = sample_times[numpy.logical_and(sample_times <= u[-1],sample_times >= u[1])] #otherwise interpolation error for out of bounds. 
-    V_sampled = scipy.interpolate.interp1d(u,V,bounds_error = False,fill_value = 0.0)(sample_times) #sampletimes will now extend beyond the interpolated range, but here it returns 0 voltage
+    V_sampled = scipy.interpolate.interp1d(u,V,bounds_error = False,fill_value = 0.0)(sample_times) #sampletimes will now extend beyond the interpolated range
+    but here it returns 0 voltage
     
-    #byte_vals = numpy.linspace(-2**(digitizer_bytes-1)+1,2**(digitizer_bytes-1),2**digitizer_bytes,dtype=int)
-    byte_vals = numpy.array([-2**(digitizer_bytes-1)+1,2**(digitizer_bytes-1)],dtype=int) #only really need endpoints
+    #bit_vals = numpy.linspace(-2**(digitizer_bits-1)+1,2**(digitizer_bits-1),2**digitizer_bits,dtype=int)
+    bit_vals = numpy.array([-2**(digitizer_bits-1)+1,2**(digitizer_bits-1)],dtype=int) #only really need endpoints
     slope = scale_noise_to/scale_noise_from
-    f = scipy.interpolate.interp1d(byte_vals/slope,byte_vals,bounds_error = False,fill_value = (byte_vals[0],byte_vals[-1]) )
+    f = scipy.interpolate.interp1d(bit_vals/slope,bit_vals,bounds_error = False,fill_value = (bit_vals[0],bit_vals[-1]) )
     V_bit = numpy.floor(f(V_sampled)) #not sure if round or floor should be used to best approximate the actual process.
     
     if plot == True:
@@ -114,13 +137,31 @@ def digitizeSignal(u,V,sample_times,digitizer_bytes,scale_noise_from,scale_noise
         pylab.stem(sample_times,V_bit,bottom = dc_offset*slope, linefmt='r-', markerfmt='rs', basefmt='r-',label='Interp Sampled at %0.2f GSPS'%sampling_rate)
     return V_bit, sample_times
 
-def syncSignals( u_in, V_in, min_time, max_time, u_step ):
+def syncSignals(V_in, u_in, min_time, max_time, u_step ):
     '''
-    Given a dictionary with an array (or empty array) for each antenna, This 
-    will extend the temporal range of each signal to be the same, and 
-    produce an ndarray with each row representing a signal and
-    appropriately place the V_in along this extended timeline.  This should be 
-    used before beam summing. 
+    Given a dictionary with an array (or empty array) for each antenna, This will extend the temporal range of each signal to be the same, 
+    and produce an ndarray with each row representing a signal andappropriately place the V_in along this extended timeline.  This should 
+    be used before beam summing.  Reformats the data as expected in the next portion of the code.
+
+    Paramters
+    ---------
+    V_in : dict
+        A dict of with a key/signal for each antenna.  The electric fields.  Given in V.
+    u_in : dict
+        A dict of with a key/signal for each antenna.  Contains the times corresponding to V_in.  Given in ns.
+    min_time : float,
+        The minimum time for which the set of signals span.
+    max_time : float,
+        The maximum time for which the set of signals span.
+    u_step : float,
+        The time step for the signals.
+
+    Returns
+    -------
+    V_out : numpy.ndarray
+        The synced voltage signals.  Each row corresponds to a voltage signal for an individual antenna.  Given in V.
+    u_out : numpy.ndarray
+        The corresponding times for the voltage signals.  Given in ns.
     '''
     u_out = numpy.tile(numpy.arange(min_time,max_time+u_step,u_step), (len(list(V_in.keys())),1))
     V_out = numpy.zeros_like(u_out)
@@ -133,23 +174,39 @@ def syncSignals( u_in, V_in, min_time, max_time, u_step ):
             V_out[antenna_index,left_index:right_index] +=  V
     return V_out, u_out
 
-def fpgaBeamForming(u_in, V_in, beam_dict , plot1 = False, plot2 = False, save_figs = False, trim_sums = False,trim_amount = 50, cap_bytes = 5):
+def fpgaBeamForming(V_in, u_in, beam_dict , plot1 = False, plot2 = False, save_figs = False, cap_bits = 5):
     '''
-    This is one function which uses the code from what were the sumBeams and 
-    doFPGAPowerCalcAllBeams functions, but puts them in one to avoid the extra 
-    time from calling multiple functions. 
-    
-    Expects u_in and V_in to be the same dimensions, with the same number
-    of rows as there are antennas. The shallowest detector should be the
-    first row of the input matrix. 
-    
-    beam_dict should come from the getBeams function, and is not included here
-    because it only needs to be called once, whereas this should be called for
-    each signal.
+    This is one function which uses the code from what were the sumBeams and doFPGAPowerCalcAllBeams functions, but puts them in one to 
+    avoid the extra time from calling multiple functions. Expects u_in and V_in to be the same dimensions, with the same numberof rows 
+    as there are antennas. The shallowest detector should be thefirst row of the input matrix. beam_dict should come from the getBeams 
+    function, and is not included herebecause it only needs to be called once, whereas this should be called foreach signal.
+
+    Paramters
+    ---------
+    V_in : numpy.ndarray
+        Synced voltage signals.  Each row corresponds to a voltage signal for an individual antenna.  Given in V.
+    u_in : numpy.ndarray
+        The corresponding times for the voltage signals.  Should be a single row, as the above signals are synched and the timing
+        information is the same.  Given in ns.
+    beam_dict : dict
+
+    plot1 : bool, optional
+        Enables plotting.  (Default is False).
+    plot2 : bool, optional
+        Enables plotting.  (Default is False).
+    save_figs : bool, optional
+        Enables the saving of the produced figures.
+    cap_bits : int, optional
+        This sets number of bits to cap the power sum calculation (which will have units of adu^2).  (Default is 5).
+
+    Returns
+    -------
+    formed_beam_powers : dict
+        Dictionary containing the powers sum for each subbeam.  Given in adu^2. 
+    beam_powersums : dict
+        Dictionary containing the powers sum for total beam (sum of all subbeams).  What is actually triggered on.  Given in adu^2.
     '''
-    #####
     #Doing the beam summing portion below:
-    #####
     if len(numpy.shape(V_in)) == 1:
         signal_length = len(V_in)
     elif len(numpy.shape(V_in)) == 2:
@@ -158,9 +215,9 @@ def fpgaBeamForming(u_in, V_in, beam_dict , plot1 = False, plot2 = False, save_f
         signal_length = 0
         
     #FPGA does beamforming with only 5 bits despite signals being at 7, so they are capped here:
-    byte_vals = numpy.array([-2**(cap_bytes-1)+1,2**(cap_bytes-1)],dtype=int) #only really need endpoints
-    V_in[V_in > byte_vals[-1]] = byte_vals[-1]#upper cap
-    V_in[V_in < byte_vals[0]] = byte_vals[0]  #lower cap
+    bit_vals = numpy.array([-2**(cap_bits-1)+1,2**(cap_bits-1)],dtype=int) #only really need endpoints
+    V_in[V_in > bit_vals[-1]] = bit_vals[-1]#upper cap
+    V_in[V_in < bit_vals[0]] = bit_vals[0]  #lower cap
     
     
     #below is the fastest way I could figure out of doing these sums.  Originally
@@ -241,20 +298,8 @@ def fpgaBeamForming(u_in, V_in, beam_dict , plot1 = False, plot2 = False, save_f
             if first_subbeam == True:
                 first_subbeam = False
                 beam_powersums[beam_label] = subbeam_powersum
-                if trim_sums == True:
-                    zero_cut = subbeam_powersum == 0
             else:
                 beam_powersums[beam_label] = numpy.add(beam_powersums[beam_label],subbeam_powersum)
-                if trim_sums == True:
-                    zero_cut = numpy.logical_or(zero_cut,subbeam_powersum == 0) 
-        if trim_sums == True:
-            #print('sum(zero_cut) == ', sum(zero_cut))
-            #print(zero_cut)
-            #print(1.0*(~zero_cut))
-            #print(beam_powersums[beam_label])
-            beam_powersums[beam_label] = numpy.multiply(beam_powersums[beam_label], 1.0*(~zero_cut))
-            #print(beam_powersums[beam_label])
-            beam_powersums[beam_label] = beam_powersums[beam_label][numpy.arange(trim_amount,len(beam_powersums[beam_label]) - trim_amount)]
         if plot2 == True:
             #getting weighted angle in crude way, angle is not a real angle anyways
             total_n = 0
@@ -282,12 +327,20 @@ def fpgaBeamForming(u_in, V_in, beam_dict , plot1 = False, plot2 = False, save_f
 
 def getScaleSystemResponseScale(station, desired_noise_rms = 20.4E-3, save_new_response = False):
     '''
-    The absolute scale of the system response has been hard to obtain, so we
-    have decided to just scale it such that the noise level (which is independent
-    of antenna response scale) matches experiment.  The value of noise given
-    by Eric was 1adu  6.8mV, so for a 3adu noise rms the desired_noise_rms = 20.4mV.
-    The mode selects which version of the responses you are calculating this factor
-    for.  
+    The absolute scale of the system response has been hard to obtain, so we have decided to just scale it such that the noise level 
+    (which is independent of antenna response scale) matches experiment.  The value of noise given by Eric was 1adu = 6.8mV, so for 
+    a 3adu noise rms the desired_noise_rms = 20.4mV. The mode selects which version of the responses you are calculating this factor for. 
+    A scaling value will be calculated for each antenna in the station (which will often be redundent as currently most antennnas
+    share responses). 
+
+    Parameters
+    ----------
+    station : gnosim.detector.detector.Station
+        A station containing antennas with system responses loaded.
+    desired_noise_rms : float, optional
+        The noise level you wish to achieve.  Given in V.  (Default is 20.4E-3).
+    save_new_response : bool, optional
+        Enables saving of the newly scaled response curve.  (Default is False).
     '''
 
     for index_antenna, antenna in enumerate(station.antennas):
@@ -326,10 +379,10 @@ def getScaleSystemResponseScale(station, desired_noise_rms = 20.4E-3, save_new_r
 ############################################################
 
 #
-if __name__ == "__main__":
+if __name__ == '__main__':
     pylab.close('all')
 
-    config_file = '/home/dsouthall/Projects/GNOSim/gnosim/sim/ConfigFiles/Config_dsouthall/config_dipole_octo_-200_polar_120_rays.py'
+    config_file = '/home/dsouthall/Projects/GNOSim/gnosim/detector/station_config/config_dipole_octo_-200_polar_120_rays.py'
     testSim = gnosim.sim.antarcticsim.Sim(config_file,electricFieldDomain = 'time',do_beamforming = True)
 
     slope,sys_fft = getScaleSystemResponseScale(testSim.stations[0],desired_noise_rms = 20.4E-3,save_new_response = True)
