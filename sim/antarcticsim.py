@@ -29,7 +29,7 @@ from multiprocessing import cpu_count
 import threading
 
 sys.path.append('/home/dsouthall/Projects/GNOSim/')
-import gnosim.utils.quat
+import gnosim.utils.linalg
 import gnosim.earth.earth
 import gnosim.earth.ice
 import gnosim.trace.refraction_library
@@ -392,11 +392,21 @@ class Sim:
         index_of_refraction_at_neutrino = self.ice.indexOfRefraction(z_0)
         cherenkov_angle_deg = numpy.rad2deg(numpy.arccos(1./index_of_refraction_at_neutrino))
         rs = numpy.sqrt((x_0 - x_antennas)**2 + (y_0 - y_antennas)**2)
-        phi_rays = numpy.degrees(numpy.arctan2(y_0 - y_antennas, x_0 - x_antennas)) % 360. # deg
-        vector_rays = gnosim.utils.quat.angToVec(phi_rays, temporary_info['theta_ray']) #at neutrino event, I think theta_ray points along ray towards neutrino.  So for an upward gowing ray towards the antenna, theta_ray > 90.0, directly downward ray towards antenna is 0.0 deg  
-        vector_neutrinos = numpy.tile(gnosim.utils.quat.angToVec(phi_0, theta_0),(len(phi_rays),1)) # Direction neutrino came from
-        observation_angles = gnosim.utils.quat.angTwoVec(vector_neutrinos, vector_rays) # deg
+        phi_rays = numpy.degrees(numpy.arctan2(y_0 - y_antennas, x_0 - x_antennas)) % 360. # deg #points along thrown ray towards neutrino from antenna. 
+
+        multi_vector_rays_to_neutrino_at_neutrino = gnosim.utils.linalg.angToVec(phi_rays, temporary_info['theta_ray']) #at neutrino event, I think theta_ray points along ray towards neutrino.  So for an upward going wave vector ray towards the antenna, theta_ray > 90.0, directly downward ray towards antenna is 0.0 deg  
+        multi_emission_wave_vector = - multi_vector_rays_to_neutrino_at_neutrino #Unit vectors along ray towards antenna as emitted by neutrino.  In the ice frame.
+
+        vector_to_neutrino_source = gnosim.utils.linalg.angToVec(phi_0, theta_0) # Direction neutrino came from
+        vector_neutrino_travel_dir = -vector_to_neutrino_source # Direction the shower is propogating (he direction the neutrino is heading)
+        
+        #multi_vector_to_neutrino_source = numpy.tile(vector_to_neutrino_source,(len(phi_rays),1)) 
+        multi_vector_neutrino_travel_dir = numpy.tile(vector_neutrino_travel_dir,(len(phi_rays),1))
+        
+        #observation_angles = gnosim.utils.linalg.angTwoVec(multi_vector_to_neutrino_source, multi_vector_rays_to_neutrino_at_neutrino) # deg
+        observation_angles = gnosim.utils.linalg.angTwoVec(multi_vector_neutrino_travel_dir, multi_vector_rays_to_neutrino_at_neutrino) # deg
         observation_angles[~has_solution_array.astype(bool)] = -999.0
+        
         if pre_trigger_angle == None:
             #Pre trigger passes for everything with solution
             pre_triggers = has_solution_array 
@@ -447,6 +457,10 @@ class Sim:
         
         #Only do triggering if any pass pre_trigger
         if numpy.any(temporary_info['pre_triggered'] == True):
+
+            multi_vector_rays_to_neutrino_at_antenna = gnosim.utils.linalg.angToVec(phi_rays, temporary_info['theta_ant']) #at antenna event, I think theta_ray points along ray towards neutrino.  So for an upward going wave vector ray towards the antenna, theta_ray > 90.0, directly downward ray towards antenna is 0.0 deg  
+            multi_detection_wave_vector = - multi_vector_rays_to_neutrino_at_antenna #Unit vectors along ray towards antenna as observed at antenna.  In the ice frame.
+
             #Set event seed:
             #Seperate RandomState object used for each event to futur proof for multithreading
             #to avoid issues with reproducability with a global RandomState
@@ -547,15 +561,20 @@ class Sim:
                                 d = temporary_info[ solution_cut ]['distance'] #m
                                 theta_ant_deg = temporary_info[ solution_cut ]['theta_ant'] #deg
                                 
-                                # TODO: Double check all angles and calculations in this section.
+                                '''
                                 theta_ray_from_ant_at_neutrino  = temporary_info[ solution_cut ]['theta_ray'][0]
                                 phi_ray_from_ant_at_neutrino    = phi_ray_to_neutrino[station.label][antenna.label][solution]
                                 theta_ray_from_ant_at_antenna   = temporary_info[ solution_cut ]['theta_ant'][0]
                                 phi_ray_from_ant_at_antenna     = phi_ray_from_ant_at_neutrino
                                 theta_neutrino_source_dir       = theta_0
                                 phi_neutrino_source_dir         = phi_0
-                                signal_reduction_factor = antenna.getAntennaResponseFactor(theta_ray_from_ant_at_neutrino , phi_ray_from_ant_at_neutrino , theta_ray_from_ant_at_antenna , phi_ray_from_ant_at_antenna , theta_neutrino_source_dir , phi_neutrino_source_dir , self.in_dic_array[station.label][antenna.label][solution]['a_s'][eventid] , self.in_dic_array[station.label][antenna.label][solution]['a_p'][eventid])
-                                
+                                '''
+                                vec_neutrino_travel_dir         = vector_neutrino_travel_dir
+                                emission_wave_vector            = multi_emission_wave_vector[station_wide_solution_index]
+                                detection_wave_vector           = multi_detection_wave_vector[station_wide_solution_index]
+
+                                signal_reduction_factor = antenna.getAntennaResponseFactor(vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , self.in_dic_array[station.label][antenna.label][solution]['a_s'][eventid] , self.in_dic_array[station.label][antenna.label][solution]['a_p'][eventid])
+                                #vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , a_s , a_p )
                                 if self.electricFieldDomain == 'time':                                                                        
                                     if include_noise == True:
                                         V_noiseless, u , dominant_freq, V_noise, SNR = gnosim.interaction.askaryan.quickSignalSingle( numpy.deg2rad(observation_angle),\
@@ -1273,11 +1292,11 @@ class Sim:
             The number of events to be thrown. 
         detector_volume_radius : , optional
             The radius of the 'detector' (ice to be used as detector/populated with neutrinos).  Given in m.  This should not exceed that
-            used when making the ray tracing libaries defined in the configuration file.  Making it slightly lower than that used in the 
+            used when making the ray tracing libraries defined in the configuration file.  Making it slightly lower than that used in the 
             ray tracing library construction can help avoid edge effects from the interpolation.
         detector_volume_depth : , optional
             The depth of the 'detector' (ice to be used as detector/populated with neutrinos).  Given in m.  This should not exceed that
-            used when making the ray tracing libaries defined in the configuration file.  Making it slightly lower than that used in the 
+            used when making the ray tracing libraries defined in the configuration file.  Making it slightly lower than that used in the 
             ray tracing library construction can help avoid edge effects from the interpolation.
         outfile : str, optional
             The address/name of the output file.  Only present self.throw is run.
@@ -1292,7 +1311,7 @@ class Sim:
         include_noise : bool, optional
             Enables the addition of noise to the time domain signals.  Note supported for electricFieldDomain = 'freq'.  (Default is True).
         summed_signals : bool, optional
-            If true, then signals resulting from different solution types are combined into a single waveform per antenna.  Otherwise
+            If True, then signals resulting from different solution types are combined into a single waveform per antenna.  Otherwise
             only the waveform of the solution type with the maximum signal per antenna will be used.  (Default is True).
         plot_geometry : bool, optional
             Enables plotting of the neutrino location, rays, and antennas.  Only plots for trigger events. (Default is False).
@@ -1336,7 +1355,14 @@ class Sim:
             angle: theta_c - 10.0 deg < theta_obs < theta_c + 10.0 deg.
 
             If ANY of the solution types of ANY of the antennas in the entire array satisfies the pre trigger, then all calculations for that event proceed, 
-            not just the solution types that independently satisfied the pre trigger threshold.  (Default is None).
+            not just the solution types that independently satisfied the pre trigger threshold.  
+
+            NOTE:  Setting a pre trigger can speed up the code significantly, but it must be done with care or else information may be lost.
+            It is highly recommended that you first run a simulation with you desired settings and pre_trigger_angle set to None.  Then with this
+            preliminary simulation analyse the losses you expect by not computing these angles (using gnosim/analysis/pre_trigger_set_tool.py for example).
+            Then with this knowledge set the pre trigger for future simulations as you see fit.
+
+            (Default is None).
         '''
 
         if numpy.logical_and(numpy.logical_or(plot_geometry,plot_signals),numpy.logical_or(use_event_threading,use_interp_threading)):
@@ -1514,12 +1540,12 @@ class Sim:
             self.file.create_dataset('p_earth', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             self.file.create_dataset('p_detect', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             
-            self.file.create_dataset('index_station', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            self.file.create_dataset('index_antenna', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('index_station', (self.n_events,), dtype='i', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('index_antenna', (self.n_events,), dtype='i', compression='gzip', compression_opts=9, shuffle=True)
 
             self.file.create_dataset('electric_field', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             self.file.create_dataset('observation_angle', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            self.file.create_dataset('solution', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('solution', (self.n_events,), dtype='i', compression='gzip', compression_opts=9, shuffle=True)
             self.file.create_dataset('t', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             self.file.create_dataset('d', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             self.file.create_dataset('theta_ray', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
@@ -1774,17 +1800,19 @@ if __name__ == '__main__':
     station_config_file_fix = station_config_file.split('/')[-1].replace('.py','')
 
     if (seed != None):
-        outfile = sim_config['outfile_dir'] + 'results_2019_Mar_%s_%.2e_GeV_%i_events_%i_seed_%i.h5'%(station_config_file_fix,
-                                                                    energy_neutrino,
-                                                                    n_events,
-                                                                    seed,
-                                                                    index)
+        outfile = sim_config['outfile_dir'] + '%s_%s_%.2e_GeV_%i_events_%i_seed_%i.h5'%(    sim_config['outfile_name_root'],
+                                                                                            station_config_file_fix,
+                                                                                            energy_neutrino,
+                                                                                            n_events,
+                                                                                            seed,
+                                                                                            index)
         print('\n\n!!!Using Seed!!! \n\n Seed: ', seed, '\nOutfile Name: \n', outfile)
     else:
-        outfile = sim_config['outfile_dir'] + 'results_2019_Mar_%s_%.2e_GeV_%i_events_%i.h5'%(station_config_file_fix,
-                                                                energy_neutrino,
-                                                                n_events,
-                                                                index)
+        outfile = sim_config['outfile_dir'] + '%s_%s_%.2e_GeV_%i_events_%i.h5'%(    sim_config['outfile_name_root'],
+                                                                                    station_config_file_fix,
+                                                                                    energy_neutrino,
+                                                                                    n_events,
+                                                                                    index)
         print('Outfile Name: \n', outfile)
 
     if os.path.isfile(outfile):

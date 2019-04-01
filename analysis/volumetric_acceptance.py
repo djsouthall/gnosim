@@ -29,7 +29,28 @@ pylab.ion()
 
 def volumetricAcceptance(reader,verbose = True):
     '''
-    Calculates the volumetric acceptance of a run in # km^3 sr
+    Calculates the volumetric acceptance of a run in # km^3 sr.
+
+    Parameters
+    ----------
+    reader : HDF5 file
+        This is the HDF5 file for the simulation (already opened).  To obtain this from an
+        address of a file, run the command:
+            reader = h5py.File( PATH_TO/FILENAME.h5 , 'r')
+        This will open the file in reader mode.
+
+    verbose : bool, optional
+        This enables print statements.  (Default is True).
+
+    Returns
+    -------
+    VA : float
+        The calc
+    error : float
+
+    energy_neutrino : float
+
+
     '''
     if numpy.isin('config',list(reader.attrs)):
         config = yaml.load(open(reader.attrs['config']))
@@ -46,6 +67,14 @@ def volumetricAcceptance(reader,verbose = True):
     else:
         print('geometric_factor file not found...')
         pass
+
+    if numpy.isin('ice_model_0',list(reader.attrs)):
+        ice_model = reader.attrs['ice_model_0']
+    elif numpy.isin('ice_model',list(reader.attrs)):
+        ice_model = reader.attrs['ice_model']
+    else:
+        print('ice_model file not found...')
+        pass
     
     if verbose == True:
         print('Loading relevant parts of info')
@@ -60,15 +89,10 @@ def volumetricAcceptance(reader,verbose = True):
     if verbose == True:
         print('Loading p_earth')
     p_earth = reader['p_earth'][...]
-    '''
-    if verbose == True:
-        print('Loading p_interact')
-    p_interact = reader['p_interact'][...]
-    '''
     
     if verbose == True:
         print('Calculating VA_sum')
-    ice = gnosim.earth.ice.Ice(reader.attrs['ice_model'],suppress_fun = True)
+    ice = gnosim.earth.ice.Ice(ice_model,suppress_fun = True)
     VA_sum = numpy.sum(p_earth * (ice.density(z_0) / gnosim.utils.constants.density_water) * (info['triggered']) )
     VA  = ((geometric_factor / gnosim.utils.constants.km_to_m**3)/n_events) * VA_sum # km^3 sr
     error = VA/numpy.sqrt(VA_sum)
@@ -83,11 +107,11 @@ def volumetricAcceptance(reader,verbose = True):
 ############################
 if __name__ == "__main__":
     #Calculation Parameters
-    calculate_data = False
-    config = 'real_config_signed_fresnel'
-    outdir = '/home/dsouthall/scratch-midway2/new_fresnel/'
+    calculate_data = True
+    config = 'real_config_antarctica_180_rays_signed_fresnel'
+    outdir = './'
     outname = outdir +'volumetric_acceptance_data_%s.h5'%(config)
-    expect_merged = False
+    #expect_merged = False
     #Plotting Parameters
     plot_data = True
     label='GNOSim - Current'
@@ -100,10 +124,13 @@ if __name__ == "__main__":
 
     if calculate_data == True:
         ######
+        '''
         if expect_merged == True:
             infiles = glob.glob('./*merged*.h5')
         else:
             infiles = glob.glob('./*seed*.h5')
+        '''
+        infiles = glob.glob('./results*.h5')
         print('Attempting to calculate volumetric acceptance for the following files:')
         for infile in infiles:
             print(infile)

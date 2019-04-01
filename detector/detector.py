@@ -12,7 +12,7 @@ import pylab
 import types
 import gnosim.trace.refraction_library
 import gnosim.interaction.polarization
-import gnosim.utils.quat
+import gnosim.utils.linalg
 import gnosim.utils.misc
 ############################################################
     
@@ -75,7 +75,7 @@ def plotArrayFromConfig(config,solutions,only_station = 'all',verbose = False):
                     print('x = ', antenna.x, 'm')
                     print('y = ', antenna.y, 'm')
                     print('z = ', antenna.z, 'm')
-                R = gnosim.utils.quat.eulerRotationMatrix(numpy.deg2rad(alpha_deg), numpy.deg2rad(beta_deg), numpy.deg2rad(gamma_deg))
+                R = gnosim.utils.linalg.eulerRotationMatrix(numpy.deg2rad(alpha_deg), numpy.deg2rad(beta_deg), numpy.deg2rad(gamma_deg))
                 basis_X = R[:,0] #x basis vector of the antenna frame in the ice basis
                 basis_Y = R[:,1] #y basis vector of the antenna frame in the ice basis
                 basis_Z = R[:,2] #z basis vector of the antenna frame in the ice basis
@@ -185,8 +185,8 @@ class Station:
         This sets the number of voltage bins for a digitized signal.  Signals will be digitized asymmetrically about 0 to this bit size with values
         ranging from -2**(sampling_bits-1)+1 to 2**(sampling_bits-1).
     scale_noise_to : int
-        This scales the calculated 'analog' Askaryan calculations (in V) such that he noise_rms value is scale_noise_to adu.  The common use case
-        is to set noise_rms to 3 adu.
+        This scales the calculated 'analog' Askaryan calculations (in V) during digitization such that the noise_rms value is scale_noise_to adu.  
+        The common use case is to set noise_rms to 3 adu.
     antennas : list of Antenna objects
         A list containing all of the Antenna objects corresponding to this particular station.
     noise_rms : numpy.ndarray float, optional
@@ -377,13 +377,16 @@ class Station:
             antenna.loadConcaveHull()
 
     def getBeams(self, n , verbose = False):
-
         '''
         This creates a dictionary containing all of the beam forming information for use by the gnosim.detector.fpga module. The goal of this 
         function is to determine the beam and subbeam time delays semiautomatically for the station. Currently the minimum time shift 
         is assigned to the smallest baseline.  Thus every other timeshift resulting from larger baselines must be a multiple of the 
         minimum baseline. i.e. all subbeam baselines must be in integer multiples of  the minimum baseline.  Currently requires all 
         other baselines to be an integer multiple of the minimum baseline.
+
+        #TODO:  This currently will try to make the dictionary based on all antennas, and will likely break if anything but the
+        anticipated linear geometry of station is given.  The antennnas should be separated into 2 categories, phased v.s. reconstruct.
+        And the phased array ones must be in a line.  This should only work on those ones.  
 
         Parameters
         ----------
@@ -521,15 +524,15 @@ class Antenna:
     z : float
         The z coordinate for the position of the antenna in the ice frame.  Given in m.
     alpha_deg : float
-        The alpha euler angle coordinate for choosig the orientation of the antenna in the ice frame.
+        The alpha euler angle coordinate for choosing the orientation of the antenna in the ice frame.
         Given in degrees.  These angles will be used with a rotation to orient the axis of the antenna.
         For additional information see the EulerAngleDefiniton.pdf file located in the sim folder.
     beta_deg : float
-        The beta euler angle coordinate for choosig the orientation of the antenna in the ice frame.
+        The beta euler angle coordinate for choosing the orientation of the antenna in the ice frame.
         Given in degrees.  These angles will be used with a rotation to orient the axis of the antenna.
         For additional information see the EulerAngleDefiniton.pdf file located in the sim folder.
     gamma_deg : float
-        The gamma euler angle coordinate for choosig the orientation of the antenna in the ice frame.
+        The gamma euler angle coordinate for choosing the orientation of the antenna in the ice frame.
         Given in degrees.  These angles will be used with a rotation to orient the axis of the antenna.
         For additional information see the EulerAngleDefiniton.pdf file located in the sim folder.
     antenna_type : str
@@ -563,15 +566,15 @@ class Antenna:
     z : float
         The z coordinate for the position of the antenna in the ice frame.  Given in m.
     alpha_deg : float
-        The alpha euler angle coordinate for choosig the orientation of the antenna in the ice frame.
+        The alpha euler angle coordinate for choosing the orientation of the antenna in the ice frame.
         Given in degrees.  These angles will be used with a rotation to orient the axis of the antenna.
         For additional information see the EulerAngleDefiniton.pdf file located in the sim folder.
     beta_deg : float
-        The beta euler angle coordinate for choosig the orientation of the antenna in the ice frame.
+        The beta euler angle coordinate for choosing the orientation of the antenna in the ice frame.
         Given in degrees.  These angles will be used with a rotation to orient the axis of the antenna.
         For additional information see the EulerAngleDefiniton.pdf file located in the sim folder.
     gamma_deg : float
-        The gamma euler angle coordinate for choosig the orientation of the antenna in the ice frame.
+        The gamma euler angle coordinate for choosing the orientation of the antenna in the ice frame.
         Given in degrees.  These angles will be used with a rotation to orient the axis of the antenna.
         For additional information see the EulerAngleDefiniton.pdf file located in the sim folder.
     antenna_type : str
@@ -621,7 +624,7 @@ class Antenna:
     h_fft : numpy.ndarray of cfloat, optional
         The values for the antenna response. (Should have units of m, i.e. effective height). Only present if self.addTimingInfo() is run.
     sys_fft : numpy.ndarray of cfloat, optional
-        The values for the syste response. (Should be unitless). Only present if self.addTimingInfo() is run.
+        The values for the system response. (Should be unitless). Only present if self.addTimingInfo() is run.
     freqs_response : numpy.ndarray of float, optional
         The values for the frequencies corresponding to the above responses. Only present if self.addTimingInfo() is run.
     signal_times : numpy.ndarray of floats, optional
@@ -648,7 +651,7 @@ class Antenna:
         self.noise_temperature = noise_temperature
         self.resistance = resistance 
 
-        self.R = gnosim.utils.quat.eulerRotationMatrix(numpy.deg2rad(self.alpha_deg), numpy.deg2rad(self.beta_deg), numpy.deg2rad(self.gamma_deg))
+        self.R = gnosim.utils.linalg.eulerRotationMatrix(numpy.deg2rad(self.alpha_deg), numpy.deg2rad(self.beta_deg), numpy.deg2rad(self.gamma_deg))
         self.R_inv = numpy.linalg.inv(self.R)     
 
         accepted_types = getAcceptedAntennaTypes() #MAKE SURE TO UPDATE IF YOU ADD NEW ANTENNA TYPES.
@@ -891,17 +894,15 @@ class Antenna:
         '''
         Takes a vector in ice frame coordinates and converts returns the coefficients for the antenna frame.
 
-        R should be calculated in advance using R = gnosim.utils.quat.eulerRotationMatrix(alpha_rad, beta_rad, gamma_rad), and stored
+        R should be calculated in advance using R = gnosim.utils.linalg.eulerRotationMatrix(alpha_rad, beta_rad, gamma_rad), and stored
         with its inverse as self.R and self.R_inv.  
         
-        This is intended to perform the extrinsic rotation of a vector
-        using the Euler angles alpha, beta, gamma.  The output vector is intended
-        to be in the frame in the basis frame defined by the given Euler angles.
-        
-        This returns the coefficients of the vector in the antenna frame.  
-        I.e. if the vector u, given in the ice basis (x,y,z) as u = a x + b y + c z 
-        is represented in the ice frame, this returns the coefficients A,B,C of the
-        antenna frame basis (X,Y,Z), such that u = A X + B Y + C Z = a x + b y + c z  
+        This is intended to perform the extrinsic rotation of a vector using the Euler angles alpha, beta, gamma.  
+        The output vector is intended to be in the frame in the basis frame defined by the given Euler angles. This returns the coefficients 
+        of the vector in the antenna frame.   
+
+        I.e. if the vector u, given in the ice basis (x,y,z) as u = a x + b y + c z  is represented in the ice frame, 
+        this returns the coefficients A,B,C of the antenna frame basis (X,Y,Z), such that u = A X + B Y + C Z = a x + b y + c z  
         
         Parameters
         ----------
@@ -928,7 +929,7 @@ class Antenna:
         out_vector = numpy.dot(self.R_inv,in_vector)
         return out_vector 
 
-    def getAntennaResponseFactor(self,theta_ray_from_ant_at_neutrino , phi_ray_from_ant_at_neutrino , theta_ray_from_ant_at_antenna , phi_ray_from_ant_at_antenna , theta_neutrino_source_dir , phi_neutrino_source_dir , a_s , a_p):
+    def getAntennaResponseFactor( self , vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , a_s , a_p ):
         '''
         This calculates the net reduction in signal seen by the antenna (before system response).  Includes effects from 
         beam pattern, polarization sensitivity, etc. depending on the antenna type chosen.
@@ -940,22 +941,17 @@ class Antenna:
 
         Parameters
         ----------
-        theta_ray_from_ant_at_neutrino : float
-            Zenith theta of vector of ray from antenna along path to neutrino (degrees).
-            This should be taken at the neutrino end of the ray.
-        phi_ray_from_ant_at_neutrino : float
-            Azimuthal theta of vector of ray from antenna along path to neutrino (degrees).
-            This should be taken at the neutrino end of the ray.
-        theta_ray_from_ant_at_antenna : float
-            Zenith theta of vector of ray from antenna along path to neutrino (degrees).
-            This should be taken at the antenna end of the ray.
-        phi_ray_from_ant_at_antenna : float
-            Azimuthal theta of vector of ray from antenna along path to neutrino (degrees).
-            This should be taken at the antenna end of the ray.
-        theta_neutrino_source_dir : float
-            Zenith theta of vector directed towards the source of the neutrino (degrees).
-        phi_neutrino_source_dir : float
-            Azimuthal theta of vector directed towards the source of the neutrino (degrees).
+        vec_neutrino_travel_dir : numpy.ndarray
+            The unit vector for the direction the shower is propogating.
+            This is returned in ice-frame cartesian coordinates.
+        emission_wave_vector : numpy.ndarray
+            The unit vector for the vector directed towards the antenna along the observation ray. 
+            This is returned in ice-frame cartesian coordinates.  This should be the wave vector
+            as it was emitted from the neutrino.
+        detection_wave_vector : numpy.ndarray
+            The unit vector for the vector directed towards the antenna along the observation ray. 
+            This is returned in ice-frame cartesian coordinates.  This should be the wave vector
+            as it interacts with the antenna.
         a_s : float
             This is the attenuation factor of the s-polarization.  It should contain both the
             attenuation resulting from attenuation length, as well as the net effect of the
@@ -990,11 +986,20 @@ class Antenna:
             #####
             
             #polarization_vector_0_ice_frame, k_0_ice_frame, vec_neutrino_travel_dir_ice_frame = getInitialPolarization(theta_ray_from_ant_at_neutrino,phi_ray_from_ant_at_neutrino,theta_neutrino_source_dir,phi_neutrino_source_dir)
-            polarization_vector_1_ice_frame, k_1_ice_frame = gnosim.interaction.polarization.getPolarizationAtAntenna(theta_ray_from_ant_at_neutrino,phi_ray_from_ant_at_neutrino,theta_ray_from_ant_at_antenna,phi_ray_from_ant_at_antenna,theta_neutrino_source_dir,phi_neutrino_source_dir, a_s, a_p, return_k_1 = True)            #This is for a vpol antenna. which is sensitive at polls, 
+            #polarization_vector_1_ice_frame, k_1_ice_frame = gnosim.interaction.polarization.getPolarizationAtAntenna(phi_ray_from_ant_at_neutrino,theta_ray_from_ant_at_neutrino,phi_ray_from_ant_at_antenna,theta_ray_from_ant_at_antenna,phi_neutrino_source_dir,theta_neutrino_source_dir, a_s, a_p, return_k_1 = True)            #This is for a vpol antenna. which is sensitive at polls, 
+            #vec_neutrino_travel_dir
+            #emission_wave_vector
+            #detection_wave_vector
+            polarization_vector_1_ice_frame = gnosim.interaction.polarization.getPolarizationAtAntenna(vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , a_s , a_p)            #This is for a vpol antenna. which is sensitive at polls, 
+
+
+
+
+
             #Note k_0 and k_1 are the wave vectors along the ray TOWARDS the antenna (from emission), with k_0 being at emission, and k_1 being at antenna
             #polarization_vector_1_antenna_frame = antennaFrameCoefficients(self.R_inv, polarization_vector_1_ice_frame, pre_inv = True)
             polarization_vector_1_antenna_frame = self.antennaFrameCoefficients(polarization_vector_1_ice_frame)
-            k_1_antenna_frame = self.antennaFrameCoefficients(k_1_ice_frame)
+            detection_wave_vector_antenna_frame = self.antennaFrameCoefficients(detection_wave_vector)
             #Below you should define how your particular antenna interacts with polarization, as well as the beam pattern. 
             #Antennas can be rotated, so be sure to do the calculations in the correct frame.
             
@@ -1008,11 +1013,11 @@ class Antenna:
             polarization_and_attenuation_factor = numpy.dot(polarization_vector_1_antenna_frame,dipole_polarization_axis_antenna_frame) #CONTAINS THE ATTENUATION
             #Calculating beam pattern from theta
             #below is the standard explicit way to do this
-            #antenna_frame_theta_rad = numpy.arccos(k_1_antenna_frame[2])# Typically it is arccos(z/r) but r is 1 for unit vector
+            #antenna_frame_theta_rad = numpy.arccos(detection_wave_vector_antenna_frame[2])# Typically it is arccos(z/r) but r is 1 for unit vector
             #beam_pattern_factor = numpy.sin(antenna_frame_theta_rad)**2
             #Below is a slightly faster way to do this using more geometry
-            #Assumeds k_1_antenna_frame is a unit vector
-            beam_pattern_factor = 1.0 - k_1_antenna_frame[2]**2.0 #where r is assumed to be 1 because working with unit vectors, #Note for many beam patterns likely want vector point TO observation, i.e. negative of this. But for this calculation is doesn't matter.
+            #Assumeds detection_wave_vector_antenna_frame is a unit vector
+            beam_pattern_factor = 1.0 - detection_wave_vector_antenna_frame[2]**2.0 #where r is assumed to be 1 because working with unit vectors, #Note for many beam patterns likely want vector point TO observation, i.e. negative of this. But for this calculation is doesn't matter.
             
             signal_reduction_factor = polarization_and_attenuation_factor*beam_pattern_factor
             
@@ -1029,28 +1034,28 @@ class Antenna:
                 #Note k_0 and k_1 are the wave vectors along the ray TOWARDS the antenna (from emission), with k_0 being at emission, and k_1 being at antenna
                 #polarization_vector_1_antenna_frame = antennaFrameCoefficients(self.R_inv, polarization_vector_1_ice_frame, pre_inv = True)
                 polarization_vector_1_antenna_frame = self.antennaFrameCoefficients(polarization_vector_1_ice_frame)
-                #k_1_antenna_frame = antennaFrameCoefficients(self.R_inv, k_1_ice_frame, pre_inv = True)
-                k_1_antenna_frame = self.antennaFrameCoefficients(k_1_ice_frame)
+                #detection_wave_vector_antenna_frame = antennaFrameCoefficients(self.R_inv, k_1_ice_frame, pre_inv = True)
+                detection_wave_vector_antenna_frame = self.antennaFrameCoefficients(k_1_ice_frame)
                 
-                k_1_phi_antenna, k_1_theta_antenna = gnosim.utils.quat.vecToAng(k_1_antenna_frame)
+                k_1_phi_antenna, k_1_theta_antenna = gnosim.utils.linalg.vecToAng(detection_wave_vector_antenna_frame)
                 
                 #####
                 #Specific calculations for this antenna type
                 #####
 
                 polarization_sensitivity_theta = 90.0    #Angle from pole (in antenna frame) the antenna is most sensitive to polarization.  This can be used for an azimuthally symetric polarization sensitivity
-                polarization_sensitivity_vector = gnosim.utils.quat.angToVec(k_1_phi_antenna, polarization_sensitivity_theta) #Vector aligned with polarization in phi direction at antenna, such that the dot product only polls out how aligned it is along the z axis, not azimuthally.
+                polarization_sensitivity_vector = gnosim.utils.linalg.angToVec(k_1_phi_antenna, polarization_sensitivity_theta) #Vector aligned with polarization in phi direction at antenna, such that the dot product only polls out how aligned it is along the z axis, not azimuthally.
 
                 polarization_and_attenuation_factor = numpy.dot(polarization_vector_1_antenna_frame,polarization_sensitivity_vector) #CONTAINS THE ATTENUATION
                 
                 #Calculating beam pattern from theta
                 #below is the standard explicit way to do this
-                #antenna_frame_theta_rad = numpy.arccos(k_1_antenna_frame[2])# Typically it is arccos(z/r) but r is 1 for unit vector
+                #antenna_frame_theta_rad = numpy.arccos(detection_wave_vector_antenna_frame[2])# Typically it is arccos(z/r) but r is 1 for unit vector
                 #beam_pattern_factor = numpy.sin(antenna_frame_theta_rad)**2
                 #Below is a slightly faster way to do this using more geometry
-                #Assumeds k_1_antenna_frame is a unit vector
+                #Assumeds detection_wave_vector_antenna_frame is a unit vector
 
-                beam_pattern_factor = 1.0 - k_1_antenna_frame[2]**2.0 #where r is assumed to be 1 because working with unit vectors, #Note for many beam patterns likely want vector point TO observation, i.e. negative of this. But for this calculation is doesn't matter.
+                beam_pattern_factor = 1.0 - detection_wave_vector_antenna_frame[2]**2.0 #where r is assumed to be 1 because working with unit vectors, #Note for many beam patterns likely want vector point TO observation, i.e. negative of this. But for this calculation is doesn't matter.
                 
                 signal_reduction_factor = polarization_and_attenuation_factor*beam_pattern_factor
                 
@@ -1058,17 +1063,17 @@ class Antenna:
             '''
         elif self.antenna_type == 'old_dipole':
             #This is how is was calculated before the polarization was added. 
-            k_1_ice_frame = gnosim.interaction.polarization.getWaveVector(theta_ray_from_ant_at_antenna,phi_ray_from_ant_at_antenna) #Note for many beam patterns likely want vector point TO observation, i.e. negative of this. But for this calculation is doesn't matter.
-            #k_1_antenna_frame = antennaFrameCoefficients(self.R_inv, k_1_ice_frame, pre_inv = True)
-            k_1_antenna_frame = self.antennaFrameCoefficients(k_1_ice_frame)
-            beam_pattern_factor = 1.0 - k_1_antenna_frame[2]**2.0 #where r is assumed to be 1 because working with unit vectors
+            #k_1_ice_frame = gnosim.interaction.polarization.getWaveVector(phi_ray_from_ant_at_antenna,theta_ray_from_ant_at_antenna) #Note for many beam patterns likely want vector point TO observation, i.e. negative of this. But for this calculation is doesn't matter.
+            #detection_wave_vector_antenna_frame = antennaFrameCoefficients(self.R_inv, k_1_ice_frame, pre_inv = True)
+            detection_wave_vector_antenna_frame = self.antennaFrameCoefficients(detection_wave_vector)
+            beam_pattern_factor = 1.0 - detection_wave_vector_antenna_frame[2]**2.0 #where r is assumed to be 1 because working with unit vectors
             
             signal_reduction_factor = numpy.abs(a_p)*beam_pattern_factor
             
             return signal_reduction_factor
 
         else:
-            print('ANTENNA TYPE NOT FOUND IN ACCEPTE ANTENNAS, RETURNING 1')
+            print('ANTENNA TYPE NOT FOUND IN ACCEPTED ANTENNAS, RETURNING 1')
             
             signal_reduction_factor = 1.0
             

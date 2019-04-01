@@ -19,6 +19,31 @@ def upsampleResponses(up_sample_factor,system_response_dir,antenna_response_dir,
     as possible.
     
     This also returns the newly padded responses and freqs.
+
+    Parameters
+    ----------
+    up_sample_factor : int
+        Characterizes how much calculateTimes should up sample the responses.  This is no longer used, as it
+        is expected that signal responses are up sampled in advance. up_sample_factor is not exact, as the
+        number of points is rounded to a factor of 2 to ensure future ifft's are as fast as possible.
+    system_response_dir : str
+        The directory/file containing the system response. Only present if self.addTimingInfo() is run.
+    antenna_response_dir : str
+        The directory/file containing the antenna response. Only present if self.addTimingInfo() is run.
+    save : bool, optional
+        Enables saving of the up sampled response.
+
+    Returns
+    -------
+    u : numpy.ndarray of floats
+        The observer times for which to calculate the Askaryan radiation.  Should span both negative and positive times 
+        to get the full details of the pulse.  Given in ns. 
+    h_fft : numpy.ndarray of cfloats
+        The values for the antenna response. (Should have units of m, i.e. effective height).
+    sys_fft : numpy.ndarray of cfloats
+        The values for the system response. (Should be unitless).
+    freqs : numpy.ndarray of floats
+        The values for the frequencies corresponding to the above responses. 
     '''
     antenna_response = numpy.load(antenna_response_dir)
     electronic_response = numpy.load(system_response_dir)

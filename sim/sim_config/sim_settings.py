@@ -1,9 +1,10 @@
-{'outfile_dir'           :   '/home/dsouthall/scratch-midway2/', #Where the data files will be saved.
+{'outfile_dir'          :   '/home/dsouthall/scratch-midway2/mar27_2/', #Where the data files will be saved.
+'outfile_name_root'     :   'results_2019_Mar', #This will be the first part of the outfiles name.  It will be followed by information about the simulation such as station_config_file_name and the number of neutrino events.
 'station_config_file'   :   '/home/dsouthall/Projects/GNOSim/gnosim/detector/station_config/real_config_antarctica_180_rays_signed_fresnel.py', #The address of the station configuration file
-'solutions'             :   ['direct', 'cross', 'reflect'],#The solutions to work with in the simulation #numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2'])
+'solutions'             :   ['direct', 'cross', 'reflect'],#The solutions to work with in the simulation #['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']
 'image_extension'       :   'svg',  #The file type for any saved images.
 'image_path_root'       :   '/home/dsouthall/public_html/images/', #The location of the directory for which a new subfolder with the name of the simulation will be created for output images.
-'electricFieldDomain'   :   'time', #Selects the Askaryan calculation type.  Either 'time' (highly recommended) or 'freq'.  'freq' is not fully supported and outdated, will use the frequency domain calculation that was in early builds of GNOSim rather than the new time domain calculation.
+'electricFieldDomain'   :   'time', #Enables a the performance of beamforming trigger on digitized signals.  Meta data will be stored in the info section of the outfile pertaining to this.  Beams will only be triggered on if trigger_threshold_units is 'fpga'. 
 'do_beamforming'        :   True,   #Enables a beamforming trigger, v.s. a normal per-antenna threshold.
 'include_noise'         :   True,   #Enables the inclusion of noise.
 'summed_signals'        :   True,   #Enables signals to be joined together (i.e. a direct and reflected pulses will be read out in same time stream).

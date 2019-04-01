@@ -1,6 +1,5 @@
 '''
-Generally contains tools for vector calculations.  Orignally this was intended to contain quaternion information,
-but has been repurposed.
+Generally contains tools for vector calculations.  
 '''
 
 import numpy
@@ -22,7 +21,12 @@ def vecToAng(v):
     theta : float
         The polar spherical coordinate.  Given in degrees.
     '''
-    x, y, z = v
+    if numpy.size(v) == 3:
+        x, y, z = v
+    else:
+        x = v[:,0]
+        y = v[:,1]
+        z = v[:,2]
     r = numpy.sqrt(x**2 + y**2 + z**2)
     theta = numpy.degrees(numpy.arccos(z / r)) # angle from zenith
     phi = numpy.degrees(numpy.arctan2(y, x)) % 360.

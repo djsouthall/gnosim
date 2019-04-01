@@ -113,8 +113,7 @@ def digitizeSignal(u,V,sample_times,digitizer_bits,scale_noise_from,scale_noise_
     #sampling_period = 1.0 / sampling_rate #ns
     #sample_times = numpy.arange(u[1],u[-1],sampling_period) + random_time_offset
     #sample_times = sample_times[numpy.logical_and(sample_times <= u[-1],sample_times >= u[1])] #otherwise interpolation error for out of bounds. 
-    V_sampled = scipy.interpolate.interp1d(u,V,bounds_error = False,fill_value = 0.0)(sample_times) #sampletimes will now extend beyond the interpolated range
-    but here it returns 0 voltage
+    V_sampled = scipy.interpolate.interp1d(u,V,bounds_error = False,fill_value = 0.0)(sample_times) #sampletimes will now extend beyond the interpolated range but here it returns 0 voltage
     
     #bit_vals = numpy.linspace(-2**(digitizer_bits-1)+1,2**(digitizer_bits-1),2**digitizer_bits,dtype=int)
     bit_vals = numpy.array([-2**(digitizer_bits-1)+1,2**(digitizer_bits-1)],dtype=int) #only really need endpoints

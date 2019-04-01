@@ -4,12 +4,14 @@ import sys
 import numpy
 import h5py
 import time
+
 infiles = glob.glob('./*.h5')
 merge_cut = numpy.array([len(infile.split('merged')) > 1 for infile in infiles])
 merged_files = numpy.array(infiles)[merge_cut]
 infiles = numpy.array(infiles)[~merge_cut]
 file_roots = numpy.unique([infile.replace(infile.split('_events')[-1],'') for infile in infiles])
 sys.stdout.flush()
+
 for file_root in file_roots:
     print('On setup:',file_root)
     sys.stdout.flush()

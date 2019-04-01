@@ -1,0 +1,3 @@
+#!/bin/bash 
+module load python/3.6.1+intel-16.0
+echo "python/3.6.1+intel-16.0 loaded"

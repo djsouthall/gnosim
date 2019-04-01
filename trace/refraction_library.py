@@ -369,7 +369,7 @@ def testFresnel(n_low=1., n_high=1.5):
 
 
 
-def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = None, fresnel_mode = 'ampltude'): 
+def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = None, fresnel_mode = 'amplitude'): 
     '''
     Throws a ray in the given direction in the given ice.  Returns information for each point in the calculated ray.
     Calculates key values along a the ray.  THe most common use case of this function is to throw rays from the
@@ -412,17 +412,17 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = N
     d_array : numpy.ndarray
         Total distance traveled elapsed at each point along the ray.  Given in meters.
     phi_array : numpy.ndarray
-        Spherical azimuthal coordinate the momentum vector of the ray point along the ray in the ice frame.  I.e. as the ray is thrown
-        from the origin, the momentum vector will be in the direction azimuthal phi_0 direction, phi_array[0] = phi_0.  Given in degrees.
+        Spherical azimuthal coordinate of the momentum vector of the ray point along the ray in the ice frame.  I.e. as the ray is thrown
+        from the origin (antenna), the momentum vector will be in the direction azimuthal phi_0 direction, phi_array[0] = phi_0.  Given in degrees.
     theta_array : numpy.ndarray
-        Spherical polar coordinate the momentum vector of the ray point along the ray in the ice frame.  I.e. as the ray is thrown
-        from the origin, the momentum vector will be in the direction polar theta_ant direction, theta_array[0] = theta_ant.  Given in degrees.
+        Spherical polar coordinate of the momentum vector of the ray point along the ray in the ice frame.  I.e. as the ray is thrown
+        from the origin (antenna), the momentum vector will be in the direction polar theta_ant direction, theta_array[0] = theta_ant.  Given in degrees.
     a_p_array : numpy.ndarray
         p polarization attenuation factor.  Includes effects from general attenuation in ice due to attenuation length (currently only for 300 MHz), 
-        as well as reduction in signal resulting from fresnel coefficients (as well as sign lips resulting from fresnel amplitudes). 
+        as well as reduction in signal resulting from fresnel coefficients (as well as sign flips resulting from fresnel amplitudes). 
     a_s_array : numpy.ndarray
         s polarization attenuation factor.  Includes effects from general attenuation in ice due to attenuation length (currently only for 300 MHz), 
-        as well as reduction in signal resulting from fresnel coefficients (as well as sign lips resulting from fresnel amplitudes). 
+        as well as reduction in signal resulting from fresnel coefficients (as well as sign flips resulting from fresnel amplitudes). 
     index_reflect_air : int
         Index in the above arrays corresponding to reflections at the ice-air interface.
     index_reflect_water : int
@@ -1306,7 +1306,7 @@ if __name__ == '__main__':
     # ----------
 
     make_library = True     #If True, will compute the libraries and save them.  Otherwise just loads from previously saved libraries if available. (False is useful for plotting previously generated libraries).
-    split_library = True    #If True, will split the libaries by solution type and save them.
+    split_library = True    #If True, will split the libraries by solution type and save them.
     plot_library = False    #If True, will plot the ray tracing libraries as they are created (or loaded if make_library == False).
     save_envelope = True    #If True, will calculate the envelope for the ray tracing library and save it.  Advisable to do in advance when ray tracing library is created.
     plot_envelope = False   #If True, will plot the envelope.
