@@ -16,7 +16,6 @@ import scipy.misc
 import time
 import math
 import copy
-sys.path.append("/home/dsouthall/Projects/GNOSim/")
 from matplotlib import gridspec
 import pandas
 import gnosim.sim.antarcticsim

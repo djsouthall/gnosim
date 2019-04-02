@@ -141,8 +141,9 @@ The below section discusses the usage of the simulation code.  The general topic
 
                 import gnosim.earth.ice
 
-            Such commands required the script calling them to be executed from the folder containing gnosim, or for that folder to be added to the path
-            using the command:
+            Such commands required the script calling them to be executed from the folder containing gnosim.  If you
+            wish to run these scripts from a different location then you must add the following command before any
+            imports of gnosim are called in the script.
 
                 sys.path.append('/PATH_TO_GNOSIM/')
 
@@ -883,18 +884,33 @@ The below section discusses the usage of the simulation code.  The general topic
     3.4.0    Analysis Scripts
     -------------------------
 
-    As a full analysis has not been done with the simulation code, only some analysis files exist.  Those that exist
-    can be used as examples for future development.  Ideally as the simulation is worked with, interesting analysis
-    scripts will be developed and added to the git repository to allow for general use.  The sub sections below discuss
-    some existing analysis scripts.  Note that these are not as maintained or thought out/generalized as some things in
-    the main portion of the simulation, and may require some tinkering to ensure they work as you desire.  Analysis
-    file should stay within the gnosim/analysis folder for organization purposes.
+        As a full analysis has not been done with the simulation code, only some analysis files exist.  Those that exist
+        can be used as examples for future development.  Ideally as the simulation is worked with, interesting analysis
+        scripts will be developed and added to the git repository to allow for general use.  The sub sections below discuss
+        some existing analysis scripts.  Note that these are not as maintained or thought out/generalized as some things in
+        the main portion of the simulation, and may require some tinkering to ensure they work as you desire.  Analysis
+        file should stay within the gnosim/analysis folder for organization purposes.
 
         3.4.1    Volumetric Acceptance
         ------------------------------
 
             The volumetric acceptance is a common thing to calculate for a particular set of simulations.  During development
-            the script gnosim/analysis/volumetric_acceptance.py was used for these calculations.  The function 
+            the script gnosim/analysis/volumetric_acceptance.py was used for these calculations. 
+
+        3.4.2    Neutrino Approach Test
+        -------------------------------
+
+            This script was written for a long gone build of the code, and was supposed to plot the approach angles of the
+            neutrinos (potentially with some weighting) as a check on if it made sense.  The code is still there in case it
+            will some day be adapted for the recent code build. 
+
+        3.4.3    Arrival Times Testing
+        ------------------------------
+
+            This script was written for a long gone build of the code, and was supposed to plot times of arrival across the
+            different antennas and compare this to the expected values for different angles.  This code was used while the
+            hull was being improved but has not been touched since.  The code is still there in case it will some day be 
+            adapted for the recent code build.
 
     3.5.0    Converting Signals to Data-Like Format
     -----------------------------------------------

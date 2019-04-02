@@ -19,7 +19,6 @@ import yaml
 import pickle
 import types
 from matplotlib.colors import LogNorm
-sys.path.append('/home/dsouthall/Projects/GNOSim/')
 import gnosim.utils.constants
 import gnosim.utils.bayesian_efficiency
 import gnosim.earth.ice
@@ -107,7 +106,7 @@ def volumetricAcceptance(reader,verbose = True):
 ############################
 if __name__ == "__main__":
     #Calculation Parameters
-    calculate_data = True
+    calculate_data = False
     config = 'real_config_antarctica_180_rays_signed_fresnel'
     outdir = './'
     outname = outdir +'volumetric_acceptance_data_%s.h5'%(config)
@@ -116,11 +115,13 @@ if __name__ == "__main__":
     plot_data = True
     label='GNOSim - Current'
     dataname = outname
-    plot_paper_comparison = True
+    plot_paper_comparison = False
     paper_comparison_file = '/home/dsouthall/Projects/GNOSim/gnosim/analysis/DesignPerformancePaperData.py'
     plot_self_comparison = True
     self_comparison_file = '/home/dsouthall/scratch-midway2/mar_testing_real_config/volumetric_acceptance_data_real_config.h5'
     label_compare = 'GNOSim Old - No polarization'
+
+    plot_ratios = True
 
     if calculate_data == True:
         ######
@@ -157,7 +158,7 @@ if __name__ == "__main__":
          
         writer.close()
     
-    if plot_data:
+    if numpy.logical_or(plot_data,plot_ratios):
         markersize = 10
         linewidth = 5
         reader = h5py.File(dataname , 'r')
@@ -168,17 +169,11 @@ if __name__ == "__main__":
         
         cut = VA != 0 
         sorted_cut = numpy.argsort(energy_neutrino)[numpy.isin(numpy.argsort(energy_neutrino),numpy.where(cut)[0])]
-        fig = pylab.figure(figsize=(16.,11.2))
+
         if plot_paper_comparison == True:
-            plot_paper_comparison = True
             compare_data = yaml.load(open(paper_comparison_file))
-            for key in compare_data.keys():
-                x = numpy.array(compare_data[key]['x'])
-                y = numpy.array(compare_data[key]['y'])
-                pylab.errorbar(x,y, yerr=None,fmt=compare_data[key]['style'],label=compare_data[key]['label'],capsize=5,markersize=markersize,linewidth=linewidth)
-        
+
         if plot_self_comparison == True:
-            plot_self_comparison = True
             reader_compare = h5py.File(self_comparison_file , 'r')
             energy_neutrino_compare = reader_compare['energy_neutrino'][...]
         
@@ -187,12 +182,29 @@ if __name__ == "__main__":
             
             cut_compare = VA_compare != 0 
             sorted_cut_compare = numpy.argsort(energy_neutrino_compare)[numpy.isin(numpy.argsort(energy_neutrino_compare),numpy.where(cut_compare)[0])]
+
+    if plot_data:
+        fig = pylab.figure(figsize=(16.,11.2))
+        
+        if plot_ratios == True:
+            ax = pylab.subplot(2,1,1)
+        else:
+            ax = pylab.gca
+        
+        if plot_paper_comparison == True:
+            compare_data = yaml.load(open(paper_comparison_file))
+            for key in compare_data.keys():
+                x = numpy.array(compare_data[key]['x'])
+                y = numpy.array(compare_data[key]['y'])
+                pylab.errorbar(x,y, yerr=None,fmt=compare_data[key]['style'],label=compare_data[key]['label'],capsize=5,markersize=markersize,linewidth=linewidth)
+        
+        if plot_self_comparison == True:
             pylab.errorbar(energy_neutrino_compare[sorted_cut_compare]/1e6, VA_compare[sorted_cut_compare], yerr=error_compare[sorted_cut_compare],color='orange',fmt='o-',label=label_compare,capsize=5,markersize=markersize,linewidth=linewidth)
 
         pylab.errorbar(energy_neutrino[sorted_cut]/1e6, VA[sorted_cut], yerr=error[sorted_cut],fmt='go-',label=label,capsize=5,markersize=markersize,linewidth=linewidth)
                     
             
-        pylab.legend(loc = 'lower right',fontsize = 24)
+        pylab.legend(loc = 'lower right',fontsize = 16)
         #pylab.ylim(8e-7,1.5e2)
         #pylab.xlim(8e5,2e10)
         ax = pylab.gca()
@@ -212,7 +224,65 @@ if __name__ == "__main__":
         #ax = pylab.gca()
         #ax.minorticks_on()
             
+    if plot_ratios:
+
+        if plot_data:
+            ax = pylab.subplot(2,1,2, sharex = ax)
+        else:
+            fig = pylab.figure(figsize=(16.,11.2))
+            ax = fig.gca()
+
+        
+        if plot_paper_comparison == True:
+            plot_paper_comparison = True
+            compare_data = yaml.load(open(paper_comparison_file))
+            rounded_energy_neutrinos_sorted = numpy.zeros_like(energy_neutrino[sorted_cut])
+            for i,en in enumerate(energy_neutrino[sorted_cut]):
+                rounded_energy_neutrinos_sorted[i] = float('%0.1g'%(en/1e6)) #rounds to 3 sig figs
+
+            for key in compare_data.keys():
+                x = numpy.array(compare_data[key]['x'])
+                rounded_x = numpy.zeros_like(x)
+                for i,en in enumerate(x):
+                    rounded_x[i] = float('%0.1g'%(en)) #rounds to 3 sig figs
+                y = numpy.array(compare_data[key]['y'])
+                y = y[numpy.isin(rounded_x,rounded_energy_neutrinos_sorted)]
+                x = x[numpy.isin(rounded_x,rounded_energy_neutrinos_sorted)]
+                rounded_x = rounded_x[numpy.isin(rounded_x,rounded_energy_neutrinos_sorted)]
+                y = numpy.divide(y,VA[sorted_cut][numpy.isin(rounded_energy_neutrinos_sorted,rounded_x)])
+                pylab.errorbar(x,y, yerr=None,fmt=compare_data[key]['style'],label=compare_data[key]['label'],capsize=5,markersize=markersize,linewidth=linewidth)
+        
+        if plot_self_comparison == True:
+            plot_self_comparison = True
+            reader_compare = h5py.File(self_comparison_file , 'r')
+            energy_neutrino_compare = reader_compare['energy_neutrino'][...]
             
+            VA_compare = reader_compare['volumetric_acceptance'][numpy.isin(energy_neutrino_compare,energy_neutrino[sorted_cut])]
+            error_compare = reader_compare['error'][numpy.isin(energy_neutrino_compare,energy_neutrino[sorted_cut])]
+            energy_neutrino_compare = energy_neutrino_compare[numpy.isin(energy_neutrino_compare,energy_neutrino[sorted_cut])]
+            cut_compare = VA_compare != 0 
+            sorted_cut_compare = numpy.argsort(energy_neutrino_compare)[numpy.isin(numpy.argsort(energy_neutrino_compare),numpy.where(cut_compare)[0])]
+            ratio_compare = numpy.divide(VA_compare[sorted_cut_compare],VA[sorted_cut])
+            
+            rel_err = numpy.sqrt(numpy.divide(error[sorted_cut],VA[sorted_cut])**2 + numpy.divide(error_compare[sorted_cut_compare],VA_compare[sorted_cut_compare])**2)
+
+            pylab.errorbar(energy_neutrino_compare[sorted_cut_compare]/1e6, ratio_compare, yerr=numpy.multiply(ratio_compare,rel_err),color='orange',fmt='o-',label=label_compare,capsize=5,markersize=markersize,linewidth=linewidth)
+
+        pylab.errorbar(energy_neutrino[sorted_cut]/1e6, numpy.ones_like(VA[sorted_cut]), yerr=None,fmt='go-',label=label,capsize=5,markersize=markersize,linewidth=linewidth)
+                    
+        if not plot_data:
+            pylab.legend(loc = 'upper right',fontsize = 16)
+        #pylab.ylim(8e-7,1.5e2)
+        #pylab.xlim(8e5,2e10)
+        ax = pylab.gca()
+        ax.minorticks_on()
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+        pylab.tick_params(labelsize=16)
+        pylab.xlabel('Neutrino Energy (PeV)',fontsize = 20)
+        pylab.ylabel('Ratios of V$\Omega$',fontsize = 20)
+        pylab.grid(b=True, which='major', color='k', linestyle='-')
+        pylab.grid(b=True, which='minor', color='tab:gray', linestyle='--',alpha=0.5)
             
             
             

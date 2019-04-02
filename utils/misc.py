@@ -6,26 +6,43 @@ import numpy
 import pylab
 import os
 import os.path
+import subprocess
 import glob
 
 
+import subprocess
+
+def getGitRootPath():
+    '''
+    Returns the root directory of the git repository.  Helpful for pathing within the git.
+
+    Returns
+    -------
+    root_path : str
+        The string cooresponding to the root directory of the git.  This will contain the name of the git,
+        i.e. PATH_TO_GIT/gnosim
+        So if you wish to just have the path of the folder containing gnosim you should remove the last bit.
+    '''
+    root_path = subprocess.Popen(['git', 'rev-parse', '--show-toplevel'], stdout=subprocess.PIPE).communicate()[0].rstrip().decode('utf-8')
+    return root_path
+
 def getColorMap(n):
-	'''
-	Returns a list of unique colors which can be used when plotting.  Does not include white.
+    '''
+    Returns a list of unique colors which can be used when plotting.  Does not include white.
 
-	Parameters
-	----------
-	n : int
-		The number of colors to include in the color map.
+    Parameters
+    ----------
+    n : int
+        The number of colors to include in the color map.
 
-	Returns
-	-------
-		colors : list of tuples
-			Each tuple represents a color for plotting.
-	'''
-	colormap = pylab.cm.gist_ncar #nipy_spectral, Set1,Paired   
-	colors = [colormap(i) for i in numpy.linspace(0, 1,n+1)]
-	return colors
+    Returns
+    -------
+    colors : list of tuples
+        Each tuple represents a color for plotting.
+    '''
+    colormap = pylab.cm.gist_ncar #nipy_spectral, Set1,Paired   
+    colors = [colormap(i) for i in numpy.linspace(0, 1,n+1)]
+    return colors
 
 def makeIndexHTML(path = './',filetype = 'svg'):
     '''

@@ -28,7 +28,6 @@ import concurrent.futures
 from multiprocessing import cpu_count
 import threading
 
-sys.path.append('/home/dsouthall/Projects/GNOSim/')
 import gnosim.utils.linalg
 import gnosim.earth.earth
 import gnosim.earth.ice

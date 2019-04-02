@@ -4,7 +4,6 @@ import numpy
 import h5py
 import pylab
 
-sys.path.append("/home/dsouthall/Projects/GNOSim/")
 import gnosim.utils.constants
 import gnosim.utils.bayesian_efficiency
 import gnosim.earth.ice

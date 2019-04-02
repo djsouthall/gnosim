@@ -15,7 +15,6 @@ import yaml
 import pickle
 import types
 from matplotlib.colors import LogNorm
-sys.path.append('/home/dsouthall/Projects/GNOSim/')
 import gnosim.utils.constants
 import gnosim.utils.bayesian_efficiency
 import gnosim.trace.refraction_library

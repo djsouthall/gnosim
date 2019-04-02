@@ -4,7 +4,7 @@ to calculate and plot volumetric acceptance of various configuration types as a
 function of neutrino energy.
 
 Run in python command line:
-exec(open('./gnosim/sim/volumetric_acceptance_dsouthall.py').read())
+exec(open('./gnosim/sim/neutrino_approach_test.py').read())
 
 #NOTE IN THE CURRENT STATE THIS WAS DESIGNED FOR A MODIFIED BUILD OF THE CODE
 FOR COMMIT cc81fcdb81da4e848ad649f32d30611d02f7cd5a  THIS WILL EVENTUALLY BE 
@@ -23,7 +23,6 @@ import yaml
 import pickle
 import types
 from matplotlib.colors import LogNorm
-sys.path.append('/home/dsouthall/Projects/StationConfigurationTesting/')
 import gnosim.utils.constants
 import gnosim.utils.bayesian_efficiency
 import gnosim.earth.ice

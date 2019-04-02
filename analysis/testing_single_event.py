@@ -14,8 +14,6 @@ import yaml
 import os
 import os.path
 import glob
-
-sys.path.append("/home/dsouthall/Projects/GNOSim/")
 import gnosim.sim.antarcticsim
 pylab.ion()
   

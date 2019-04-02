@@ -20,7 +20,6 @@ import scipy.misc
 import time
 import math
 import copy
-sys.path.append("/home/dsouthall/Projects/GNOSim/")
 from matplotlib import gridspec
 import pandas
 import gnosim.utils.misc
@@ -384,7 +383,7 @@ if __name__ == '__main__':
     config_file = '/home/dsouthall/Projects/GNOSim/gnosim/detector/station_config/config_dipole_octo_-200_polar_120_rays.py'
     testSim = gnosim.sim.antarcticsim.Sim(config_file,electricFieldDomain = 'time',do_beamforming = True)
 
-    slope,sys_fft = getScaleSystemResponseScale(testSim.stations[0],desired_noise_rms = 20.4E-3,save_new_response = True)
+    slope,sys_fft = getScaleSystemResponseScale(testSim.stations[0],desired_noise_rms = 20.4E-3,save_new_response = False)
     print('Simple method of scaling: ', slope)
     
 ############################################################

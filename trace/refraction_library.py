@@ -11,7 +11,6 @@ import h5py
 import pylab
 import os
 from mpl_toolkits.mplot3d import Axes3D
-sys.path.append('/home/dsouthall/Projects/GNOSim/')
 import gnosim.utils.constants
 import gnosim.utils.rf
 import gnosim.utils.plane
