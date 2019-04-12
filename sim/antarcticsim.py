@@ -3,8 +3,11 @@
 '''
 Simulation
 '''
-
+import os
 import sys
+#sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))).split('gnosim')[0])
+#print('Appended path:',os.path.dirname(os.path.dirname(os.path.abspath(__file__))).split('gnosim')[0])
+sys.path.append('/home/dsouthall/Projects/GNOSim')
 import numpy
 import h5py
 import matplotlib
@@ -13,7 +16,6 @@ import pylab
 #pylab.ioff() #Use so it doesn't popup plots during the running of the sime
 import json
 import yaml
-import os
 import os.path
 import glob
 import scipy
@@ -27,7 +29,7 @@ import concurrent.futures
 
 from multiprocessing import cpu_count
 import threading
-
+import gnosim
 import gnosim.utils.linalg
 import gnosim.earth.earth
 import gnosim.earth.ice
@@ -40,50 +42,6 @@ import gnosim.utils.misc
 pylab.ion() #this turns interactive mode on.  I should test with this off
 
 ############################################################
-
-import cProfile, pstats, io
-
-def profile(fnc):
-    '''
-    A decorator that uses cProfile to profile a function
-    This is lifted from https://osf.io/upav8/
-    
-    Required imports:
-    import cProfile, pstats, io
-    
-    To use, decorate function of interest by putting @profile above
-    its definition.
-    
-    Meanings:
-    ncalls  - for the number of calls.  When there are two numbers (for example 3/1), 
-              it means that the function recursed. The second value is the number 
-              of primitive calls and the former is the total number of calls. Note 
-              that when the function does not recurse, these two values are the same, 
-              and only the single figure is printed.
-    tottime - for the total time spent in the given function (and excluding time made 
-              in calls to sub-functions)
-    percall - is the quotient of tottime divided by ncalls
-    cumtime - is the cumulative time spent in this and all subfunctions (from invocation 
-              till exit). This figure is accurate even for recursive functions.
-    percall - is the quotient of cumtime divided by primitive calls
-    filename:lineno(function) - provides the respective data of each function
-    '''
-    
-    def inner(*args, **kwargs):
-        
-        pr = cProfile.Profile()
-        pr.enable()
-        retval = fnc(*args, **kwargs)
-        pr.disable()
-        s = io.StringIO()
-        sortby = 'cumulative'
-        ps = pstats.Stats(pr, stream=s)
-        ps.strip_dirs().sort_stats(sortby)
-        ps.print_stats()
-        print(s.getvalue())
-        return retval
-
-    return inner
 
 def getAcceptedTriggerUnits():
     '''
@@ -143,6 +101,10 @@ class Sim:
         Station objects corresponding to the stations (and antennas) specified in the configuration file.
     n_antenna : int
         The total number of antennas across all stations.  Used interally.
+    n_antenna_PA : int
+        The total number of antennas in phased arrays across all stations.  Used interally.
+    n_antenna_RA : int
+        The total number of antennas in reconstruction arrays across all stations.  Used interally.
     do_beamforming : bool
         Determines whether or not to perform beamforming.
     n_cores : int
@@ -215,15 +177,19 @@ class Sim:
             self.electricFieldDomain = electricFieldDomain[0]
 
         self.stations = []
-        for ii in range(0, self.config['stations']['n']):
-            station_label = 'station'+str(ii)
-            x_station, y_station, z_station = self.config['stations']['positions'][ii]
-            station = gnosim.detector.detector.Station(x_station, y_station, z_station, self.config, station_label,solutions = self.solutions)
-            self.stations.append(station)
-            
-        self.n_antenna = sum([len(self.stations[s].antennas) for s in range(len(self.stations))])
-        print('Total Number of Antennas = ', self.n_antenna)
 
+        for station_label in list(self.config['stations'].keys()):
+            station = gnosim.detector.detector.Station(station_label, self.config, solutions = self.solutions,electricFieldDomain = self.electricFieldDomain)
+            self.stations.append(station)
+        
+        self.stations = numpy.array(self.stations)            
+        self.n_antenna = sum([len(s.antennas) for s in self.stations])
+        self.n_antenna_PA = sum([sum(s.phased_cut) for s in self.stations])
+        self.n_antenna_RA = sum([sum(s.reconstruction_cut) for s in self.stations])
+
+        print('Total Number of Antennas = ', self.n_antenna)
+        max_bits = 0
+        max_cap_bits = 0
         if self.electricFieldDomain == 'time':
 
             print('Preparing digitization')
@@ -239,25 +205,61 @@ class Sim:
                 print('Preparing for beamforming')
                 for station in self.stations:
                     z_array = []
-                    for antenna in station.antennas:
+                    for antenna in station.antennas[station.phased_cut]:
                         z_array.append(antenna.z)
                     z_array = numpy.array(z_array)
                     index_refraction_array = self.ice.indexOfRefraction(z_array) 
                     mean_index = numpy.mean(index_refraction_array) #used to estimate angles for each beam.
                     station.getBeams(mean_index)
+                    if station.sampling_bits > max_bits:
+                        max_bits = station.sampling_bits
+                    if station.sampling_bits > max_cap_bits:
+                        max_cap_bits = station.beamforming_power_sum_bit_cap
         
         self.n_cores = cpu_count()
         #self.lock = threading.RLock() #Hopefully fixes multithreading plotting (it didn't)
         self.lock = threading.Lock()
 
+        def minDType(n,mode='int'):
+            '''
+            Determines the minimum dtype for a number.  Returns it.
+            Mode options: 'float', 'int', 'uint'
+            '''
+            n = abs(n)
+            if mode == 'uint':
+                if n > numpy.iinfo(numpy.uint32).max:
+                    return numpy.uint64
+                elif n > numpy.iinfo(numpy.uint16).max:
+                    return numpy.uint32
+                elif n > numpy.iinfo(numpy.uint8).max:
+                    return numpy.uint16
+                else:
+                    return numpy.uint8
+            elif mode == 'int':
+                if n > numpy.iinfo(numpy.int32).max:
+                    return numpy.int64
+                elif n > numpy.iinfo(numpy.int16).max:
+                    return numpy.int32
+                elif n > numpy.iinfo(numpy.int8).max:
+                    return numpy.int16
+                else:
+                    return numpy.int8
+            else:
+                return numpy.float64 
+
         #For more info about the below type of dtype check out HDF5's discussion of them in 
         #O'Reilly, Python and HDF5: Chapter 7. More About Types - Compound Types
-        self.info_dtype = numpy.dtype([('eventid','i'),('station',numpy.uint16),('antenna',numpy.uint16),('has_solution',numpy.bool_),('pre_triggered',numpy.bool_),('triggered',numpy.bool_),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('theta_ray','f'),('observation_angle','f'),('electric_field','f'),('electric_field_digitized','f'),('dominant_freq','f'),('a_s','f'),('a_p','f'),('SNR','f'),('signal_reduction_factor','f'),('fpga_max','i'),('seed',numpy.uint32)])
+        station_type = minDType(len(self.stations),mode='uint')
+        antenna_type = minDType(self.n_antenna,mode='uint')
+        E_digital_type = minDType(2**(max_bits-1),mode='int')
+        fpga_type = minDType(2**(max_cap_bits-1),mode='int')
+
+        self.info_dtype = numpy.dtype([('eventid','i'),('station',station_type),('antenna',antenna_type),('has_solution',numpy.bool_),('pre_triggered',numpy.bool_),('triggered',numpy.bool_),('solution','S10'),('time','f'),('distance','f'),('theta_ant','f'),('theta_ray','f'),('observation_angle','f'),('electric_field','f'),('electric_field_digitized',E_digital_type),('dominant_freq','f'),('a_s','f'),('a_p','f'),('SNR','f'),('signal_reduction_factor','f'),('fpga_max',fpga_type),('seed',numpy.uint32)])
 
         
     #@profile 
     def event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, anti=False, include_noise = True, 
-            plot_signals=False, plot_geometry=False, summed_signals=True, trigger_threshold = 0.0, trigger_threshold_units = 'fpga', 
+            plot_signals=False, plot_geometry=False,plot_geometry_mode_3d = True, summed_signals=True, trigger_threshold = 0.0, trigger_threshold_units = 'fpga', 
             plot_filetype_extension = 'svg',image_path = './',  random_time_offset = 0.0, dc_offset = 0.0, do_beamforming = False, 
             output_all_solutions = True, pre_trigger_angle = None, event_seed = None, return_fig_array = False):
         '''
@@ -291,6 +293,8 @@ class Sim:
             Enables plotting of the waveforms, as well as of the beam forming plots and some meta data.  Only plots for trigger events. (Default is False).
         plot_geometry : bool, optional
             Enables plotting of the neutrino location, rays, and antennas.  Only plots for trigger events. (Default is False).
+        plot_geometry_mode_3d : bool, optional
+            Selects whether to plot geometry in 3d (True) or wrapped cylindrical coordinates (False).  (Default is True).
         summed_signals : bool, optional
             If true, then signals resulting from different solution types are combined into a single waveform per antenna.  Otherwise
             only the waveform of the solution type with the maximum signal per antenna will be used.  (Default is True).
@@ -362,8 +366,8 @@ class Sim:
         fig_array : list of figures, optional
             A list of the figures produced during the running of this function.
         '''
+
         effective_energy_neutrino = energy_neutrino*inelasticity
-        triggered = False
         
         #Calculations required for pretrigger
         #Pretrigger should be on observation angle to check how on-cone each solution will be
@@ -371,25 +375,28 @@ class Sim:
         
         info = numpy.zeros(  self.n_antenna  , dtype = self.info_dtype) 
         temporary_info = numpy.zeros(  len(self.solutions)*self.n_antenna  , dtype = self.info_dtype)
-        
+
+        ant_labels         = numpy.array(['']*len(self.solutions)*self.n_antenna)
         x_antennas         = numpy.zeros( len(self.solutions)*self.n_antenna )
         y_antennas         = numpy.zeros( len(self.solutions)*self.n_antenna )
         z_antennas         = numpy.zeros( len(self.solutions)*self.n_antenna )
         has_solution_array = numpy.zeros( len(self.solutions)*self.n_antenna )
-        station_wide_solution_index = -1 #add one to it for each antenna, used for indexing temporary array
+        station_wide_solution_index = -1
         for index_station, station in enumerate(self.stations):
-            # Loop over station antennas
-            for index_antenna, antenna in enumerate(self.stations[index_station].antennas):
-                for solution in antenna.solutions:
+            for index_antenna, antenna in enumerate(station.antennas):
+                for index_solution, solution in enumerate(antenna.solutions):
                     station_wide_solution_index += 1
+                    ant_labels[station_wide_solution_index] = antenna.label
                     has_solution_array[station_wide_solution_index] = self.in_flag_array[station.label][antenna.label][solution][eventid]
                     x_antennas[station_wide_solution_index] = antenna.x
                     y_antennas[station_wide_solution_index] = antenna.y
                     z_antennas[station_wide_solution_index] = antenna.z
-                    temporary_info[station_wide_solution_index] = numpy.array([(eventid,index_station,index_antenna,has_solution_array[station_wide_solution_index],0,0,solution,self.in_dic_array[station.label][antenna.label][solution]['t'][eventid],self.in_dic_array[station.label][antenna.label][solution]['d'][eventid],self.in_dic_array[station.label][antenna.label][solution]['theta_ant'][eventid],self.in_dic_array[station.label][antenna.label][solution]['theta'][eventid],-999.0,-999.0,-999.0,-999.0,self.in_dic_array[station.label][antenna.label][solution]['a_s'][eventid],self.in_dic_array[station.label][antenna.label][solution]['a_p'][eventid],-999.0,-999.0,-999,event_seed)],dtype = self.info_dtype)
-            
+                    temporary_info[station_wide_solution_index] = numpy.array([(eventid,index_station,index_antenna,has_solution_array[station_wide_solution_index],False,False,solution,self.in_dic_array[station.label][antenna.label][solution]['t'][eventid],self.in_dic_array[station.label][antenna.label][solution]['d'][eventid],self.in_dic_array[station.label][antenna.label][solution]['theta_ant'][eventid],self.in_dic_array[station.label][antenna.label][solution]['theta'][eventid],-999.0,-999.0,-999.0,-999.0,self.in_dic_array[station.label][antenna.label][solution]['a_s'][eventid],self.in_dic_array[station.label][antenna.label][solution]['a_p'][eventid],-999.0,-999.0,-999,event_seed)],dtype = self.info_dtype)
+        
         index_of_refraction_at_neutrino = self.ice.indexOfRefraction(z_0)
+
         cherenkov_angle_deg = numpy.rad2deg(numpy.arccos(1./index_of_refraction_at_neutrino))
+        
         rs = numpy.sqrt((x_0 - x_antennas)**2 + (y_0 - y_antennas)**2)
         phi_rays = numpy.degrees(numpy.arctan2(y_0 - y_antennas, x_0 - x_antennas)) % 360. # deg #points along thrown ray towards neutrino from antenna. 
 
@@ -397,13 +404,13 @@ class Sim:
         multi_emission_wave_vector = - multi_vector_rays_to_neutrino_at_neutrino #Unit vectors along ray towards antenna as emitted by neutrino.  In the ice frame.
 
         vector_to_neutrino_source = gnosim.utils.linalg.angToVec(phi_0, theta_0) # Direction neutrino came from
-        vector_neutrino_travel_dir = -vector_to_neutrino_source # Direction the shower is propogating (he direction the neutrino is heading)
+        vector_neutrino_travel_dir = - vector_to_neutrino_source # Direction the shower is propogating (the direction the neutrino is heading)
         
         #multi_vector_to_neutrino_source = numpy.tile(vector_to_neutrino_source,(len(phi_rays),1)) 
         multi_vector_neutrino_travel_dir = numpy.tile(vector_neutrino_travel_dir,(len(phi_rays),1))
         
         #observation_angles = gnosim.utils.linalg.angTwoVec(multi_vector_to_neutrino_source, multi_vector_rays_to_neutrino_at_neutrino) # deg
-        observation_angles = gnosim.utils.linalg.angTwoVec(multi_vector_neutrino_travel_dir, multi_vector_rays_to_neutrino_at_neutrino) # deg
+        observation_angles = gnosim.utils.linalg.angTwoVec(multi_vector_neutrino_travel_dir, multi_emission_wave_vector) # deg
         observation_angles[~has_solution_array.astype(bool)] = -999.0
         
         if pre_trigger_angle == None:
@@ -413,11 +420,10 @@ class Sim:
             #Pre trigger passes within angular window
             pre_triggers = numpy.abs(observation_angles - cherenkov_angle_deg) < pre_trigger_angle #True for each solution which has observation within tolerance
             pre_triggers[~has_solution_array.astype(bool)] = 0
+        
         temporary_info['pre_triggered'] = pre_triggers
         temporary_info['observation_angle'] = observation_angles
         
-
-
         #Calculations not required for pretrigger
         
         if trigger_threshold_units == 'fpga':
@@ -453,24 +459,28 @@ class Sim:
         #note p_earth has no random components
         p_earth = gnosim.earth.earth.probSurvival(energy_neutrino, theta_0, self.ice, elevation=z_0, anti=anti) #Should not use effective_energy_neutrino, as that only becomes effective AFTER interaction, these test if there is an interaction at all
 
-        
         #Only do triggering if any pass pre_trigger
         if numpy.any(temporary_info['pre_triggered'] == True):
-
-            multi_vector_rays_to_neutrino_at_antenna = gnosim.utils.linalg.angToVec(phi_rays, temporary_info['theta_ant']) #at antenna event, I think theta_ray points along ray towards neutrino.  So for an upward going wave vector ray towards the antenna, theta_ray > 90.0, directly downward ray towards antenna is 0.0 deg  
-            multi_detection_wave_vector = - multi_vector_rays_to_neutrino_at_antenna #Unit vectors along ray towards antenna as observed at antenna.  In the ice frame.
 
             #Set event seed:
             #Seperate RandomState object used for each event to futur proof for multithreading
             #to avoid issues with reproducability with a global RandomState
-            random_local = numpy.random.RandomState(seed = event_seed)
-            #random_local.normal() etc.,  would need to pass random_local to any function that uses random
             
+            #random_local.normal() etc.,  would need to pass random_local to any function that uses random
+
+            random_local = numpy.random.RandomState(seed = event_seed) #Should be placed before any random calls, and used as the random class.
             if self.electricFieldDomain == 'time':
+                #The four below will contain all signals
                 time_analog = {}
                 V_analog = {}
                 time_digital = {}
                 V_digital = {}
+
+                #The four below will contain only the signals going into beam forming
+                u_outs = {}
+                V_outs = {}
+                ud_outs = {}
+                Vd_outs = {}
                 if numpy.logical_and(include_noise == True,summed_signals == True):
                     V_just_noise = {}
                     
@@ -480,156 +490,189 @@ class Sim:
                 #inelasticity etc, and thus can't be done once per sim as the energy is not just one
                 #value.
                 askaryan_fp_fft = {}
+                
                 for station in self.stations:
                     for antenna in station.antennas:
                         if ~numpy.isin(antenna.antenna_response_dir,askaryan_fp_fft.keys()):
                             askaryan_fp = gnosim.interaction.askaryan.F_p(effective_energy_neutrino,antenna.signal_times,index_of_refraction_at_neutrino,1.0)
                             askaryan_fp_fft[antenna.antenna_response_dir] = numpy.fft.rfft(askaryan_fp)
-                    
-            #Calculating the times to digitize the signal in advance, should be done after a pretrigger
-            minimum_time = 1e20
-            maximum_time = -1e20
 
-            phi_ray_to_neutrino = {}
-            station_wide_solution_index = -1 #add one to it for each antenna, used for indexing temporary array
-            for station in self.stations:
-                phi_ray_to_neutrino[station.label] = {}
-                for antenna in station.antennas:
-                    phi_ray_to_neutrino[station.label][antenna.label] = {}
-                    for solution in antenna.solutions:
-                        station_wide_solution_index += 1
-                        phi_ray_to_neutrino[station.label][antenna.label][solution] = phi_rays[station_wide_solution_index]
+            multi_vector_rays_to_neutrino_at_antenna = gnosim.utils.linalg.angToVec(phi_rays, temporary_info['theta_ant']) #at antenna event, I think theta_ray points along ray towards neutrino.  So for an upward going wave vector ray towards the antenna, theta_ray > 90.0, directly downward ray towards antenna is 0.0 deg  
+            multi_detection_wave_vector = - multi_vector_rays_to_neutrino_at_antenna #Unit vectors along ray towards antenna as observed at antenna.  In the ice frame.
 
-                    event_times = numpy.sort(temporary_info[temporary_info['has_solution'] == True]['time'])
-                    if minimum_time > antenna.signal_times[0] + event_times[0]:
-                        minimum_time = antenna.signal_times[0] + event_times[0]
-                    if maximum_time < antenna.signal_times[-1] + event_times[-1]:
-                        maximum_time = antenna.signal_times[-1] + event_times[-1]
-                    if minimum_time == 1e20:
-                        minimum_time = antenna.signal_times[0]
-                    if maximum_time == -1e20:
-                        maximum_time = antenna.signal_times[-1]
             if return_fig_array == True:
                 fig_array = []
-            
+
+            if numpy.all([self.electricFieldDomain == 'time', plot_geometry == True, plot_geometry_mode_3d == True]):
+                emission_polarization_vecs = numpy.zeros_like(multi_vector_neutrino_travel_dir)
+                final_polarization_vecs = numpy.zeros_like(multi_vector_neutrino_travel_dir)
+            else:
+                emission_polarization_vecs = None
+                final_polarization_vecs = None
+
             # Loop over stations
-            station_wide_antenna_index = -1 #add one to it for each antenna, used for indexing temporary array
             for index_station, station in enumerate(self.stations):
-                digital_sample_times = numpy.arange(minimum_time,maximum_time,station.digital_sampling_period) + random_time_offset #these + random_time_offset #these
-                # Loop over station antennas
-                if self.electricFieldDomain == 'time':
-                    time_analog[station.label] = {}
-                    V_analog[station.label] = {}
-                    time_digital[station.label] = {}
-                    V_digital[station.label] = {}
-                    if numpy.logical_and(include_noise == True,summed_signals == True):
-                        V_just_noise[station.label] = {}
-                for index_antenna, antenna in enumerate(station.antennas):
-                    station_wide_antenna_index += 1
-                    first_solution_index = station_wide_antenna_index * len (antenna.solutions) #useful for things that are antenna specific but calculated for each solution
+                triggered = False
+                temp_station_cut = temporary_info['station'] == index_station
+
+                if numpy.any(temporary_info[temp_station_cut]['pre_triggered'] == True):
+                    #Calculating the times to digitize the signal in advance, should be done after a pretrigger
+                    station_times = numpy.sort(temporary_info[numpy.logical_and(temporary_info['has_solution'] == True,temp_station_cut)]['time'])   
+                    minimum_time = 1e20
+                    maximum_time = -1e20
+
+                    for index_antenna, antenna in enumerate(station.antennas):
+                        temp_antenna_cut = numpy.logical_and(temp_station_cut ,temporary_info['antenna'] == index_antenna) #this with a where() can probably replace the station_wide indices
+                        if numpy.size(station_times != 0):
+                            if minimum_time > antenna.signal_times[0] + station_times[0]:
+                                minimum_time = antenna.signal_times[0] + station_times[0]
+                            if maximum_time < antenna.signal_times[-1] + station_times[-1]:
+                                maximum_time = antenna.signal_times[-1] + station_times[-1]
+                        if minimum_time == 1e20:
+                            minimum_time = antenna.signal_times[0]
+                        if maximum_time == -1e20:
+                            maximum_time = antenna.signal_times[-1]
+
+                    digital_sample_times = numpy.arange(minimum_time,maximum_time,station.digital_sampling_period) + random_time_offset #these + random_time_offset #these
                     
+                    # Loop over station antennas
+
                     if self.electricFieldDomain == 'time':
-                        time_analog[station.label][antenna.label] = {}
-                        V_analog[station.label][antenna.label] = {}
-                        
+                        #The four below will contain all signals
+                        time_analog[station.label] = {}
+                        V_analog[station.label] = {}
+                        time_digital[station.label] = {}
+                        V_digital[station.label] = {}
+
+                        #The four below will contain only the signals going into beam forming
+                        u_outs[station.label] = {}
+                        V_outs[station.label] = {}
+                        ud_outs[station.label] = {}
+                        Vd_outs[station.label] = {}
+
                         if numpy.logical_and(include_noise == True,summed_signals == True):
-                            V_just_noise[station.label][antenna.label] = {}
+                            V_just_noise[station.label] = {}
 
-                        for solution in antenna.solutions:
-                            time_analog[station.label][antenna.label][solution] = []
-                            V_analog[station.label][antenna.label][solution] = []
+                    #NOTE:  THIS LOOP ASSUMES PHASED ARRAY ANTENNAS ARE FIRST.  IT WILL DO CALCULATIONS FOR THEM, THEN ON THE LAST
+                    #PHASED ARRAY ANTENNA IT WILL RUN THE TRIGGER, THEN IF IT TRIGGERS THE LOOP CONTINUES, OTHERWISE IT BREAKS
+                    last_phased_array_index = numpy.where(station.phased_cut)[0][-1]
+
+                    for index_antenna, antenna in enumerate(station.antennas):
+                        temp_antenna_cut = numpy.logical_and(temp_station_cut ,temporary_info['antenna'] == index_antenna) #this with a where() can probably replace the station_wide indices
+                        
+                        in_phased_array = station.phased_cut[index_antenna]
+
+                        if self.electricFieldDomain == 'time':
+                            time_analog[station.label][antenna.label] = []
+                            V_analog[station.label][antenna.label] = []
+                            
                             if numpy.logical_and(include_noise == True,summed_signals == True):
-                                V_just_noise[station.label][antenna.label][solution] = []
+                                V_just_noise[station.label][antenna.label] = []
 
-                    electric_field_max = 0. 
-                    r = rs[first_solution_index]
+                        electric_field_max = 0. 
 
-                    flag_array = temporary_info[ numpy.logical_and(temporary_info['station'] == index_station, temporary_info['antenna'] == index_antenna)]['has_solution']
-                    if numpy.any(flag_array):
-                        has_solution = 1
+                        flag_array = temporary_info[ numpy.logical_and(temporary_info['station'] == index_station, temporary_info['antenna'] == index_antenna)]['has_solution']
+                        if numpy.any(flag_array):
+                            has_solution = 1
 
-                        for ii, solution in enumerate(antenna.solutions):
-                            total_solution_index = station_wide_antenna_index * len (antenna.solutions) + ii
-                            if temporary_info[total_solution_index]['has_solution'] == True:
-                                #So now it will always get to the above trigger only if ANY pass pre trigger, bit will still only calculate the ones that have solutions regardless if they were the solutions that pretriggered
-                                # Direction of outgoing ray from antenna to interaction vertex
-                                
-                                solution_cut = numpy.logical_and(temporary_info['solution'] == solution.encode(),numpy.logical_and(temporary_info['station'] == index_station, temporary_info['antenna'] == index_antenna))
-                                observation_angle = temporary_info[ solution_cut ]['observation_angle']
-                                
-                                d = temporary_info[ solution_cut ]['distance'] #m
-                                theta_ant_deg = temporary_info[ solution_cut ]['theta_ant'] #deg
-                                
-                                '''
-                                theta_ray_from_ant_at_neutrino  = temporary_info[ solution_cut ]['theta_ray'][0]
-                                phi_ray_from_ant_at_neutrino    = phi_ray_to_neutrino[station.label][antenna.label][solution]
-                                theta_ray_from_ant_at_antenna   = temporary_info[ solution_cut ]['theta_ant'][0]
-                                phi_ray_from_ant_at_antenna     = phi_ray_from_ant_at_neutrino
-                                theta_neutrino_source_dir       = theta_0
-                                phi_neutrino_source_dir         = phi_0
-                                '''
-                                vec_neutrino_travel_dir         = vector_neutrino_travel_dir
-                                emission_wave_vector            = multi_emission_wave_vector[station_wide_solution_index]
-                                detection_wave_vector           = multi_detection_wave_vector[station_wide_solution_index]
+                            for ii, solution in enumerate(antenna.solutions):
+                                temp_solution_cut = numpy.logical_and(temporary_info['solution'] == solution.encode(),temp_antenna_cut)
+                                temp_solution_index = numpy.where(temp_solution_cut)[0][0]
+                                if temporary_info[temp_solution_cut]['has_solution'] == True:
+                                    #So now it will always get to the above trigger only if ANY pass pre trigger, bit will still only calculate the ones that have solutions regardless if they were the solutions that pretriggered
+                                    # Direction of outgoing ray from antenna to interaction vertex
 
-                                signal_reduction_factor = antenna.getAntennaResponseFactor(vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , self.in_dic_array[station.label][antenna.label][solution]['a_s'][eventid] , self.in_dic_array[station.label][antenna.label][solution]['a_p'][eventid])
-                                #vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , a_s , a_p )
-                                if self.electricFieldDomain == 'time':                                                                        
-                                    if include_noise == True:
-                                        V_noiseless, u , dominant_freq, V_noise, SNR = gnosim.interaction.askaryan.quickSignalSingle( numpy.deg2rad(observation_angle),\
-                                          temporary_info[ solution_cut ]['distance'],effective_energy_neutrino,index_of_refraction_at_neutrino,\
-                                          self.in_dic_array[station.label][antenna.label][solution]['t'][eventid],signal_reduction_factor,\
-                                          antenna.signal_times,antenna.h_fft,antenna.sys_fft,antenna.freqs_response,fp_fft = askaryan_fp_fft[antenna.antenna_response_dir],plot_signals=False,plot_spectrum=False,plot_potential = False,\
-                                          include_noise = True, resistance = antenna.resistance, noise_temperature = antenna.noise_temperature, random_local = random_local)  #expects ovbservation_angle to be in radians (hence the deg2rad on input)
-                                        
-                                        if summed_signals == True:
-                                            V_just_noise[station.label][antenna.label][solution] = numpy.add(V_noise,-V_noiseless) #subtracting away raw signal from noisy signal to get just the noise
-                                        electric_array = V_noise
+                                    observation_angle = temporary_info[ temp_solution_cut ]['observation_angle']
+                                    
+                                    d = temporary_info[ temp_solution_cut ]['distance'] #m
+                                    theta_ant_deg = temporary_info[ temp_solution_cut ]['theta_ant'] #deg
+
+                                    vec_neutrino_travel_dir     = vector_neutrino_travel_dir
+                                    emission_wave_vector        = multi_emission_wave_vector[temp_solution_index]
+                                    detection_wave_vector       = multi_detection_wave_vector[temp_solution_index]
+
+                                    if numpy.all([emission_polarization_vecs is not None, final_polarization_vecs is not None, antenna.antenna_type == 'dipole']):
+                                        signal_reduction_factor, final_polarization_vecs[temp_solution_cut], emission_polarization_vecs[temp_solution_cut] = antenna.getAntennaResponseFactor(vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , self.in_dic_array[station.label][antenna.label][solution]['a_s'][eventid] , self.in_dic_array[station.label][antenna.label][solution]['a_p'][eventid], return_polarizations = True)
                                     else:
-                                        V_noiseless, u , dominant_freq = gnosim.interaction.askaryan.quickSignalSingle( numpy.deg2rad(observation_angle),\
-                                          temporary_info[ solution_cut ]['distance'],effective_energy_neutrino,index_of_refraction_at_neutrino,\
-                                          self.in_dic_array[station.label][antenna.label][solution]['t'][eventid],signal_reduction_factor,\
-                                          antenna.signal_times,antenna.h_fft,antenna.sys_fft,antenna.freqs_response,fp_fft = askaryan_fp_fft[antenna.antenna_response_dir],plot_signals=False,plot_spectrum=False,plot_potential = False,\
-                                          include_noise = False, resistance = antenna.resistance, noise_temperature = antenna.noise_temperature, random_local = random_local)  #expects ovbservation_angle to be in radians (hence the deg2rad on input)
+                                        signal_reduction_factor = antenna.getAntennaResponseFactor(vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , self.in_dic_array[station.label][antenna.label][solution]['a_s'][eventid] , self.in_dic_array[station.label][antenna.label][solution]['a_p'][eventid], return_polarizations = False)
+
+                                    if self.electricFieldDomain == 'time':                                                                        
+                                        if include_noise == True:
+                                            u , V_noiseless, dominant_freq, V_noise, SNR = gnosim.interaction.askaryan.quickSignalSingle( numpy.deg2rad(observation_angle),\
+                                              temporary_info[ temp_solution_cut ]['distance'],effective_energy_neutrino,index_of_refraction_at_neutrino,\
+                                              self.in_dic_array[station.label][antenna.label][solution]['t'][eventid],signal_reduction_factor,\
+                                              antenna.signal_times,antenna.h_fft,antenna.sys_fft,antenna.freqs_response,fp_fft = askaryan_fp_fft[antenna.antenna_response_dir],plot_signals=False,plot_spectrum=False,plot_potential = False,\
+                                              include_noise = True, resistance = antenna.resistance, noise_temperature = antenna.noise_temperature, random_local = random_local)  #expects ovbservation_angle to be in radians (hence the deg2rad on input)
+                                            
+                                            electric_array = V_noise
+                                        else:
+                                            u , V_noiseless, dominant_freq = gnosim.interaction.askaryan.quickSignalSingle( numpy.deg2rad(observation_angle),\
+                                              temporary_info[ temp_solution_cut ]['distance'],effective_energy_neutrino,index_of_refraction_at_neutrino,\
+                                              self.in_dic_array[station.label][antenna.label][solution]['t'][eventid],signal_reduction_factor,\
+                                              antenna.signal_times,antenna.h_fft,antenna.sys_fft,antenna.freqs_response,fp_fft = askaryan_fp_fft[antenna.antenna_response_dir],plot_signals=False,plot_spectrum=False,plot_potential = False,\
+                                              include_noise = False, resistance = antenna.resistance, noise_temperature = antenna.noise_temperature, random_local = random_local)  #expects ovbservation_angle to be in radians (hence the deg2rad on input)
+                                            
+                                            SNR = -999.
+                                            electric_array = V_noiseless
+
+                                        electric_field = numpy.max(numpy.abs(electric_array))#maybe shouldn't be abs.  Need to change some lines that comapre to this if made not abs here.  
+                                        electric_field_digitized = gnosim.detector.fpga.digitizeSignal([0,1],numpy.array([electric_field,electric_field]),[0.5],station.sampling_bits,antenna.noise_rms,station.scale_noise_to, dc_offset = 0, plot = False)[1] #I don't like this workaround.... :(
                                         
+                                        if summed_signals == False:
+                                            if electric_field >= electric_field_max:
+                                                V_analog[station.label][antenna.label] = electric_array
+                                                time_analog[station.label][antenna.label] = u
+                                                if include_noise == True:
+                                                    V_just_noise[station.label][antenna.label] = numpy.add(V_noise,-V_noiseless) #subtracting away raw signal from noisy signal to get just the noise
+                                        else:
+                                            V_analog[station.label][antenna.label].append(electric_array)
+                                            time_analog[station.label][antenna.label].append(u)
+                                            if include_noise == True:
+                                                V_just_noise[station.label][antenna.label].append(numpy.add(V_noise,-V_noiseless)) #subtracting away raw signal from noisy signal to get just the noise
+
+                                    else:
+                                        if self.electricFieldDomain != 'freq':
+                                            print('Electric field domain selection did not fit one of the\ntwo expected values.  Continuing with old method: freq.')
+                                            sys.stdout.flush()
+                                        frequency = numpy.linspace(antenna.frequency_low, antenna.frequency_high, 100) # GHz
+                                        #Note below doesn't use effective_energy_neutrino because it has inelasticity as an input parameter and does that calculation internally.  This is the problem with trying to carry along old code 
+                                        electric_field \
+                                            = gnosim.interaction.askaryan.electricFieldFrequencyDomainRaw(frequency, temporary_info[ temp_solution_cut ]['distance'], observation_angle,
+                                                                                        energy_neutrino, inelasticity, index_of_refraction_at_neutrino) # V m^-1 GHz^-1, dimensionless, expects observation_angle to be in degrees
+                                        electric_field *= signal_reduction_factor
+                                        electric_array, electric_field, dominant_freq = antenna.totalElectricField(frequency, electric_field, theta_ant_deg) # V m^-1 #THIS WAS CHANGED THETA WAS ADDED
                                         SNR = -999.
-                                        electric_array = V_noiseless
+                                        electric_field_digitized = -999.
                                     
-                                    electric_field = numpy.max(numpy.abs(electric_array))#maybe shouldn't be abs.  Need to change some lines that comapre to this if made not abs here.  
-                                    electric_field_digitized = gnosim.detector.fpga.digitizeSignal([0,1],numpy.array([electric_field,electric_field]),[0.5],station.sampling_bits,antenna.noise_rms,station.scale_noise_to, dc_offset = 0, plot = False)[0] #I don't like this workaround.... :(
+                                    temporary_info[temp_solution_index]['electric_field']           = electric_field
+                                    temporary_info[temp_solution_index]['electric_field_digitized'] = electric_field_digitized
+                                    temporary_info[temp_solution_index]['dominant_freq']            = dominant_freq
+                                    temporary_info[temp_solution_index]['SNR']                      = SNR
+                                    temporary_info[temp_solution_index]['signal_reduction_factor']  = signal_reduction_factor
                                     
-                                    V_analog[station.label][antenna.label][solution] = electric_array
-                                    time_analog[station.label][antenna.label][solution] = u
-                                else:
-                                    if self.electricFieldDomain != 'freq':
-                                        print('Electric field domain selection did not fit one of the\ntwo expected values.  Continuing with old method: freq.')
-                                        sys.stdout.flush()
-                                    frequency = numpy.linspace(antenna.frequency_low, antenna.frequency_high, 100) # GHz
-                                    #Note below doesn't use effective_energy_neutrino because it has inelasticity as an input parameter and does that calculation internally.  This is the problem with trying to carry along old code 
-                                    electric_field \
-                                        = gnosim.interaction.askaryan.electricFieldFrequencyDomainRaw(frequency, temporary_info[ solution_cut ]['distance'], observation_angle,
-                                                                                    energy_neutrino, inelasticity, index_of_refraction_at_neutrino) # V m^-1 GHz^-1, dimensionless, expects observation_angle to be in degrees
-                                    electric_field *= signal_reduction_factor
-                                    electric_array, electric_field, dominant_freq = antenna.totalElectricField(frequency, electric_field, theta_ant_deg) # V m^-1 #THIS WAS CHANGED THETA WAS ADDED
-                                    SNR = -999.
-                                    electric_field_digitized = -999.
-                                
-                                temporary_info[total_solution_index]['electric_field']           = electric_field
-                                temporary_info[total_solution_index]['electric_field_digitized'] = electric_field_digitized
-                                temporary_info[total_solution_index]['dominant_freq']            = dominant_freq
-                                temporary_info[total_solution_index]['SNR']                      = SNR
-                                temporary_info[total_solution_index]['signal_reduction_factor']  = signal_reduction_factor
-                                
-                                if electric_field >= electric_field_max:
-                                    electric_field_max = electric_field
-                                    observation_angle_max = observation_angle
-                                    solution_max = ii
-                                    solution_type_max = solution
-                                    index_station_max = index_station
-                                    index_antenna_max = index_antenna
-                                    SNR_max = SNR
-                                    
+                                    if electric_field >= electric_field_max:
+                                        #This is per antenna
+                                        electric_field_max = electric_field
+                                        observation_angle_max = observation_angle
+                                        solution_max = ii
+                                        solution_type_max = solution
+                                        index_station_max = index_station
+                                        index_antenna_max = index_antenna
+                                        SNR_max = SNR
+                                        max_solution_cut = numpy.logical_and(temporary_info['solution'] == solution_type_max.encode(),temp_antenna_cut)
+
+                        else:
+                            #This event has no solution for this antenna
+                            #has_solution = 0
+                            solution_type_max = antenna.solutions[0]
+                        
+                        #Temporary_info but only the max solution type.  Should defult to the first solution type, with values already filled out previously to be filler values
+                        max_solution_cut = numpy.logical_and(temporary_info['solution'] == solution_type_max.encode(),temp_antenna_cut)
+                        max_solution_index = numpy.where(max_solution_cut)[0][0]
+                        info[ sum([len(self.stations[s].antennas) for s in range(0,index_station)]) + index_antenna] = temporary_info[max_solution_index] 
+                        
                         if electric_field_max >= event_electric_field_max:
+                            #This is for the whole event.
                             event_electric_field_max = electric_field_max
                             event_electric_field_max = electric_field_max
                             event_observation_angle_max = observation_angle_max
@@ -637,131 +680,128 @@ class Sim:
                             event_index_station_max = index_station_max
                             event_index_antenna_max = index_antenna_max
                             event_SNR_max = SNR_max
-                        
-                    else:
-                        #This event has no solution for this antenna
-                        #has_solution = 0
-                        solution_type_max = antenna.solutions[0]
-                    
-                    #Temporary_info but only the max solution type.  Should defult to the first solution type, with values already filled out previously to be filler values
-                    info[ sum([len(self.stations[s].antennas) for s in range(0,index_station)]) + index_antenna] = temporary_info[numpy.logical_and(numpy.logical_and(temporary_info['station'] == index_station,temporary_info['antenna'] == index_antenna),temporary_info['solution'] == solution_type_max.encode() )] #numpy.array(temporary_info['solution']).astype(str) == solution_type_max
-                    max_solution_cut = numpy.logical_and(temporary_info['solution'] == solution_type_max.encode(),numpy.logical_and(temporary_info['station'] == index_station, temporary_info['antenna'] == index_antenna))
-                    dic_max['d'] = temporary_info[ max_solution_cut ]['distance']
-                    dic_max['r'] = rs[max_solution_cut]
-                    dic_max['t'] = temporary_info[ max_solution_cut ]['time']
-                    dic_max['theta'] = temporary_info[ max_solution_cut ]['theta_ray']
-                    dic_max['theta_ant'] = temporary_info[ max_solution_cut ]['theta_ant']
-                    dic_max['a_s'] = temporary_info[ max_solution_cut ]['a_s']
-                    dic_max['a_p'] = temporary_info[ max_solution_cut ]['a_p']
-                    dic_max['z'] = z_0#self.in_dic_array[station.label][antenna.label][solution_type_max]['z'][eventid]
-                
-                
-                #Only do triggering if any pass pre_trigger
-                if numpy.any(temporary_info[temporary_info['station'] == index_station]['pre_triggered'] == True):
-                    # Triggering Code below:
-                    signals_out[station.label] = numpy.array([])
-                    if numpy.any(info['has_solution']) == True:
+                            event_max_solution_cut = max_solution_cut
+
+                        if index_antenna == last_phased_array_index:
+                            #Now I can perform the triggering. If it doesn't trigger it should break from this level of the loop.
+                            # Triggering Code below:
+                            if numpy.any(info['has_solution']) == True:
+                                if self.electricFieldDomain == 'time':
+                                    for index_antenna, antenna in enumerate(station.antennas[station.phased_cut]):
+                                        u_in = numpy.array(time_analog[station.label][antenna.label])
+                                        V_in = numpy.array(V_analog[station.label][antenna.label])
+                                        if numpy.logical_and(include_noise == True,summed_signals == True):
+                                            V_just_noise_in = numpy.array(V_just_noise[station.label][antenna.label])
+
+                                        if numpy.size(u_in) != 0:
+                                            if summed_signals == True:
+                                                if include_noise == True:
+                                                    u_out , V_out = gnosim.interaction.askaryan.addSignals(u_in,V_in,plot=False,V_noise_in = V_just_noise_in, remove_noise_overlap = True)
+                                                else:
+                                                    u_out , V_out = gnosim.interaction.askaryan.addSignals(u_in,V_in,plot=False)
+                                            else:
+                                                u_out = numpy.array(time_analog[station.label][antenna.label][max_E_val_solution_type])
+                                                V_out = numpy.array(V_analog[station.label][antenna.label][max_E_val_solution_type])
+                                            
+                                            ud_out , Vd_out = gnosim.detector.fpga.digitizeSignal(u_out,V_out,digital_sample_times,station.sampling_bits,antenna.noise_rms,station.scale_noise_to, dc_offset = dc_offset, plot = False)
+                                        else:
+                                            V_out = numpy.array([])
+                                            u_out = numpy.array([])
+                                            Vd_out = numpy.array([])
+                                            ud_out = numpy.array([])
+                                    
+                                        #The four below will contain only the signals going into beam forming
+                                        u_outs[station.label][antenna.label] = u_out
+                                        V_outs[station.label][antenna.label] = V_out
+                                        ud_outs[station.label][antenna.label] = ud_out
+                                        Vd_outs[station.label][antenna.label] = Vd_out
+
+                                        if triggered == False:
+                                            if trigger_threshold_units == 'adu':
+                                                if numpy.any(numpy.fabs(Vd_out) > trigger_threshold):
+                                                    triggered = True
+                                            elif trigger_threshold_units == 'V':
+                                                if numpy.any(numpy.fabs(V_out) > trigger_threshold):
+                                                    triggered = True
+
+                                    min_time = digital_sample_times[0]
+                                    max_time = digital_sample_times[-1]
+                                    dt = digital_sample_times[1] - digital_sample_times[0]
+                                
+                                #Triggering
+                                if do_beamforming == True:
+                                    #Here is where I perform the beamforming algorithms. 
+                                    ud_out_sync , Vd_out_sync  = gnosim.detector.fpga.syncSignals(ud_outs[station.label],Vd_outs[station.label], min_time, max_time, dt)
+                                    formed_beam_powers, beam_powersums = gnosim.detector.fpga.fpgaBeamForming(ud_out_sync, Vd_out_sync, station.beam_dict , plot1 = False, plot2 = False, save_figs = False, cap_bits = station.beamforming_power_sum_bit_cap)
+
+                                    #Getting max values
+                                    keep_top = 1
+                                    
+                                    beam_label_list = numpy.array(list(beam_powersums.keys()))
+                                    stacked_beams = numpy.zeros((len(beam_label_list),len(beam_powersums[beam_label_list[0]])))
+                                    for beam_index, beam_label in enumerate(beam_label_list):
+                                        stacked_beams[beam_index,:] = beam_powersums[beam_label]
+                                    max_vals = numpy.max(stacked_beams,axis=1)
+                                    top_val_indices = numpy.argsort(max_vals)[-numpy.arange(1,keep_top+1)]
+                                    top_vals = max_vals[top_val_indices] #descending order
+                                    top_val_beams = beam_label_list[top_val_indices]
+                                    top_val_theta_ant = numpy.array([station.beam_dict['theta_ant'][beam_label] for beam_label in top_val_beams])
+
+                                    #Currently don't know what to do with these values.  They will be written out as I progress but
+                                    #right now I am just testing that they can be calculate without breaking the simulation.
+                                    #Right now I am only storing the 3 highest values.  It is likely that I want to store every beam
+                                    #that satisfies the trigger condiditon?
+                                    temporary_info['fpga_max'] = top_vals
+                                    info['fpga_max'] = top_vals
+
+                                    if trigger_threshold_units == 'fpga':
+                                        if top_vals[0] > trigger_threshold:
+                                            triggered = True
+
+                            else:
+                                triggered = False
+                                break    
+                                    
+                    if triggered == True:
+                        info['triggered'][info['station'] == index_station] = True #Not temp info can't use temp info cut.
+                        temporary_info['triggered'][temp_station_cut] = True
+
+                        #Digitize signals that were not digitized before:
                         if self.electricFieldDomain == 'time':
                             for index_antenna, antenna in enumerate(station.antennas):
-                                u_in = []
-                                V_in = []
+                                u_in = numpy.array(time_analog[station.label][antenna.label])
+                                V_in = numpy.array(V_analog[station.label][antenna.label])
                                 if numpy.logical_and(include_noise == True,summed_signals == True):
-                                    V_just_noise_in = []
-                                if summed_signals == False:
-                                    max_V_in_val = 0
-                                    max_E_val_solution_type = ''
-                                for solution in antenna.solutions:
-                                    if self.in_flag_array[station.label][antenna.label][solution][eventid]:
-                                        u_in.append(time_analog[station.label][antenna.label][solution])
-                                        V_in.append(V_analog[station.label][antenna.label][solution])
-                                        
-                                        if numpy.logical_and(include_noise == True,summed_signals == True):
-                                            V_just_noise_in.append(V_just_noise[station.label][antenna.label][solution])
-                                        if summed_signals == False:
-                                            current_max = max(numpy.fabs(V_analog[station.label][antenna.label][solution]))
-                                            if current_max > max_V_in_val:
-                                                max_V_in_val = current_max
-                                                max_E_val_solution_type = solution
-                                
-                                u_in = numpy.array(u_in)
-                                V_in = numpy.array(V_in)
-                                if numpy.logical_and(include_noise == True,summed_signals == True):
-                                    V_just_noise_in = numpy.array(V_just_noise_in)
-                                
+                                    V_just_noise_in = numpy.array(V_just_noise[station.label][antenna.label])
+
                                 if numpy.size(u_in) != 0:
                                     if summed_signals == True:
                                         if include_noise == True:
-                                            V_out, u_out = gnosim.interaction.askaryan.addSignals(u_in,V_in,plot=False,V_noise_in = V_just_noise_in, remove_noise_overlap = True)
+                                            u_out , V_out = gnosim.interaction.askaryan.addSignals(u_in,V_in,plot=False,V_noise_in = V_just_noise_in, remove_noise_overlap = True)
                                         else:
-                                            V_out, u_out = gnosim.interaction.askaryan.addSignals(u_in,V_in,plot=False)
+                                            u_out , V_out = gnosim.interaction.askaryan.addSignals(u_in,V_in,plot=False)
                                     else:
                                         u_out = numpy.array(time_analog[station.label][antenna.label][max_E_val_solution_type])
                                         V_out = numpy.array(V_analog[station.label][antenna.label][max_E_val_solution_type])
-                                    Vd_out, ud_out = gnosim.detector.fpga.digitizeSignal(u_out,V_out,digital_sample_times,station.sampling_bits,antenna.noise_rms,station.scale_noise_to, dc_offset = dc_offset, plot = False)
-                                    
+                                    ud_out , Vd_out = gnosim.detector.fpga.digitizeSignal(u_out,V_out,digital_sample_times,station.sampling_bits,antenna.noise_rms,station.scale_noise_to, dc_offset = dc_offset, plot = False)
                                 else:
                                     V_out = numpy.array([])
                                     u_out = numpy.array([])
                                     Vd_out = numpy.array([])
                                     ud_out = numpy.array([])
                             
+                                #The four below will contain only the signals going into beam forming
                                 time_analog[station.label][antenna.label] = u_out
                                 V_analog[station.label][antenna.label] = V_out
                                 time_digital[station.label][antenna.label] = ud_out
                                 V_digital[station.label][antenna.label] = Vd_out
-                            
-                            
+
                             min_time = digital_sample_times[0]
                             max_time = digital_sample_times[-1]
                             dt = digital_sample_times[1] - digital_sample_times[0]
-                        
-                        #Triggering
-                        if do_beamforming == True:
-                            #Here is where I perform the beamforming algorithms. 
-                            
-                            Vd_out_sync, ud_out_sync  = gnosim.detector.fpga.syncSignals(V_digital[station.label],time_digital[station.label], min_time, max_time, dt)
-                            formed_beam_powers, beam_powersums = gnosim.detector.fpga.fpgaBeamForming(Vd_out_sync,ud_out_sync, station.beam_dict , plot1 = False, plot2 = False, save_figs = False, cap_bits = station.beamforming_power_sum_bit_cap)
-                            #Getting max values
-                            keep_top = 3
-                            
-                            beam_label_list = numpy.array(list(beam_powersums.keys()))
-                            stacked_beams = numpy.zeros((len(beam_label_list),len(beam_powersums[beam_label_list[0]])))
-                            for beam_index, beam_label in enumerate(beam_label_list):
-                                stacked_beams[beam_index,:] = beam_powersums[beam_label]
-                            max_vals = numpy.max(stacked_beams,axis=1)
-                            top_val_indices = numpy.argsort(max_vals)[-numpy.arange(1,keep_top+1)]
-                            top_vals = max_vals[top_val_indices] #descending order
-                            top_val_beams = beam_label_list[top_val_indices]
-                            top_val_theta_ant = numpy.array([station.beam_dict['theta_ant'][beam_label] for beam_label in top_val_beams])
-                            #Currently don't know what to do with these values.  They will be written out as I progress but
-                            #right now I am just testing that they can be calculate without breaking the simulation.
-                            #Right now I am only storing the 3 highest values.  It is likely that I want to store every beam
-                            #that satisfies the trigger condiditon?
-                            temporary_info['fpga_max'] = top_vals[0]
-                            info['fpga_max'] = top_vals[0]
-                        
-                        if trigger_threshold_units == 'adu':
-                            if numpy.size(V_out) > 0:
-                                if numpy.any(Vd_out > trigger_threshold):
-                                    triggered = True
-                        elif trigger_threshold_units == 'fpga':
-                            #DO FPGA CODE
-                            if top_vals[0] > trigger_threshold:
-                                triggered = True
-                        else:
-                            if numpy.size(V_out) > 0:
-                                if numpy.any(V_out > trigger_threshold):
-                                    triggered = True
-                        if numpy.logical_and(do_beamforming == False, triggered == True):
-                            Vd_out_sync, ud_out_sync  = gnosim.detector.fpga.syncSignals(V_digital[station.label],time_digital[station.label], min_time, max_time, dt)
-                    else:
-                        triggered = False    
-                            
-                    if triggered == True:
-                        info['triggered'] = True
-                        temporary_info['triggered'] = True
-                        signals_out[station.label] = numpy.vstack((Vd_out_sync, ud_out_sync[0,:]))
-                        
+                            ud_out_sync , Vd_out_sync  = gnosim.detector.fpga.syncSignals(time_digital[station.label],V_digital[station.label], min_time, max_time, dt)
+                            signals_out[station.label] = numpy.vstack((Vd_out_sync, ud_out_sync[0,:]))
+
                         try:
                             print('Triggered on event %i at Time: %0.3f'%(eventid,time.time() - self.throw_start_time))
                         except:
@@ -773,7 +813,11 @@ class Sim:
                                 self.lock.acquire()
                                 try:
                                     print('Plotting Signals Acquired a lock')
-                                    fig = gnosim.trace.refraction_library.plotGeometry(self.stations,neutrino_loc,phi_0,temporary_info[numpy.logical_and(temporary_info['has_solution'] == True,temporary_info['station'] == index_station)],self.ice)
+                                    if plot_geometry_mode_3d == True:
+
+                                        fig = gnosim.trace.refraction_library.plotGeometry(self.stations,neutrino_loc,temporary_info[temporary_info['has_solution'] == True],self.ice,plot3d=True,neutrino_travel_dir = vector_neutrino_travel_dir, emission_polarization_vecs = emission_polarization_vecs, final_polarization_vecs = final_polarization_vecs)
+                                    else:
+                                        fig = gnosim.trace.refraction_library.plotGeometry(self.stations,neutrino_loc,temporary_info[temporary_info['has_solution'] == True],self.ice,plot3d=False)
                                     if return_fig_array == True:
                                         fig_array.append(fig)
 
@@ -796,7 +840,7 @@ class Sim:
 
                                 fig = pylab.figure(figsize=(16.,11.2)) #my screensize
                                 
-                                n_rows = len(station.antennas)
+                                n_rows = sum(station.phased_cut)
                                 ntables = 4 #With below lines is 5 for beamforming == True
                                 height_ratios = [2,2,n_rows+1,n_rows+1]
                                 if do_beamforming == True:
@@ -813,7 +857,7 @@ class Sim:
                                 first_in_loop = True
                                 axis2 = []
                                 max_ax1_range = numpy.array([1e20,-1e20])
-                                for index_antenna, antenna in enumerate(station.antennas):
+                                for index_antenna, antenna in enumerate(station.antennas[station.phased_cut]):
                                     if first_in_loop == True:
                                         first_in_loop = False
                                         ax = pylab.subplot(gs_left[2*index_antenna])
@@ -827,8 +871,9 @@ class Sim:
                                     if index_antenna == 0:
                                         boolstring = ['False','True']
                                         pylab.title('Event %i, summed_signals = %s'%(eventid,boolstring[int(summed_signals)])) 
-                                    ax1.plot(time_analog[station.label][antenna.label],V_analog[station.label][antenna.label],label='s%ia%i'%(index_station,index_antenna),linewidth=0.6,c = c1)
-                                    ax2.plot(time_digital[station.label][antenna.label],V_digital[station.label][antenna.label],label='s%ia%i'%(index_station,index_antenna),linewidth=0.4,c = c2)
+
+                                    ax1.plot(u_outs[station.label][antenna.label],V_outs[station.label][antenna.label],label='s%ia%i'%(index_station,index_antenna),linewidth=0.6,c = c1)
+                                    ax2.plot(ud_outs[station.label][antenna.label],Vd_outs[station.label][antenna.label],label='s%ia%i'%(index_station,index_antenna),linewidth=0.4,c = c2)
                                     
                                     if ( n_rows // 2 == index_antenna):
                                         ax1.set_ylabel('V$_{%i}$ (V)'%(eventid),fontsize=12, color=c1)
@@ -893,11 +938,13 @@ class Sim:
                                 table_fig.patch.set_visible(False)
                                 table_ax.axis('off')
                                 table_ax.axis('tight')
-                                antenna =           ['%i'%i for i in info['antenna'].astype(int)]
-                                observation_angle = ['%0.4g'%i for i in info['observation_angle'].astype(float)]
-                                theta_ant =         ['%0.4g'%i for i in info['theta_ant'].astype(float)]
-                                distance =          ['%0.3g'%i for i in info['distance'].astype(float)]
-                                reduction_factor =       ['%0.3g'%i for i in info['signal_reduction_factor']]
+                                #only want info from phased antennas
+                                info_phased_cut = numpy.logical_and(info['station'] == index_station , numpy.isin(info['antenna'],numpy.where(station.phased_cut)[0])) 
+                                antenna =           ['%i'%i for i in info[info_phased_cut]['antenna'].astype(int)]
+                                observation_angle = ['%0.4g'%i for i in info[info_phased_cut]['observation_angle'].astype(float)]
+                                theta_ant =         ['%0.4g'%i for i in info[info_phased_cut]['theta_ant'].astype(float)]
+                                distance =          ['%0.3g'%i for i in info[info_phased_cut]['distance'].astype(float)]
+                                reduction_factor =       ['%0.3g'%i for i in info[info_phased_cut]['signal_reduction_factor']]
                                 df = pandas.DataFrame({'antenna':antenna , '$\\theta_\mathrm{ant}$ (deg)':theta_ant , '$\\theta_\mathrm{emit}$ (deg)':observation_angle,'d$_\mathrm{path}$ (m)':distance, 'Reduction Factor':reduction_factor})
                                 table = pylab.table(cellText = df.values, colLabels = df.columns, loc = 'center')
                                 table.auto_set_font_size(False)
@@ -911,10 +958,10 @@ class Sim:
                                 table_fig.patch.set_visible(False)
                                 table_ax.axis('off')
                                 table_ax.axis('tight')
-                                antenna =           ['%i'%i for i in info['antenna'].astype(int)]
-                                electric_field =    ['%0.3g'%i for i in info['electric_field'].astype(float)]
-                                dom_freqs =         ['%0.3g'%i for i in (info['dominant_freq']/1e6).astype(float)]
-                                SNRs =              ['%0.3g'%i for i in info['SNR'].astype(float)]
+                                antenna =           ['%i'%i for i in info[info_phased_cut]['antenna'].astype(int)]
+                                electric_field =    ['%0.3g'%i for i in info[info_phased_cut]['electric_field'].astype(float)]
+                                dom_freqs =         ['%0.3g'%i for i in (info[info_phased_cut]['dominant_freq']/1e6).astype(float)]
+                                SNRs =              ['%0.3g'%i for i in info[info_phased_cut]['SNR'].astype(float)]
                                 df = pandas.DataFrame({'antenna':antenna , '$V_\mathrm{max}$ (V)':electric_field , 'SNR':SNRs, '$f_\mathrm{max}$ (MHz)':dom_freqs})
                                 table = pylab.table(cellText = df.values , colLabels = df.columns, loc = 'center')
                                 table.auto_set_font_size(False)
@@ -940,7 +987,7 @@ class Sim:
                                     #table_ax.axis('tight')
                                 pylab.subplots_adjust(left = 0.03, bottom = 0.05, right = 0.97, top = 0.97, wspace = 0.15, hspace = 0.28)
                                 if return_fig_array == True:
-                                    fig_array.append(fig)   
+                                    fig_array.append(fig)
 
                                 try:
                                     pylab.savefig('%s%s-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
@@ -954,8 +1001,26 @@ class Sim:
                                 print('Plotting Signals Released a lock')
                                 self.lock.release()
                     else:
-                        info['triggered'] = False
-                        temporary_info['triggered'] = False
+                        #What to do if the station doesn't trigger
+                        temporary_info[temp_station_cut]['triggered'] = False
+                        info[info['station'] == index_station]['triggered'] = False
+                        signals_out[station.label] = numpy.array([])
+                else:
+                    #What happens if the station doesn't pass the pre_trigger.
+                    info[info['station'] == index_station] = temporary_info[numpy.logical_and(temp_station_cut,temporary_info['solution'] == station.antennas[0].solutions[0].encode())] #should pick out first solution type of each antenna for output in info.
+
+            #After all stations, if at least one passed pre_trigger
+
+            #dic_max declarations should be here
+            dic_max['d'] = temporary_info[ event_max_solution_cut ]['distance']
+            dic_max['r'] = rs[event_max_solution_cut]
+            dic_max['t'] = temporary_info[ event_max_solution_cut ]['time']
+            dic_max['theta'] = temporary_info[ event_max_solution_cut ]['theta_ray']
+            dic_max['theta_ant'] = temporary_info[ event_max_solution_cut ]['theta_ant']
+            dic_max['a_s'] = temporary_info[ event_max_solution_cut ]['a_s']
+            dic_max['a_p'] = temporary_info[ event_max_solution_cut ]['a_p']
+            dic_max['z'] = z_0#self.in_dic_array[station.label][antenna.label][solution_type_max]['z'][eventid]
+
         else:
             dic_max['d'] = temporary_info[0]['distance']
             dic_max['r'] = rs[0]
@@ -968,10 +1033,14 @@ class Sim:
         if output_all_solutions == True:
             info = temporary_info
         p_detect = numpy.any(info['has_solution'])
+        event_triggered = numpy.any(info['triggered'])
+
+        #TODO: Decide if I want to separate phased array and reconstruction array info on output.  Could do a cut here before output. 
+
         if return_fig_array == True:
-            return eventid, p_interact, p_earth, p_detect, event_electric_field_max, dic_max, event_observation_angle_max, event_solution_max, event_index_station_max, event_index_antenna_max, info, triggered, signals_out, fig_array
+            return eventid, p_interact, p_earth, p_detect, event_electric_field_max, dic_max, event_observation_angle_max, event_solution_max, event_index_station_max, event_index_antenna_max, info, event_triggered, signals_out, fig_array
         else:
-            return eventid, p_interact, p_earth, p_detect, event_electric_field_max, dic_max, event_observation_angle_max, event_solution_max, event_index_station_max, event_index_antenna_max, info, triggered, signals_out
+            return eventid, p_interact, p_earth, p_detect, event_electric_field_max, dic_max, event_observation_angle_max, event_solution_max, event_index_station_max, event_index_antenna_max, info, event_triggered, signals_out
     
     def makeFlagArray(self, x_query, y_query , z_query):
         '''
@@ -1371,12 +1440,28 @@ class Sim:
 
         self.throw_start_time = time.time()
         
+        
+        #Filtering trigger units to acceptable values.
+        try:
+            accepted_units = getAcceptedTriggerUnits()
+            if type(trigger_threshold_units) == bytes:
+                trigger_threshold_units = accepted_units[numpy.isin(accepted_units,trigger_threshold_units.decode())][0]
+            else:
+                trigger_threshold_units = accepted_units[numpy.isin(accepted_units,trigger_threshold_units)][0]
+            if len(trigger_threshold_units) == 0:
+                print('Selection of trigger units did not match predefined values.  Breaking.')
+                return
+        except:
+            print('Selection of trigger units did not match predefined values.  Breaking.')
+            return
+
+
         self.pre_split = pre_split
         self.outfile = outfile
         self.save_signals = save_signals
         self.n_events = n_events
         #seed for testing purposes (if want replicated data)
-        if (seed != None):
+        if (seed is not None):
             numpy.random.seed(seed)
         else:
             numpy.random.seed()
@@ -1409,6 +1494,7 @@ class Sim:
         
         
         #Location of neutrino interaction (characterized by [x_0, y_0, z_0] or [phi_vertex, theta_vertex, z_0] )
+        #TODO: Make sure detector volume is big enough if multiple stations are present.  
         if z_0 == None:
             z_0 = numpy.random.uniform(-1. * detector_volume_depth, 0., size=self.n_events) # m #maybe something to double check later, make sure doesn't give solutions outside of earth
         else:
@@ -1418,8 +1504,8 @@ class Sim:
             else:
                 z_0 = z_0.astype(float)
                 
-        if numpy.logical_and(phi_vertex  != None, r_vertex != None):
-            if numpy.logical_or(x_0 != None, y_0 != None):
+        if numpy.logical_and(phi_vertex  is not None, r_vertex is not None):
+            if numpy.logical_or(x_0 is not None, y_0 is not None):
                 print('phi_vertex and r_vertex are given and will be used')
                 print('Ignoring provide x_0, y_0 coordinates, if you want to use x_0, y_0 please ensure phi_vertex = None and r_vertex = None')
             
@@ -1436,8 +1522,8 @@ class Sim:
             x_0 = r_vertex * numpy.cos(numpy.radians(phi_vertex))
             y_0 = r_vertex * numpy.sin(numpy.radians(phi_vertex))
             
-        elif numpy.logical_and(x_0  != None, y_0 != None):
-            if numpy.logical_or(phi_vertex  != None, r_vertex != None):
+        elif numpy.logical_and(x_0  is not None, y_0 is not None):
+            if numpy.logical_or(phi_vertex  is not None, r_vertex is not None):
                 print('x_0 and y_0 are given and will be used')
                 print('Ignoring provide phi_vertex, r_vertex coordinates, if you want to use phi_vertex, r_vertex please ensure x_0 = None and y_0 = None')
             
@@ -1478,9 +1564,9 @@ class Sim:
         #Preparing output arrays
         
         if output_all_solutions == False:
-            self.len_info_per_event = self.n_antenna
+            self.len_info_per_event = self.n_antenna#self.n_antenna_PA
         else:
-            self.len_info_per_event = len(self.solutions)*self.n_antenna
+            self.len_info_per_event = len(self.solutions)*self.n_antenna#self.n_antenna_PA
 
         p_interact = numpy.zeros(self.n_events)
         p_earth = numpy.zeros(self.n_events)
@@ -1506,7 +1592,7 @@ class Sim:
             #self.file.attrs['geometric_factor'] = (4. * numpy.pi) * (numpy.pi * detector_volume_radius**2 * detector_volume_depth) # m^3 sr
             # ORIGINAL 28 MAY 2014
             # NEW CURVATURE
-            if (seed != None):
+            if (seed is not None):
                 self.file.attrs['seed'] = seed
             else:
                 self.file.attrs['seed'] = 'None'
@@ -1517,13 +1603,13 @@ class Sim:
                                                 * detector_volume_depth) # m^3 sr not that the 2 pi (1 - cos theta) is the area of a cap, that is then multiplied by a differential depth (depth of ice) to get volume, then 4 pi to get m^3 sr
                                                 
             # NEW CURVATURE
-
+            #TODO: Write both configuration files to the outfile.  
             self.file.attrs['config'] = self.config_file
             self.file.attrs['ice_model'] = self.ice.ice_model
-            self.file.attrs['trigger_mode'] = trigger_threshold_units
+            self.file.attrs['trigger_mode'] = numpy.string_(trigger_threshold_units)
             self.file.attrs['trigger_threshold'] = trigger_threshold
             if pre_trigger_angle == None:
-                self.file.attrs['pre_trigger_angle'] = 'None'
+                self.file.attrs['pre_trigger_angle'] = numpy.string_('None')
             else:
                 self.file.attrs['pre_trigger_angle'] = pre_trigger_angle
 
@@ -1567,6 +1653,7 @@ class Sim:
         #Interpolating values from using griddata:
         ############################################################################
         print('Loading ray tracing libraries for interpolation.')
+        #Might want to do this one at a time rather than all at once.
         for station in self.stations:
             station.loadLib(pre_split = self.pre_split)
             station.loadConcaveHull()
@@ -1623,6 +1710,7 @@ class Sim:
                         #This region I will need to be careful adjustig when/if I add multithreading per event. 
                         #Note to future self, there is a section in 'Python and HDF5' about multithreading with HDF5
                         self.file['signals'].create_group(event_label)
+                        #TODO: The because the times are float, and how I am storing things now, the signals are also stored as float.  They need not be, could save memory by changing how the signal are being stored. 
                         for index_station, station in enumerate(self.stations):
                             self.file['signals'][event_label].create_dataset(station.label, numpy.shape(signals_out[station.label]), dtype='f', compression='gzip', compression_opts=9, shuffle=True)  
                             self.file['signals'][event_label][station.label][...] = signals_out[station.label]
@@ -1797,8 +1885,10 @@ if __name__ == '__main__':
     station_config_file = sim_config['station_config_file']
 
     station_config_file_fix = station_config_file.split('/')[-1].replace('.py','')
+    if sim_config['outfile_dir'][-1] != '/':
+        sim_config['outfile_dir'] = sim_config['outfile_dir'] + '/'
 
-    if (seed != None):
+    if (seed is not None):
         outfile = sim_config['outfile_dir'] + '%s_%s_%.2e_GeV_%i_events_%i_seed_%i.h5'%(    sim_config['outfile_name_root'],
                                                                                             station_config_file_fix,
                                                                                             energy_neutrino,
@@ -1861,13 +1951,14 @@ if __name__ == '__main__':
     sys.stdout.flush()
     
     print('Trying to print station geometry and antenna orientations')
-    try:
-        fig = gnosim.detector.detector.plotArrayFromConfig(my_sim.config,my_sim.solutions,only_station = 'all',verbose = False)
-        fig.savefig('%s%s_array_geometry.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),sim_config['image_extension']),bbox_inches='tight')
-        pylab.close(fig)
-    except Exception as e:
-        print('Failed to save image %s%s_array_geometry.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),sim_config['image_extension']))
-        print(e)
+    for station in my_sim.stations:
+        try:
+            fig = station.plotStation(verbose = False)
+            fig.savefig('%s%s_%s_geometry.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),station.label,sim_config['image_extension']),bbox_inches='tight')
+            pylab.close(fig)
+        except Exception as e:
+            print('Failed to save image %s%s_array_geometry.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),sim_config['image_extension']))
+            print(e)
     
     print('Trying to create index.html file for new images')
     try:

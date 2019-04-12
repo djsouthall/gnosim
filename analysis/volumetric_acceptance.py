@@ -77,8 +77,15 @@ def volumetricAcceptance(reader,verbose = True):
     
     if verbose == True:
         print('Loading relevant parts of info')
-    info = numpy.unique(reader['info']['eventid','triggered'])
-    
+    info = numpy.unique(reader['info']['eventid','triggered']) #This will reduce info to just eventid and if a station triggered or didn't.  There could be multiples of events if one station triggers and another doesn't.
+    unique_arr, indices, counts = numpy.unique(info['eventid'],return_index=True,return_counts=True) #Indices and counts can be used to determine which are multiples, so I can ensure they are set to Triggered, as I want the event to count as detected if a single station detects it.
+    info['triggered'][indices[counts>1]] = True 
+    #If any station triggered then event is triggered.  Counts would only be greater than 1 if two unique 
+    #answers present (True and False) for triggered in the same event.  Which could occur for multiple 
+    #stations, one triggering one not.  Events that have 1 and already triggered don't need to be altered.
+    info = info[indices] #Now it is unique, but each triggered weights are appropriately set.
+    #TODO: The above code is untested with multiple stations, should test.
+
     n_events = len(info)
     
     if verbose == True:
@@ -106,16 +113,17 @@ def volumetricAcceptance(reader,verbose = True):
 ############################
 if __name__ == "__main__":
     #Calculation Parameters
-    calculate_data = False
+    calculate_data = True
+    in_path = '/scratch/midway2/dsouthall/April9/'
     config = 'real_config_antarctica_180_rays_signed_fresnel'
-    outdir = './'
+    outdir = in_path
     outname = outdir +'volumetric_acceptance_data_%s.h5'%(config)
     #expect_merged = False
     #Plotting Parameters
     plot_data = True
     label='GNOSim - Current'
     dataname = outname
-    plot_paper_comparison = False
+    plot_paper_comparison = True
     paper_comparison_file = '/home/dsouthall/Projects/GNOSim/gnosim/analysis/DesignPerformancePaperData.py'
     plot_self_comparison = True
     self_comparison_file = '/home/dsouthall/scratch-midway2/mar_testing_real_config/volumetric_acceptance_data_real_config.h5'
@@ -131,7 +139,8 @@ if __name__ == "__main__":
         else:
             infiles = glob.glob('./*seed*.h5')
         '''
-        infiles = glob.glob('./results*.h5')
+        #infiles = glob.glob('./results*.h5')
+        infiles = glob.glob(in_path + 'results*.h5')
         print('Attempting to calculate volumetric acceptance for the following files:')
         for infile in infiles:
             print(infile)

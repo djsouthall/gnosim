@@ -20,10 +20,10 @@ pylab.ion()
 if __name__ == "__main__":
     pylab.close('all')
     #Parameters
-    infile = '/home/dsouthall/scratch-midway2/results_2019_Mar_config_dipole_octo_-200_antarctica_180_rays_3.00e+09_GeV_10000_events_1.h5'
-    plot_geometry = False
+    infile = '/home/dsouthall/scratch-midway2/results_2019_April_real_config_full_station_3.00e+09_GeV_10000_events_2_seed_1.h5'#'/home/dsouthall/scratch-midway2/results_2019_April_real_config_full_station_3.00e+09_GeV_10000_events_5_seed_1.h5'#'/home/dsouthall/scratch-midway2/results_2019_April_real_config_full_station_3.00e+09_GeV_10000_events_1_seed_1.h5'#results_2019_Mar_config_dipole_octo_-200_antarctica_180_rays_3.00e+09_GeV_10000_events_1.h5
+    plot_geometry = True
     plot_signals = True
-    choose_n = 10 #How many of the triggered events to run
+    choose_n = 1 #How many of the triggered events to run
     #Loading (set up to only be done first time file is executed.)
     try:
         print('Pre_loaded = %i, skipping loading',pre_loaded)
@@ -31,7 +31,7 @@ if __name__ == "__main__":
         reader = h5py.File(infile , 'r')
         
         info = reader['info'][...]
-        solutions = numpy.array(['direct', 'cross', 'reflect'])
+        solutions = numpy.array(['direct'])
         config_file = reader.attrs['config']
         trigger = 0#reader.attrs['trigger_threshold']
         testSim = gnosim.sim.antarcticsim.Sim(config_file, solutions = solutions, electricFieldDomain = 'time',do_beamforming = True)
@@ -55,6 +55,7 @@ if __name__ == "__main__":
             do_events = numpy.array([])
 
     for eventid in do_events:
+        print('Attempting event ',eventid)
         event_info = info[info['eventid'] == eventid]
         if numpy.isin('random_time_offsets',list(reader.keys())):
             random_time_offset = reader['random_time_offsets'][eventid]
@@ -70,7 +71,7 @@ if __name__ == "__main__":
         eventid, p_interact, p_earth, p_detect, event_electric_field_max, dic_max, event_observation_angle_max, event_solution_max, event_index_station_max, event_index_antenna_max, info_out, triggered, signals_out, fig_array = \
             testSim.event(reader['energy_neutrino'][eventid], reader['phi_0'][eventid], reader['theta_0'][eventid], reader['x_0'][eventid], reader['y_0'][eventid], reader['z_0'][eventid], \
                         eventid,reader['inelasticity'][eventid], anti=False, include_noise = True,plot_signals=plot_signals,plot_geometry=plot_geometry,\
-                        summed_signals = True,trigger_threshold = trigger , trigger_threshold_units = reader.attrs['trigger_mode'], \
+                        summed_signals = True,trigger_threshold = trigger , trigger_threshold_units = reader.attrs['trigger_mode'].decode(), \
                         plot_filetype_extension='svg', image_path = './', random_time_offset = random_time_offset,\
                         dc_offset = dc_offset, do_beamforming = testSim.do_beamforming, output_all_solutions = True,
                         pre_trigger_angle = pre_trigger_angle, event_seed = numpy.unique(event_info['seed'])[0],return_fig_array = True)

@@ -36,9 +36,9 @@ def calculateProjectedArea(theta_cone , theta_obs , n_points , r_curvature = 6.3
         Adds print statements.  (Default is True).
     equal : bool, optional
         Forces equal scaling of axis.  (Default is True).
-    fig : figure, optional
+    fig : matplotlib.pyplot.figure, optional
         The figure on which to plot on.  (Default is None).
-    ax : axis, optional
+    ax : matplotlib.pyplot.axis, optional
         The axis on which to plot on.  (Default is None).
 
     Returns

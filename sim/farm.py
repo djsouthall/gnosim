@@ -8,14 +8,16 @@ import yaml
 #----------
 username = 'dsouthall'
 
-simulation_config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/sim/sim_config/sim_settings.py'] #List of all config files to use.  Simulations will be run for each config file.
-energy_neutrino_array =  10**numpy.arange(7., 8.1, 0.5)#10**numpy.arange(7., 12.1, 0.5)#10**numpy.arange(6.5, 11.1, 0.5) # GeV
+simulation_config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/sim/sim_config/sim_settings_old_dipole.py'] #List of all config files to use.  Simulations will be run for each config file.
+energy_neutrino_array =  10**numpy.arange(7., 12.1, 0.5)#10**numpy.arange(6.5, 11.1, 0.5) # GeV
 cpu_per_task = 16
 mem_per_cpu = 1500 #1000 = 1GB, looks like the total MaxRSS for 1M events was 13GB total, so 2000-3000 per cpu for that.  
+partition = 'broadwl'
 n_events = 1000000
-n_trials = 5 # 1, 10
+n_trials = numpy.ones(len(energy_neutrino_array),dtype=int) #should be same length as energy_neutrino.  Can allow for different number of trials for different energies.
+n_trials[0:2] = 5
 use_seed = True
-seeds = numpy.arange(n_trials)#[0,1,2,3,4]#IF USING SEEDS THERE NEEDS TO BE n_trials DIFFERENT SEEDS SO YOU DON'T RUN THE SAME SEED MULTIPLE TIMES
+seeds = numpy.arange(max(n_trials))#[0,1,2,3,4]#IF USING SEEDS THERE NEEDS TO BE n_trials DIFFERENT SEEDS SO YOU DON'T RUN THE SAME SEED MULTIPLE TIMES
 jobname = 'gnosim'
 
 #Script
@@ -25,12 +27,12 @@ for sim_config_file in simulation_config_file_array:
     station_config_file = sim_config['station_config_file']
     station_config_file_fix = station_config_file.split('/')[-1].replace('.py','')
     if use_seed:
-        if len(seeds) != n_trials:
+        if len(seeds) != max(n_trials):
             print('WARNING, NUMBER OF TRIALS EXCEEDS SEEDS PROVIDED SKIPPING EVERYTHING')
             break
-    for energy_neutrino in energy_neutrino_array:
-        for index, index_name in enumerate(range(1, n_trials+1)):
-            batch = 'sbatch --cpus-per-task=%i --mem-per-cpu=%i --job-name=%s '%(cpu_per_task,mem_per_cpu, jobname)
+    for index_energy, energy_neutrino in enumerate(energy_neutrino_array):
+        for index, index_name in enumerate(range(1, n_trials[index_energy]+1)):
+            batch = 'sbatch --partition=%s --cpus-per-task=%i --mem-per-cpu=%i --job-name=%s '%(partition,cpu_per_task,mem_per_cpu, jobname)
             if use_seed == True:
                 command = '/home/dsouthall/Projects/GNOSim/gnosim/sim/antarcticsim.py %s %.2e %i %i %i'%(sim_config_file, energy_neutrino, n_events, index_name, seeds[index])
             else:

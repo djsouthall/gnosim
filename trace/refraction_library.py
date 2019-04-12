@@ -549,7 +549,7 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = N
         x_array[ii + 1] = x_array[ii] + x_step
         y_array[ii + 1] = y_array[ii] + y_step
         z_array[ii + 1] = z_array[ii] + z_step
-        if r_limit != None:
+        if r_limit is not None:
             if x_array[ii + 1]**2 + y_array[ii + 1]**2 > r_limit**2:
                 max_ii = ii
                 break
@@ -649,8 +649,8 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = N
     a_s_array = numpy.real(numpy.cumprod(a_s_array))
     #using the amplitudes keeps the sign here.
 
-    if r_limit != None:
-        if max_ii != None:
+    if r_limit is not None:
+        if max_ii is not None:
             n_steps = max_ii
                 
     return (x_array[0: n_steps], y_array[0: n_steps], z_array[0: n_steps], \
@@ -658,7 +658,7 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = N
         theta_array[0: n_steps], a_p_array[0: n_steps], a_s_array[0: n_steps], \
         index_reflect_air, index_reflect_water)
 
-def plotGeometry(stations,neutrino_loc,info,ice):
+def plotGeometry(stations,neutrino_loc,info,ice,plot3d = False, neutrino_travel_dir = None, emission_polarization_vecs = None, final_polarization_vecs = None):
     '''
     Plots the antennas, rays, and neutrino location for an event.
     
@@ -672,14 +672,55 @@ def plotGeometry(stations,neutrino_loc,info,ice):
         The info object array corresponding to this event. 
     ice : gnosim.earth.ice.Ice
         The ice object containing the appropriate ice model.
+    plot3d : bool
+        If True then the plot will be made in 3d, otherwise it will be plotted in wrapped cylidrical coordinates.
+        (Default is False).
+    neutrino_travel_dir : numpy.ndarray
+        A vector in the ice frame that points in the direction of travel of the neutrino.  If present then 
+        will be plotted, if None then will not be plotted.   This will only be ploted in 3d mode.  
+        (Default is None).
+    emission_polarization_vecs : numpy.ndarray
+        This should be a 3 column numpy array where each row is a vector containing the polarization of
+        that rays (corresponding to an antenna) polarization vector as the ray is emitted. The number of
+        rows must match the total number of antennas. 
+        If present then will be plotted, if None then will not be plotted.   This will only be ploted in 3d mode.  
+        (Default is None).
+    final_polarization_vecs : numpy.ndarray
+        This should be a 3 column numpy array where each row is a vector containing the polarization of
+        that rays (corresponding to an antenna) polarization vector as the ray is emitted. The number of
+        rows must match the total number of antennas. 
+        If present then will be plotted, if None then will not be plotted.   This will only be ploted in 3d mode.  
+        (Default is None).
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        The figure containing the plot.
     '''
+    if emission_polarization_vecs is not None:
+        vector_length = numpy.sqrt(neutrino_loc[0]**2 + neutrino_loc[1]**2)/20.0
+        if numpy.logical_or(sum([len(station.antennas)*len(station.solutions) for station in stations]) != numpy.shape(emission_polarization_vecs)[0],  numpy.shape(emission_polarization_vecs)[1] != 3):
+            print('Dimesions of emission_polarization_vecs did not match requirements.  Skipping.')
+            emission_polarization_vecs = None
+        if numpy.logical_or(sum([len(station.antennas)*len(station.solutions) for station in stations]) != numpy.shape(final_polarization_vecs)[0],  numpy.shape(final_polarization_vecs)[1] != 3):
+            print('Dimesions of final_polarization_vecs did not match requirements.  Skipping.')
+            final_polarization_vecs = None
+
+    max_xy = 0.0
+    min_xy = 0.0
+
     linestyle_dict = {'direct':(0, ()),'cross':(0, (3, 1, 1, 1)),'reflect':(0, (1, 1)),'direct_2':(0, (5, 1)),'cross_2':(0, (3, 5, 1, 5)),'reflect_2':(0, (1, 5))}
     neutrino_loc_r = numpy.sqrt(neutrino_loc[0]**2 + neutrino_loc[1]**2)
     if len(numpy.unique(info['eventid'])) == 1:
         eventid = numpy.unique(info['eventid'])[0]
         fig = pylab.figure(figsize=(16.,11.2)) #my screensize
+        if plot3d == True:
+            ax = fig.gca(projection='3d')
+        else:
+            ac = fig.gca()
         pylab.title('Event %i'%(eventid))
         sub_info = numpy.unique(info[info['eventid'] == eventid])
+        array_wide_solution_index = -1
         for index_station,station in enumerate(stations):
             station_cut = sub_info['station'] == index_station
             antenna_colors = gnosim.utils.misc.getColorMap(len(numpy.unique(sub_info['antenna'])))
@@ -689,24 +730,75 @@ def plotGeometry(stations,neutrino_loc,info,ice):
                 antenna_loc = numpy.array([antenna.x,antenna.y,antenna.z])
                 origin_r = numpy.sqrt(antenna_loc[0]**2 + antenna_loc[1]**2)
                 ssub_info = sub_info[numpy.logical_and(station_cut,antenna_cut)]
+                ant_label = station.label + ':' + antenna.label
+                phi_throw = numpy.rad2deg(numpy.arctan2(neutrino_loc[1] - antenna_loc[1],neutrino_loc[0] - antenna_loc[0])) #Azimuthal direction from antenna to throw ray towards neutrino 
+                if plot3d == True:
+                    if antenna.label == station.antenna_keys[station.phased_cut][0]:
+                        ax.view_init(elev = 30.0, azim = phi_throw-90.0)
                 for index_solution, solution in enumerate(ssub_info['solution']):
-                    phi_throw = numpy.rad2deg(numpy.arctan((neutrino_loc[1] - antenna_loc[1])/(neutrino_loc[0] - antenna_loc[0]))) #Azimuthal direction from antenna to throw ray towards neutrino 
+                    array_wide_solution_index += 1
                     x, y, z, t, d, phi, theta, a_p, a_s, index_reflect_air, index_reflect_water = rayTrace(antenna_loc, phi_throw, ssub_info['theta_ant'][ssub_info['solution'] == solution],ice, r_limit = 1.001*neutrino_loc_r)
-                    r = numpy.sqrt(x**2 + y**2)
-                    label = 'S%iA%i %s'%(index_station,index_antenna,solution.decode())
+                    
+                    if x[-1] > max_xy:
+                        max_xy = x[-1]
+                    elif x[-1] < min_xy:
+                        min_xy = x[-1]
+
+                    if y[-1] > max_xy:
+                        max_xy = y[-1]
+                    elif y[-1] < min_xy:
+                        min_xy = y[-1]
+
+                    label = ant_label + ' ' + solution.decode()
                     if numpy.isin(solution.decode(),list(linestyle_dict.keys())):
                         style = linestyle_dict[solution.decode()]
                     else:
                         style = '-'
-                    pylab.plot(r,z,label=label,color=antenna_colors[index_antenna],linestyle = style)
-                pylab.scatter(origin_r,antenna_loc[2],label='Antenna %i'%(index_antenna),color=antenna_colors[index_antenna],marker = 'd',s = 100)
-        pylab.scatter(neutrino_loc_r,neutrino_loc[2],label='Neutrino Loc',marker = '*',color = 'k',s = 100)
-        pylab.legend(fontsize = 14)
-        pylab.xlabel('r(m)',fontsize=20)
-        pylab.ylabel('z(m)',fontsize=20)
-        ax = pylab.gca()
-        ax.tick_params(axis = 'both',labelsize = 14)
-        pylab.subplots_adjust(left = 0.07, bottom = 0.06, right = 0.97, top = 0.97, wspace = 0.20, hspace = 0.20)
+                    if plot3d == False:
+                        r = numpy.sqrt(x**2 + y**2)
+                        ax.plot(r,z,label=label,color=antenna_colors[index_antenna],linestyle = style)
+                    else:
+                        ax.plot(x,y,z,label=label,color=antenna_colors[index_antenna],linestyle = style)
+                        if emission_polarization_vecs is not None:
+                            emission_polarization_vec = vector_length*gnosim.utils.linalg.normalize(emission_polarization_vecs[array_wide_solution_index])
+                            ax.quiver(neutrino_loc[0],neutrino_loc[1],neutrino_loc[2],emission_polarization_vec[0],emission_polarization_vec[1],emission_polarization_vec[2],color=antenna_colors[index_antenna],linestyle = style)
+                        if emission_polarization_vecs is not None:
+                            final_polarization_vec = vector_length*gnosim.utils.linalg.normalize(final_polarization_vecs[array_wide_solution_index])
+                            ax.quiver(antenna_loc[0],antenna_loc[1],antenna_loc[2],final_polarization_vec[0],final_polarization_vec[1],final_polarization_vec[2],color=antenna_colors[index_antenna], linestyle = style)
+
+                if plot3d == False:
+                    ax.scatter(origin_r,antenna_loc[2],label=ant_label,color=antenna_colors[index_antenna],marker = 'd',s = 100)
+                else:
+                    ax.scatter(antenna_loc[0],antenna_loc[1],antenna_loc[2],label=ant_label,color=antenna_colors[index_antenna],marker = 'd',s = 100)
+        
+        if plot3d == False:
+            ax.scatter(neutrino_loc_r,neutrino_loc[2],label='Neutrino Loc',marker = '*',color = 'k',s = 100)
+            ax.legend(fontsize = 14)
+            ax.xlabel('r(m)',fontsize=20)
+            ax.ylabel('z(m)',fontsize=20)
+            ax.tick_params(axis = 'both',labelsize = 14)
+            pylab.subplots_adjust(left = 0.07, bottom = 0.06, right = 0.97, top = 0.97, wspace = 0.20, hspace = 0.20)
+        else:
+            ax.scatter(neutrino_loc[0],neutrino_loc[1],neutrino_loc[2],label='Neutrino Loc',marker = '*',color = 'k',s = 100)
+            if neutrino_travel_dir is not None:
+                try:
+                    neutrino_travel_dir = 2.0*vector_length*gnosim.utils.linalg.normalize(neutrino_travel_dir)
+                    ax.quiver(neutrino_loc[0],neutrino_loc[1],neutrino_loc[2],neutrino_travel_dir[0],neutrino_travel_dir[1],neutrino_travel_dir[2], color = 'k',label='Neutrino Travel Direction')
+                except:
+                    print('Error in plotting neutrino vector.')
+            ax.legend(fontsize = 14)
+            ax.set_xlabel('x(m)',fontsize=20)
+            ax.set_ylabel('y(m)',fontsize=20)
+            ax.set_zlabel('z(m)',fontsize=20)
+
+            ax.set_xlim([min_xy,max_xy])
+            ax.set_ylim([min_xy,max_xy])
+            #ax.set_zlim([min_xy,max_xy])
+
+            #
+            ax = pylab.gca()
+            ax.tick_params(axis = 'both',labelsize = 14)
+            pylab.subplots_adjust(left = 0.07, bottom = 0.06, right = 0.97, top = 0.97, wspace = 0.20, hspace = 0.20)
         #fig.patch.set_alpha(0.)
         #ax.patch.set_alpha(0.)
         return fig
@@ -1309,7 +1401,7 @@ if __name__ == '__main__':
     plot_library = False    #If True, will plot the ray tracing libraries as they are created (or loaded if make_library == False).
     save_envelope = True    #If True, will calculate the envelope for the ray tracing library and save it.  Advisable to do in advance when ray tracing library is created.
     plot_envelope = False   #If True, will plot the envelope.
-    z_array = numpy.array([-173.0,-174.0,-175.0,-176.0,-177.0,-179.0,-181.0]) #The list of depths for which to throw rays (or load libraries if make_library == False).
+    z_array = numpy.array([-180.0])#numpy.array([-173.0,-174.0,-175.0,-176.0,-177.0,-179.0,-181.0]) #The list of depths for which to throw rays (or load libraries if make_library == False).
     n_rays = 180            #The number of rays to be thrown per depth.
     r_limit = None          #Note if this is NOT None, then all thrown rays will quit once they read this particular radius.  Use with care.  
                             #If you want a simulation with r = 6300m, it might be advisable to make r_limit = 7000 so the boundaries of hulls are still well defined
@@ -1327,7 +1419,7 @@ if __name__ == '__main__':
     for z_0 in z_array:
 
         #Library Name Formatting
-        library_dir = 'library_%i_%s_%i_rays'%(int(z_0),ice_model,n_rays)
+        library_dir = 'library_%i_%s_%i_rays_signed_fresnel'%(int(z_0),ice_model,n_rays)
        
         theta_array = numpy.linspace(0., 180., n_rays) 
 

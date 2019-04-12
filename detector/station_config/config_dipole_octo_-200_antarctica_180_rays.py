@@ -1,19 +1,20 @@
-
-{'detector_volume': {'ice_model': 'antarctica',
-                     'radius': 6200.,
-                     'depth': 2950.},#making volume slightly smaller than throw valume to avoid edge effects of interpolation
- 'DAQ': {   'sampling_rate_GHz': 1.5,
-            'sampling_bits': 7,
-            'scale_noise_to': 3,
-            'n_beams':15,
-            'n_baselines':2,
-            'power_calculation_sum_length':16,  #How long each power sum window is
-            'power_calculation_interval':8, #How frequent each power sum window begins
-            'beamforming_power_sum_bit_cap':5 #FPGA does beamforming with only 5 bits despite signals being at 7, so they are capped here:
-            },  
- 'stations': {'n': 1,
-              'positions': [[0., 0., -200.]]},
- 'antenna_definitions': {
+{   'detector_volume': {'ice_model': 'antarctica',
+                        'radius': 6200.,
+                        'depth': 2950.},#making volume slightly smaller than throw valume to avoid edge effects of interpolation
+    'stations':{
+            'station0':{
+                'DAQ': {
+                        'sampling_rate_GHz': 1.5,
+                        'sampling_bits': 7,
+                        'scale_noise_to': 3,
+                        'n_beams':15,
+                        'n_baselines':2,
+                        'power_calculation_sum_length':16,  #How long each power sum window is
+                        'power_calculation_interval':8, #How frequent each power sum window begins
+                        'beamforming_power_sum_bit_cap':5 #FPGA does beamforming with only 5 bits despite signals being at 7, so they are capped here:
+                        },
+                'position' : [0., 0., -200.], #The antenna positions are relative to this.
+                'phased_antennas' : { #Antennas in this should be in one vertical string/line, they are used for the phased array calculations.
                         'dipole0': {
                                     'antenna_type':'dipole',
                                     'lib': '/home/dsouthall/Projects/GNOSim/library_-200_antarctica_180_rays_signed_fresnel/*.h5',
@@ -110,6 +111,14 @@
                                     'frequency_low': 0.1, # GHz
                                     'frequency_high': 0.8
                                     }
-                        }
+                            }, #end 'phased_antennas'
+
+                'reconstruction_antennas' : { #Antennas in this should be in one vertical string/line, they are used for the phased array calculations.
+                            } #end 'reconstruction_antennas'
+
+                    }, #end 'ARA5'
+
+                } #end 'stations'
 }
+
 

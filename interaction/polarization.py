@@ -124,7 +124,7 @@ def calculateSPUnitVectors(wave_vector):
     return s_vector, p_vector
 ############################################################
 
-def getPolarizationAtAntenna( vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , a_s , a_p):
+def getPolarizationAtAntenna( vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , a_s , a_p, return_initial_polarization = False):
     '''
     Parameters
     ----------
@@ -151,6 +151,8 @@ def getPolarizationAtAntenna( vec_neutrino_travel_dir , emission_wave_vector , d
         fresnel amplitudes over the corse of the ray's path to the antenna.
         Currently only numpy.real(a_p) is returned from refraction_library.makeLibrary,
         so a real float is expected here.
+    return_initial_polarization : bool
+        If True then the initial polarization will also be output.  (Defaul is False).
 
     Returns
     -------
@@ -158,6 +160,10 @@ def getPolarizationAtAntenna( vec_neutrino_travel_dir , emission_wave_vector , d
         The unit vector for the polarization as it is just before interacting with the antenna.
         This is NOT a unit vector, magnitudes represent how the s and p polarizations have been
         reduced during ray propogation.
+        This is returned in ice-frame cartesian coordinates.
+    polarization_vector_0: numpy.ndarray, optional
+        The unit vector for the polarization as it is just after emissionat the neutrino.
+        This is a unit vector, as the magnitudes have not reduced yet.
         This is returned in ice-frame cartesian coordinates.
     
     See Also
@@ -179,7 +185,10 @@ def getPolarizationAtAntenna( vec_neutrino_travel_dir , emission_wave_vector , d
     #The final polarization is the sum of these
     polarization_vector_1 = polarization_vector_1_p + polarization_vector_1_s #Not a unit vector.  The magnitude changes to represent reduction in E field.  a_s and a_p include attenuation in ice.
     
-    return polarization_vector_1
+    if return_initial_polarization == True:
+        return polarization_vector_1, polarization_vector_0
+    else:
+        return polarization_vector_1
 
 def testPolarization():
     ice = gnosim.earth.ice.Ice('antarctica',suppress_fun = True)

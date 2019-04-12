@@ -49,6 +49,7 @@ for file_root in file_roots:
             if out_key not in dic_attrs.keys():
                 writer.attrs[out_key] = reader.attrs[key]
         for key in reader.keys():
+            #TODO: if only one infile (or if just the first?), this should be done differently, as the element by element adjustments are not needed.
             print('\tOn key:',key)
             sys.stdout.flush()
             if key == 'signals':
@@ -66,7 +67,7 @@ for file_root in file_roots:
             elif key == 'signals':
                 for signal_key in list(reader['signals'].keys()):
                     event_label = signal_key.replace(signal_key.split('event')[-1], str(int(signal_key.split('event')[-1]) + index*n_events)) #reader['signals'][signal_keys]
-                    print(event_label)
+                    print('\t\t' + event_label)
                     sys.stdout.flush()
                     writer['signals'].create_group(event_label)
                     for station_label in list(reader['signals'][signal_key].keys()):

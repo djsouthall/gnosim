@@ -252,8 +252,8 @@ The below section discusses the usage of the simulation code.  The general topic
     -----------------------------------------------
 
         Station configuration files are used in the construction of the station in the simulation.  It contains a lot of information and options for customizing
-        the station.  Currently stations are 'rubber stamped', meaning that you can clone stations and place them in different locations, but the code does not
-        support individually designed and placed stations.  #TODO: Update this feature.
+        the station.  Multiple stations can be supported, each must simply be a different dictionary listed in the 'stations' section.  The key given to each
+        station should be a unique station label, (for instance, 'ARA5').  This label will then be used as the key in dictionaries and labels for plots, etc.
 
         Station configuration files should be located in gnosim/detector/station_config.  Below is a description of the keys to include in the configuration file.
         It is recommended that you copy and modify existing configuration files locally, rather than creating your own from scratch.
@@ -264,112 +264,126 @@ The below section discusses the usage of the simulation code.  The general topic
             A dictionary containing information about the ice to be loaded in the simulation.
 
             ice_model : str
-                The desired ice model (label) to be loaded when the ice is initiated.  This will be checked with checkIceModel to ensure
+                The desired ice model (label) to be loaded when the ice is initiated.  This will be checked with gnosim.earth.ice.getAcceptedIceModels() to ensure
                 it is an acceptable ice model.
             radius : float
-                The radius of the 'detector' (ice to be used as detector/populated with neutrinos).  Given in m.  This should not exceed that
-                used when making the ray tracing libraries defined in the configuration file.  Making it slightly lower than that used in the 
-                ray tracing library construction can help avoid edge effects from the interpolation.
+                The radius of the 'detector' (ice to be used as detector/populated with neutrinos).  Given in m.  Small edge effects can be present for neutrinos
+                near the edge of a ray tracing library due to interpolation at a boundary, however signals at these boundaries are often to weak to be detected anyways.
+                With that in mind, if using a single station then it may be beneficial to make this radius just under the radius used for creating the ray tracing
+                library such that neutrinos aren't populated near edges.  
+                For use of multiple stations one should keep in mind that this specifies the region of ice for which neutrinos are being populated.  Thus if you have two
+                stations each with an effective detectable radius (governed by the ray tracing libraries), then this radius should be large enough to place 
+                neutrinos in the visible volume of both stations effective radii (accounting for the stations physical separation).  
             depth : float
                 The depth of the 'detector' (ice to be used as detector/populated with neutrinos).  Given in m.  This should not exceed that
                 used when making the ray tracing libraries defined in the configuration file.  Making it slightly lower than that used in the 
                 ray tracing library construction can help avoid edge effects from the interpolation.
-      
-        DAQ : dict
-            A dictionary containing relevant quantities for calculations pertaining to digitization, the fpga, and beamforming.
-
-            sampling_rate_GHz : float
-                This is the sampling rate of the fpga digitizer.  It will sample from the electric fields at this rate, returning digitized signals.
-            Given in GHz.
-                sampling_bits: : int
-                This sets the number of voltage bins for a digitized signal.  Signals will be digitized asymmetrically about 0 to this bit size with values
-                ranging from -2**(sampling_bits-1)+1 to 2**(sampling_bits-1).
-            scale_noise_to : int
-                This scales the calculated 'analog' Askaryan calculations (in V) during digitization such that the noise_rms value is scale_noise_to adu.  
-                The common use case is to set noise_rms to 3 adu.
-            n_beams : int
-                The number of beams to be formed when creating a beam forming dictionary. 
-            n_baselines : int
-                This sets the number of baselines to be considered when creating the beam forming dictionary.  Currently this will automatically select the
-                n_baselines that are smallest (in m).  I.e. if you had 8 antennas separated evenly by 1 m, then n_baselines = 2 would result in both the 1 m
-                and 2 m baselines being used for subbeams.  If they 8 antennas were separated evenly by 2 m, then n_baselines = 2 would result in both the 2 m
-                and 4 m baselines being used for subbeams.  A subbeam is created for each baseline for a given beam (assuming at least 2 antennas are separated
-                by the baseline).  Thus this parameter selects the number of subbeams to be used per beam.  Specified in the configuration file.
-                Currently the minimum time shift is assigned to the smallest baseline.  Thus every other time shift resulting from larger baselines must be a 
-                multiple of the minimum baseline. i.e. all subbeam baselines must be in integer multiples of  the minimum baseline.  Currently requires all 
-                other baselines to be an integer multiple of the minimum baseline.
-            power_calculation_sum_length : int
-                This sets the width (in bins of voltage data points) of a particular power sum window.  This is used in the beamforming calculation 
-                during the power sum.
-            power_calculation_interval : int
-                This sets the number of bins between successive sums in the power sum.  If this is less than power_calculation_sum_length then successive
-                bins will overlap.  The common use case when this was written was to have the interval set to half of the sum length, so successive sums
-                contain half of their values in common with the previous sum.  This is used in the beamforming calculation during the power sum. 
-            beamforming_power_sum_bit_cap : int
-                This sets number of bits to cap the power sum calculation (which will have units of adu^2).  This is used in gnosim.detector.fpga.fpgaBeamForming.
-
+        
         stations : dict
-            A dictionary containing information about the stations locations.  This defines the origin in the ice frame relative to which the antenna locations 
-            are specified.  i.e. if a station location is specified as [0., 0., -173.], and an antenna within that station has position in the config file of 
-            [0., 0., -1.], then the absolute ice frame coordinates of the antenna will be [0., 0., -174.].
+            Contains the dictionaries of each station.  Each station dictionary should include the following:
 
-            n : int
-                Number of stations to be placed.  Note currently the stations will each be identical.
-            positions : list of lists of floats
-                A list of the positions of the stations relative to the ice frame. E.g. [[0., 0., -173.],[1000., 0., -173.]] would place a station at a depth
-                of -173 m, and one shifted 1000 m in the x direction of that station at the same depth.  Given in m.
+            DAQ : dict
+                A dictionary containing relevant quantities for calculations pertaining to digitization, the fpga, and beamforming for this station.
 
-        antenna_definitions : dict
-            A dictionary containing each antennas definition dictionary.
+                sampling_rate_GHz : float
+                    This is the sampling rate of the fpga digitizer.  It will sample from the electric fields at this rate, returning digitized signals.
+                Given in GHz.
+                    sampling_bits: : int
+                    This sets the number of voltage bins for a digitized signal.  Signals will be digitized asymmetrically about 0 to this bit size with values
+                    ranging from -2**(sampling_bits-1)+1 to 2**(sampling_bits-1).
+                scale_noise_to : int
+                    This scales the calculated 'analog' Askaryan calculations (in V) during digitization such that the noise_rms value is scale_noise_to adu.  
+                    The common use case is to set noise_rms to 3 adu.
+                n_beams : int
+                    The number of beams to be formed when creating a beam forming dictionary. 
+                n_baselines : int
+                    This sets the number of baselines to be considered when creating the beam forming dictionary.  Currently this will automatically select the
+                    n_baselines that are smallest (in m).  I.e. if you had 8 antennas separated evenly by 1 m, then n_baselines = 2 would result in both the 1 m
+                    and 2 m baselines being used for subbeams.  If they 8 antennas were separated evenly by 2 m, then n_baselines = 2 would result in both the 2 m
+                    and 4 m baselines being used for subbeams.  A subbeam is created for each baseline for a given beam (assuming at least 2 antennas are separated
+                    by the baseline).  Thus this parameter selects the number of subbeams to be used per beam.  Specified in the configuration file.
+                    Currently the minimum time shift is assigned to the smallest baseline.  Thus every other time shift resulting from larger baselines must be a 
+                    multiple of the minimum baseline. i.e. all subbeam baselines must be in integer multiples of  the minimum baseline.  Currently requires all 
+                    other baselines to be an integer multiple of the minimum baseline.
+                power_calculation_sum_length : int
+                    This sets the width (in bins of voltage data points) of a particular power sum window.  This is used in the beamforming calculation 
+                    during the power sum.
+                power_calculation_interval : int
+                    This sets the number of bins between successive sums in the power sum.  If this is less than power_calculation_sum_length then successive
+                    bins will overlap.  The common use case when this was written was to have the interval set to half of the sum length, so successive sums
+                    contain half of their values in common with the previous sum.  This is used in the beamforming calculation during the power sum. 
+                beamforming_power_sum_bit_cap : int
+                    This sets number of bits to cap the power sum calculation (which will have units of adu^2).  This is used in gnosim.detector.fpga.fpgaBeamForming.
 
-            antenna_key : dict
-                antenna_key is a unique identifier that labels the antenna within the station.  This dictionary contains the info relevant for
-                that antenna.
+            position : list
+                A 3 element list containing the x,y,z coordinates of the stations origin.  Antenna positions will be specified with respect to these values.  
 
-                antenna_type : str
-                    This is the label of a particular antenna type defined in the code.  This will select how the antenna
-                    behaves, i.e. beam patterns, polarization sensitivity, etc.  To see current supported antenna types 
-                    try gnosim.detector.detector.getAcceptedAntennaTypes().
-                lib : str
-                    The location of the ray tracing library corresponding to an antenna at this location.
-                position : list of floats
-                    The Cartesian coordinates of the antenna relative to the stations origin.   i.e. if a station location is specified as [0., 0., -173.], 
-                    and an antenna within that station has position in the config file of [0., 0., -1.], then the absolute ice frame coordinates of the 
-                    antenna will be [0., 0., -174.].  Given in m.
-                orientation : list of floats
-                    Specifies the Euler angle coordinates for choosing the orientation of the antenna in the ice frame: [alpha_deg, beta_deg, gamma_deg].
-                    Given in degrees.  These angles will be used with a rotation matrix to orient the axis of the antenna using a z-x-z extrinsic rotation.
-                    For additional information see the gnosim/info/EulerAngleDefiniton.pdf file.
-                system_response : str, optional
-                    The directory/file containing the system response. See gnosim.detector.detector.Antenna.addTimingInfo() to see how the system response
-                    is loaded and handled.  If a new system response is loaded it should have am equally sampled antenna response.  The sampling period for
-                    each should be sufficiently small that the calculations of Askaryan radiation do not lose necessary resolution (A sampling period of ~0.1 ns).
-                    It may be necessary to up sample the responses to accommodate this.  Note:  I am aware that upsampling the system/antenna response does
-                    NOT increase information about the responses, but the times used to calculate Askaryan radiation are chosen such that they easily match
-                    up with the frequencies of the responses.  So information can be lost in the Askaryan calculation if the responses are not sampled at 
-                    high enough rate because the Askaryan radiation is calculated at that time step.
-                antenna_response : str
-                    The directory/file containing the antenna response. See gnosim.detector.detector.Antenna.addTimingInfo() to see how the antenna response
-                    is loaded and handled.  If a new antenna response is loaded it should have am equally sampled system response.  The sampling period for
-                    each should be sufficiently small that the calculations of Askaryan radiation do not lose necessary resolution (A sampling period of ~0.1 ns).
-                    It may be necessary to up sample the responses to accommodate this.  Note:  I am aware that upsampling the system/antenna response does
-                    NOT increase information about the responses, but the times used to calculate Askaryan radiation are chosen such that they easily match
-                    up with the frequencies of the responses.  So information can be lost in the Askaryan calculation if the responses are not sampled at 
-                    high enough rate because the Askaryan radiation is calculated at that time step.
-                noise_temperature : float
-                    The temperature to be used in the noise calculation.  Given in K.
-                    Note that the noise is also processed by the system response, which may be scaled to obtain a particular noise
-                    level for a certain temperature.
-                resistance : float
-                    The resistance to be used in the noise calculation.  Given in Ohms. 
-                    Note that the noise is also processed by the system response, which may be scaled to obtain a particular noise
-                    level for a certain temperature.
-                frequency_low : float, optional
-                    The lower frequency bound for the old and unsupported frequency domain calculation of the Askaryan radiation.  Only used if the
-                    selected time domain for the calculation is 'freq'.  electricFieldDomain is specified in the simulation configuration file.
-                frequency_high : float, optional
-                    The upper frequency bound for the old and unsupported frequency domain calculation of the Askaryan radiation.  Only used if the
-                    selected time domain for the calculation is 'freq'.  electricFieldDomain is specified in the simulation configuration file.
+            phased_antennas : dict
+                A dictionary containing the detectors that will be used in the triggering process.  If using beamforming triggering these phased array antennas
+                should all be positions in a single vertical string, otherwise beamforming calculations and preparations may be false.  Each antenna dictionary
+                should be formatted to contain the following:
+
+                antenna_definitions : dict
+                    A dictionary containing each antennas definition dictionary.  
+
+                    antenna_key : dict
+                        antenna_key is an identifier given to each antenna should be a unique antenna label (within the station), for instance, 'PA00' for the 
+                        first phased array antenna, or 'RA00' for the first reconstruction array antenna.  This label will then be used as the key in dictionaries 
+                        and labels for plots, etc.  Ideally these labels should allow someone to distinguish between phased array v.s. reconstruction array
+                        antennas.  The corresponding dictionary contains the info relevant for that antenna:
+
+                        antenna_type : str
+                            This is the label of a particular antenna type defined in the code.  This will select how the antenna behaves, i.e. beam patterns, 
+                            polarization sensitivity, etc.  To see current supported antenna types  try gnosim.detector.detector.getAcceptedAntennaTypes().
+                        lib : str
+                            The location of the ray tracing library corresponding to an antenna at this location.
+                        position : list of floats
+                            The Cartesian coordinates of the antenna relative to the stations origin.   i.e. if a station location is specified as [0., 0., -173.], 
+                            and an antenna within that station has position in the config file of [0., 0., -1.], then the absolute ice frame coordinates of the 
+                            antenna will be [0., 0., -174.].  Given in m.
+                        orientation : list of floats
+                            Specifies the Euler angle coordinates for choosing the orientation of the antenna in the ice frame: [alpha_deg, beta_deg, gamma_deg].
+                            Given in degrees.  These angles will be used with a rotation matrix to orient the axis of the antenna using a z-x-z extrinsic rotation.
+                            For additional information see the gnosim/info/EulerAngleDefiniton.pdf file.
+                        system_response : str, optional
+                            The directory/file containing the system response. See gnosim.detector.detector.Antenna.addTimingInfo() to see how the system response
+                            is loaded and handled.  If a new system response is loaded it should have am equally sampled antenna response.  The sampling period for
+                            each should be sufficiently small that the calculations of Askaryan radiation do not lose necessary resolution (A sampling period of ~0.1 ns).
+                            It may be necessary to up sample the responses to accommodate this.  Note:  I am aware that upsampling the system/antenna response does
+                            NOT increase information about the responses, but the times used to calculate Askaryan radiation are chosen such that they easily match
+                            up with the frequencies of the responses.  So information can be lost in the Askaryan calculation if the responses are not sampled at 
+                            high enough rate because the Askaryan radiation is calculated at that time step.
+                        antenna_response : str
+                            The directory/file containing the antenna response. See gnosim.detector.detector.Antenna.addTimingInfo() to see how the antenna response
+                            is loaded and handled.  If a new antenna response is loaded it should have am equally sampled system response.  The sampling period for
+                            each should be sufficiently small that the calculations of Askaryan radiation do not lose necessary resolution (A sampling period of ~0.1 ns).
+                            It may be necessary to up sample the responses to accommodate this.  Note:  I am aware that upsampling the system/antenna response does
+                            NOT increase information about the responses, but the times used to calculate Askaryan radiation are chosen such that they easily match
+                            up with the frequencies of the responses.  So information can be lost in the Askaryan calculation if the responses are not sampled at 
+                            high enough rate because the Askaryan radiation is calculated at that time step.
+                        noise_temperature : float
+                            The temperature to be used in the noise calculation.  Given in K.
+                            Note that the noise is also processed by the system response, which may be scaled to obtain a particular noise
+                            level for a certain temperature.
+                        resistance : float
+                            The resistance to be used in the noise calculation.  Given in Ohms. 
+                            Note that the noise is also processed by the system response, which may be scaled to obtain a particular noise
+                            level for a certain temperature.
+                        frequency_low : float, optional
+                            The lower frequency bound for the old and unsupported frequency domain calculation of the Askaryan radiation.  Only used if the
+                            selected time domain for the calculation is 'freq'.  electricFieldDomain is specified in the simulation configuration file.
+                        frequency_high : float, optional
+                            The upper frequency bound for the old and unsupported frequency domain calculation of the Askaryan radiation.  Only used if the
+                            selected time domain for the calculation is 'freq'.  electricFieldDomain is specified in the simulation configuration file.
+
+            reconstruction_antennas : dict
+                A dictionary containing the detectors that will be used for reconstruction.  These antennas are only used in the event that the phased array triggers.
+                Unlike phased array antennas, these do not be on a single string and can be placed throughout the ice as desired.  
+                Each antenna should be formatted in the same was as described above for the phased antennas.  Keep in mind that the antenna labels are station-wide,
+                NOT per group.  So you label a phased antenna 'dipole0' an a reconstruction antenna 'dipole0', there WILL be issues.  It is best to keep the labels
+                clear and separate.  For instance 'PA00' v.s. 'RA00'.
+
+        
 
     1.4.0    Preparing a Simulation Configuration File
     --------------------------------------------------
@@ -874,11 +888,14 @@ The below section discusses the usage of the simulation code.  The general topic
                 triggered_event_ids = my_info['eventid'][ my_info['triggered'] == True ] #This returns the 'eventid' section but sliced by 
                                                                                          #the cut on the 'triggered' section.
 
-            This example shows a commonly used method of slicing one section of an info object by a cut on another section.  Note that
-            this is equivalent in result to the statement below.  If speed is an issue you should test which is faster.  
+            Note that when working with these compound data types, you should first select the key and then apply the cut.
+            It will work both ways with reading the information, but if you wish to set values to a certain cut, the cut
+            must be applied second.  i.e.:
 
-                triggered_event_ids = my_info[ my_info['triggered'] == True ]['eventid']
-
+                WILL WORK: 
+                    my_info['eventid'][ my_info['triggered'] == False ] = -999 #will set the eventid for all non-triggered events to -999
+                WON'T WORK
+                    my_info[ my_info['triggered'] == False ]['eventid'] = -999 #This will not actually set the values to -999 in my experience.
 
 
     3.4.0    Analysis Scripts

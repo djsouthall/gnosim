@@ -27,50 +27,6 @@ import gnosim.sim.antarcticsim
 pylab.ion()
 ############################################################
 
-import cProfile, pstats, io
-
-def profile(fnc):
-    '''
-    A decorator that uses cProfile to profile a function
-    This is lifted from https://osf.io/upav8/
-    
-    Required imports:
-    import cProfile, pstats, io
-    
-    To use, decorate function of interest by putting @profile above
-    its definition.
-    
-    Meanings:
-    ncalls  - for the number of calls.  When there are two numbers (for example 3/1), 
-              it means that the function recursed. The second value is the number 
-              of primitive calls and the former is the total number of calls. Note 
-              that when the function does not recurse, these two values are the same, 
-              and only the single figure is printed.
-    tottime - for the total time spent in the given function (and excluding time made 
-              in calls to sub-functions)
-    percall - is the quotient of tottime divided by ncalls
-    cumtime - is the cumulative time spent in this and all subfunctions (from invocation 
-              till exit). This figure is accurate even for recursive functions.
-    percall - is the quotient of cumtime divided by primitive calls
-    filename:lineno(function) - provides the respective data of each function
-    '''
-    
-    def inner(*args, **kwargs):
-        
-        pr = cProfile.Profile()
-        pr.enable()
-        retval = fnc(*args, **kwargs)
-        pr.disable()
-        s = io.StringIO()
-        sortby = 'cumulative'
-        ps = pstats.Stats(pr, stream=s)
-        ps.strip_dirs().sort_stats(sortby)
-        ps.print_stats()
-        print(s.getvalue())
-        return retval
-
-    return inner
-
 
 def digitizeSignal(u,V,sample_times,digitizer_bits,scale_noise_from,scale_noise_to, dc_offset = 0, plot = False):
     '''
@@ -133,9 +89,9 @@ def digitizeSignal(u,V,sample_times,digitizer_bits,scale_noise_from,scale_noise_
         pylab.xlabel('t (ns)')
         pylab.plot(u,V*slope)
         pylab.stem(sample_times,V_bit,bottom = dc_offset*slope, linefmt='r-', markerfmt='rs', basefmt='r-',label='Interp Sampled at %0.2f GSPS'%sampling_rate)
-    return V_bit, sample_times
+    return sample_times,V_bit
 
-def syncSignals(V_in, u_in, min_time, max_time, u_step ):
+def syncSignals(u_in , V_in, min_time, max_time, u_step ):
     '''
     Given a dictionary with an array (or empty array) for each antenna, This will extend the temporal range of each signal to be the same, 
     and produce an ndarray with each row representing a signal andappropriately place the V_in along this extended timeline.  This should 
@@ -143,10 +99,10 @@ def syncSignals(V_in, u_in, min_time, max_time, u_step ):
 
     Paramters
     ---------
-    V_in : dict
-        A dict of with a key/signal for each antenna.  The electric fields.  Given in V.
     u_in : dict
         A dict of with a key/signal for each antenna.  Contains the times corresponding to V_in.  Given in ns.
+    V_in : dict
+        A dict of with a key/signal for each antenna.  The electric fields.  Given in V.
     min_time : float,
         The minimum time for which the set of signals span.
     max_time : float,
@@ -156,10 +112,10 @@ def syncSignals(V_in, u_in, min_time, max_time, u_step ):
 
     Returns
     -------
-    V_out : numpy.ndarray
-        The synced voltage signals.  Each row corresponds to a voltage signal for an individual antenna.  Given in V.
     u_out : numpy.ndarray
         The corresponding times for the voltage signals.  Given in ns.
+    V_out : numpy.ndarray
+        The synced voltage signals.  Each row corresponds to a voltage signal for an individual antenna.  Given in V.
     '''
     u_out = numpy.tile(numpy.arange(min_time,max_time+u_step,u_step), (len(list(V_in.keys())),1))
     V_out = numpy.zeros_like(u_out)
@@ -170,9 +126,9 @@ def syncSignals(V_in, u_in, min_time, max_time, u_step ):
             left_index = numpy.argmin(abs(u_out[antenna_index] - u[0]))
             right_index = left_index + len(V)
             V_out[antenna_index,left_index:right_index] +=  V
-    return V_out, u_out
+    return u_out, V_out
 
-def fpgaBeamForming(V_in, u_in, beam_dict , plot1 = False, plot2 = False, save_figs = False, cap_bits = 5):
+def fpgaBeamForming(u_in , V_in, beam_dict , plot1 = False, plot2 = False, save_figs = False, cap_bits = 5):
     '''
     This is one function which uses the code from what were the sumBeams and doFPGAPowerCalcAllBeams functions, but puts them in one to 
     avoid the extra time from calling multiple functions. Expects u_in and V_in to be the same dimensions, with the same numberof rows 
@@ -181,11 +137,11 @@ def fpgaBeamForming(V_in, u_in, beam_dict , plot1 = False, plot2 = False, save_f
 
     Paramters
     ---------
-    V_in : numpy.ndarray
-        Synced voltage signals.  Each row corresponds to a voltage signal for an individual antenna.  Given in V.
     u_in : numpy.ndarray
         The corresponding times for the voltage signals.  Should be a single row, as the above signals are synched and the timing
         information is the same.  Given in ns.
+    V_in : numpy.ndarray
+        Synced voltage signals.  Each row corresponds to a voltage signal for an individual antenna.  Given in V.
     beam_dict : dict
 
     plot1 : bool, optional

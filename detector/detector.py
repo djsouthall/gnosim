@@ -12,93 +12,9 @@ import pylab
 import types
 import gnosim.trace.refraction_library
 import gnosim.interaction.polarization
+import gnosim.interaction.askaryan
 import gnosim.utils.linalg
 import gnosim.utils.misc
-############################################################
-    
-def plotArrayFromConfig(config,solutions,only_station = 'all',verbose = False):
-    '''
-    Given a loaded config file this shouldplot the cooardinate system of each of
-    the antennas in the lab frame.  
-    only_station should either be 'all', to plot all stations, or a single index, 
-    to plot a single station.  The index should be base 0. 
-
-    TODO: Eventually this should be added as a method to the station class.
-    
-    Parameters
-    ----------
-    config : dict
-        The configuration dictionary loaded from a config file.
-    solutions : numpy.ndarray of str
-        A list of the solution types used when creating the stations.
-    only_station: str or int
-        If 'all' then this will plot each station.  Otherwise it must be an integer index for a station.
-    verbose : bool, optional
-        Enables more print statements (Default is False).
-
-    See Also
-    --------
-    gnosim.trace.refraction_library
-    '''
-    from matplotlib import markers
-    fig = pylab.figure(figsize=(16,11.2))
-    ax = fig.gca(projection='3d')
-    xs = []
-    ys = []
-    zs = []
-    first = True
-    
-    marker_exclusions = ['.']
-    ms = numpy.array(list(markers.MarkerStyle.markers))[~numpy.isin(list(markers.MarkerStyle.markers),marker_exclusions)]
-
-    stations = []
-    for ii in range(0, config['stations']['n']):
-        x_station, y_station, z_station = config['stations']['positions'][ii]
-        station = gnosim.detector.detector.Station(x_station, y_station, z_station,config,solutions)
-        #station.loadLib(pre_split = True)
-        stations.append(station)
-
-    for index_station, station in enumerate(stations):
-        # Loop over station antennas
-        if numpy.logical_or(only_station == 'all', only_station == index_station):
-            station_label = 'station'+str(index_station)
-            m = ms[index_station]
-            for antenna_index, antenna in enumerate(station.antennas):
-                alpha_deg, beta_deg, gamma_deg = antenna.orientation
-                xs.append(antenna.x)
-                ys.append(antenna.y)
-                zs.append(antenna.z)
-                if verbose == True:
-                    print('alpha = ', alpha_deg ,'deg')
-                    print('beta = ', beta_deg,'deg')
-                    print('gamma = ', gamma_deg,'deg')
-                    print('x = ', antenna.x, 'm')
-                    print('y = ', antenna.y, 'm')
-                    print('z = ', antenna.z, 'm')
-                R = gnosim.utils.linalg.eulerRotationMatrix(numpy.deg2rad(alpha_deg), numpy.deg2rad(beta_deg), numpy.deg2rad(gamma_deg))
-                basis_X = R[:,0] #x basis vector of the antenna frame in the ice basis
-                basis_Y = R[:,1] #y basis vector of the antenna frame in the ice basis
-                basis_Z = R[:,2] #z basis vector of the antenna frame in the ice basis
-                if first == True:
-                    first = False
-                    ax.quiver(antenna.x, antenna.y, antenna.z, basis_X[0], basis_X[1], basis_X[2],color='r',label = 'Antenna X',linestyle='--')
-                    ax.quiver(antenna.x, antenna.y, antenna.z, basis_Y[0], basis_Y[1], basis_Y[2],color='g',label = 'Antenna Y',linestyle='--')
-                    ax.quiver(antenna.x, antenna.y, antenna.z, basis_Z[0], basis_Z[1], basis_Z[2],color='b',label = 'Antenna Z',linestyle='--')
-                else:
-                    ax.quiver(antenna.x, antenna.y, antenna.z, basis_X[0], basis_X[1], basis_X[2],color='r',linestyle='--')
-                    ax.quiver(antenna.x, antenna.y, antenna.z, basis_Y[0], basis_Y[1], basis_Y[2],color='g',linestyle='--')
-                    ax.quiver(antenna.x, antenna.y, antenna.z, basis_Z[0], basis_Z[1], basis_Z[2],color='b',linestyle='--')
-                ax.scatter(x,y,z,label = 'S%i '%index_station + antenna_label,marker=m,s=50)
-    ax.set_xlim([min(xs) - 1, max(xs) + 1])
-    ax.set_ylim([min(ys) - 1, max(ys) + 1])
-    ax.set_zlim([min(zs) - 1, max(zs) + 1])
-    ax.set_xlabel('Ice x',fontsize=16)
-    ax.set_ylabel('Ice y',fontsize=16)
-    ax.set_zlabel('Ice z',fontsize=16)
-    ax.view_init(elev = 30.0, azim = 45.0)
-    pylab.legend(fancybox=True, framealpha=0.5,fontsize=12)
-    return fig
-
 ############################################################
 
 class Station:
@@ -187,8 +103,15 @@ class Station:
     scale_noise_to : int
         This scales the calculated 'analog' Askaryan calculations (in V) during digitization such that the noise_rms value is scale_noise_to adu.  
         The common use case is to set noise_rms to 3 adu.
-    antennas : list of Antenna objects
-        A list containing all of the Antenna objects corresponding to this particular station.
+    antennas : numpy.ndarray of Antenna objects
+        An array containing all of the Antenna objects corresponding to this particular station.  Contains all antennas, with phased array antennas
+        listed first and reconstruction antennas following. 
+    antenna_keys : numpy.ndarray of str
+        An array of the unique keys for each antenna in the array.
+    phased_cut :  numpy.ndarray of bool
+        An array of bools that can be used as a cut on antenna_keys or antennas to select only the antennas in the phased array.
+    reconstruction_cut :  numpy.ndarray of bool
+        An array of bools that can be used as a cut on antenna_keys or antennas to select only the antennas in the reconstruction array.
     noise_rms : numpy.ndarray float, optional
         The rms of the noise calculated for each antenna antenna.  Given in V.  Not present unless self.calculateNoiseRMS is run.
     beam_dict : dict, optional
@@ -201,17 +124,18 @@ class Station:
     Antenna
     gnosim.detector.fpga
     '''
-    def __init__(self, x, y, z, config, station_label, solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']), electricFieldDomain = 'time'):
-        self.label = station_label
-        self.config = config
-        self.x = x
-        self.y = y
-        self.z = z
+    def __init__(self, station_key, config, solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']), electricFieldDomain = 'time'):
+        self.label = station_key
+        self.config = config['stations'][self.label]
+        self.x = self.config['position'][0]
+        self.y = self.config['position'][1]
+        self.z = self.config['position'][2]
         self.electricFieldDomain = electricFieldDomain
         self.accepted_solutions = gnosim.trace.refraction_library.getAcceptedSolutions()
-        self.power_calculation_sum_length = config['DAQ']['power_calculation_sum_length']
-        self.power_calculation_interval = config['DAQ']['power_calculation_interval']
-        self.beamforming_power_sum_bit_cap = config['DAQ']['beamforming_power_sum_bit_cap']
+
+        self.power_calculation_sum_length = self.config['DAQ']['power_calculation_sum_length']
+        self.power_calculation_interval = self.config['DAQ']['power_calculation_interval']
+        self.beamforming_power_sum_bit_cap = self.config['DAQ']['beamforming_power_sum_bit_cap']
         self.n_beams = self.config['DAQ']['n_beams']
         self.n_baselines = self.config['DAQ']['n_baselines']
         self.sampling_rate = self.config['DAQ']['sampling_rate_GHz']
@@ -227,36 +151,47 @@ class Station:
         else:
             self.solutions = solutions
 
-        self.antennas = [] # TODO: In the future might want 2 types of antennas, those in the phased array and those in the reconstruction array.  Prefereably stored seperately.
         self.buildStation() 
 
     def buildStation(self):
         '''
         Creates an Antenna object for each antenna specified in the configuration file.  Does not load the ray tracing libraries.  Call loadLib() for that.
         '''
-        # TODO: In the future might want 2 types of antennas, those in the phased array and those in the reconstruction array.  Prefereably stored seperately.
-        for key in list(self.config['antenna_definitions'].keys()):
-            x_antenna, y_antenna, z_antenna = self.config['antenna_definitions'][key]['position']
-            if numpy.isin('orientations',list(self.config['antenna_definitions'][key].keys())) == True:                                   
-                alpha_deg, beta_deg, gamma_deg =  self.config['antenna_definitions'][key]['orientation']
+        
+        self.antennas = [] 
+        self.antenna_keys = []
+        self.phased_cut = []
+        self.reconstruction_cut = []
+        
+        antenna_groups = numpy.append(numpy.tile('phased_antennas',(len(list(self.config['phased_antennas'].keys())),1)) , numpy.tile('reconstruction_antennas',(len(list(self.config['reconstruction_antennas'].keys())),1)))
+        self.antenna_keys = numpy.append(list(self.config['phased_antennas'].keys()),list(self.config['reconstruction_antennas'].keys()))
+        self.phased_cut = numpy.append(numpy.tile(True,(len(list(self.config['phased_antennas'].keys())),1)) , numpy.tile(False,(len(list(self.config['reconstruction_antennas'].keys())),1)))
+        self.reconstruction_cut = numpy.logical_not(self.phased_cut)
+        for index, key in enumerate(self.antenna_keys):
+            x_antenna, y_antenna, z_antenna = self.config[antenna_groups[index]][key]['position']
+            if numpy.isin('orientations',list(self.config[antenna_groups[index]][key].keys())) == True:                                   
+                alpha_deg, beta_deg, gamma_deg =  self.config[antenna_groups[index]][key]['orientation']
             else:
                 alpha_deg, beta_deg, gamma_deg = [0.0,0.0,0.0]
 
             antenna = Antenna(x_antenna + self.x, y_antenna + self.y, z_antenna + self.z, 
                                 alpha_deg, beta_deg, gamma_deg,
-                                self.config['antenna_definitions'][key]['antenna_type'],
-                                self.config['antenna_definitions'][key]['noise_temperature'], 
-                                self.config['antenna_definitions'][key]['resistance'],
-                                self.config['antenna_definitions'][key]['lib'],
+                                self.config[antenna_groups[index]][key]['antenna_type'],
+                                self.config[antenna_groups[index]][key]['noise_temperature'], 
+                                self.config[antenna_groups[index]][key]['resistance'],
+                                self.config[antenna_groups[index]][key]['lib'],
                                 key,
                                 solutions = self.solutions)
             
             if self.electricFieldDomain == 'freq':
-                antenna.setUpFrequencyDomain(self.config['antenna_definitions'][key]['frequency_low'],self.config['antenna_definitions'][key]['frequency_high'])
+                antenna.setUpFrequencyDomain(self.config[antenna_groups[index]][key]['frequency_low'],self.config[antenna_groups[index]][key]['frequency_high'])
             elif self.electricFieldDomain == 'time':
-                antenna.addTimingInfo(self.config['antenna_definitions'][key]['system_response'],self.config['antenna_definitions'][key]['antenna_response'])
-
+                antenna.addTimingInfo(self.config[antenna_groups[index]][key]['system_response'],self.config[antenna_groups[index]][key]['antenna_response'])
             self.antennas.append(antenna)
+        self.antennas = numpy.array(self.antennas) 
+        self.antenna_keys = numpy.array(self.antenna_keys)
+        self.phased_cut = numpy.array(self.phased_cut)
+        self.reconstruction_cut = numpy.array(self.reconstruction_cut)
 
     def loadLib(self,pre_split = False,build_lib = True):
         '''
@@ -401,10 +336,18 @@ class Station:
         gnosim.detector.fpga
         '''
         print('Using:\npower_calculation_sum_length = %i\npower_calculation_interval = %i\nn_baselines = %i'%(self.power_calculation_sum_length,self.power_calculation_interval,self.n_baselines))
-        n_antennas = len(self.antennas)
+        
+        '''
+        phased_antennas = []
+        for antenna in self.antennas:
+            if numpy.isin(antenna.label,self.antenna_keys[self.phased_cut]):
+                phased_antennas.append(antenna)
+        '''
+        phased_antennas = self.antennas[self.phased_cut]
+        n_antennas = len(phased_antennas)
         min_antennas_per_subbeam =  2#numpy.round(n_antennas/3) #if the number of antennas satisfying a baseline is less than this that beam won't be counted
         
-        depths = numpy.array([antenna.z for antenna in self.antennas])
+        depths = numpy.array([antenna.z for antenna in phased_antennas])
         relative_antenna_depths = depths - max(depths)
 
         baselines = []
@@ -495,6 +438,80 @@ class Station:
             antenna.calculateNoiseRMS()
             noise_rms.append(antenna.noise_rms)
         self.noise_rms = numpy.array(noise_rms)
+
+    def plotStation(self,verbose = False, fig = None , ax = None):
+        '''
+        This plots creates a 3d plot of the antenna locations in the station.
+
+        Parameters
+        ----------
+        verbose : bool, optional
+            Enables more print statements (Default is False).
+        fig : matplotlib.pyplot.figure, optional
+            The figure on which to plot on.  If None, then a figure will be created.  (Default is None).
+        ax : matplotlib.pyplot.axis, optional
+            The axis on which to plot on.  As this is a 3d plot, this must be a 3d projection axis.  These can be obtained with:
+            fig.gca(projection='3d')
+            If None, then a figure will be created.  (Default is None).
+        '''
+        from matplotlib import markers
+        if fig == None:
+            fig = pylab.figure()
+        if ax == None:
+            ax = fig.gca(projection='3d')
+        
+        xs_PA = []
+        ys_PA = []
+        zs_PA = []
+        xs_RA = []
+        ys_RA = []
+        zs_RA = []
+        first = True
+        
+        marker_exclusions = ['.']
+        ms = numpy.array(list(markers.MarkerStyle.markers))[~numpy.isin(list(markers.MarkerStyle.markers),marker_exclusions)]
+
+        first = True
+        for antenna in self.antennas:
+            if verbose == True:
+                print('alpha = ', antenna.alpha_deg ,'deg')
+                print('beta = ', antenna.beta_deg,'deg')
+                print('gamma = ', antenna.gamma_deg,'deg')
+                print('x = ', antenna.x, 'm')
+                print('y = ', antenna.y, 'm')
+                print('z = ', antenna.z, 'm')
+            basis_X = antenna.R[:,0] #x basis vector of the antenna frame in the ice basis
+            basis_Y = antenna.R[:,1] #y basis vector of the antenna frame in the ice basis
+            basis_Z = antenna.R[:,2] #z basis vector of the antenna frame in the ice basis
+            if first == True:
+                first = False
+                ax.quiver(antenna.x, antenna.y, antenna.z, basis_X[0], basis_X[1], basis_X[2],color='r',label = 'Antenna X',linestyle='--')
+                ax.quiver(antenna.x, antenna.y, antenna.z, basis_Y[0], basis_Y[1], basis_Y[2],color='g',label = 'Antenna Y',linestyle='--')
+                ax.quiver(antenna.x, antenna.y, antenna.z, basis_Z[0], basis_Z[1], basis_Z[2],color='b',label = 'Antenna Z',linestyle='--')
+            else:
+                ax.quiver(antenna.x, antenna.y, antenna.z, basis_X[0], basis_X[1], basis_X[2],color='r',linestyle='--')
+                ax.quiver(antenna.x, antenna.y, antenna.z, basis_Y[0], basis_Y[1], basis_Y[2],color='g',linestyle='--')
+                ax.quiver(antenna.x, antenna.y, antenna.z, basis_Z[0], basis_Z[1], basis_Z[2],color='b',linestyle='--')
+            if numpy.all(numpy.isin(antenna.label,self.antenna_keys[self.phased_cut])):
+                xs_PA.append([antenna.x])
+                ys_PA.append([antenna.y])
+                zs_PA.append([antenna.z])
+            else:
+                xs_RA.append([antenna.x])
+                ys_RA.append([antenna.y])
+                zs_RA.append([antenna.z])
+
+        ax.scatter(xs_PA,ys_PA,zs_PA,marker=ms[0],s=50,label='Phased Array')
+        ax.scatter(xs_RA,ys_RA,zs_RA,marker=ms[0],s=50,label='Reconstruction Array')
+        #ax.set_xlim([min(xs) - 1, max(xs) + 1])
+        #ax.set_ylim([min(ys) - 1, max(ys) + 1])
+        #ax.set_zlim([min(zs) - 1, max(zs) + 1])
+        ax.set_xlabel('Ice x',fontsize=16)
+        ax.set_ylabel('Ice y',fontsize=16)
+        ax.set_zlabel('Ice z',fontsize=16)
+        ax.view_init(elev = 30.0, azim = 45.0)
+        pylab.legend(fancybox=True, framealpha=0.5,fontsize=12)
+        return fig
 
 ############################################################
 
@@ -929,7 +946,7 @@ class Antenna:
         out_vector = numpy.dot(self.R_inv,in_vector)
         return out_vector 
 
-    def getAntennaResponseFactor( self , vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , a_s , a_p ):
+    def getAntennaResponseFactor( self , vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , a_s , a_p , return_polarizations = False):
         '''
         This calculates the net reduction in signal seen by the antenna (before system response).  Includes effects from 
         beam pattern, polarization sensitivity, etc. depending on the antenna type chosen.
@@ -964,21 +981,40 @@ class Antenna:
             fresnel amplitudes over the corse of the ray's path to the antenna.
             Currently only numpy.real(a_p) is returned from refraction_libray_beta.makeLibrary,
             so a real float is expected here.
+        return_polarizations : bool
+            If True then this will return the polarization vectors as well.  This only works currently for
+            the 'dipole' antenna type.  (Default is False).
 
         Returns
         -------
         signal_reduction_factor : float
             This is the reduction factor that should be multiplied with the antenna response.  This is typically used as the 
             signal_reduction_factor input parameter of the gnosim.interaction.askaryan.quickSignalSingle calculation.
+        polarization_vector_1_ice_frame: numpy.ndarray, optional
+            The unit vector for the polarization as it is just before interacting with the antenna.
+            This is NOT a unit vector, magnitudes represent how the s and p polarizations have been
+            reduced during ray propogation.
+            This is returned in ice-frame cartesian coordinates.
+        polarization_vector_0_ice_frame: numpy.ndarray, optional
+            The unit vector for the polarization as it is just after emissionat the neutrino.
+            This is a unit vector, as the magnitudes have not reduced yet.
+            This is returned in ice-frame cartesian coordinates.
 
         See Also
         --------
         gnosim.interaction.askaryan
         '''
         if self.antenna_type == 'simple':
+
             #This is attenuation from attenuation length, and for a p polarized light.  Most like what was done with simple before.  No beam pattern.
             signal_reduction_factor = numpy.abs(a_p)
-            return signal_reduction_factor
+
+            if return_polarizations == True:
+                print('ERROR: Polarization not supported for old_dipole antenna type.  Returning null polarization vectors.')
+                return signal_reduction_factor, numpy.zeros(3), numpy.zeros(3)
+            else:
+                return signal_reduction_factor
+
         elif self.antenna_type == 'dipole':
 
             #####
@@ -990,11 +1026,10 @@ class Antenna:
             #vec_neutrino_travel_dir
             #emission_wave_vector
             #detection_wave_vector
-            polarization_vector_1_ice_frame = gnosim.interaction.polarization.getPolarizationAtAntenna(vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , a_s , a_p)            #This is for a vpol antenna. which is sensitive at polls, 
-
-
-
-
+            if return_polarizations == True:
+                polarization_vector_1_ice_frame, polarization_vector_0_ice_frame = gnosim.interaction.polarization.getPolarizationAtAntenna(vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , a_s , a_p, return_initial_polarization = True)            #This is for a vpol antenna. which is sensitive at polls, 
+            else:
+                polarization_vector_1_ice_frame = gnosim.interaction.polarization.getPolarizationAtAntenna(vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , a_s , a_p)            #This is for a vpol antenna. which is sensitive at polls, 
 
             #Note k_0 and k_1 are the wave vectors along the ray TOWARDS the antenna (from emission), with k_0 being at emission, and k_1 being at antenna
             #polarization_vector_1_antenna_frame = antennaFrameCoefficients(self.R_inv, polarization_vector_1_ice_frame, pre_inv = True)
@@ -1020,8 +1055,10 @@ class Antenna:
             beam_pattern_factor = 1.0 - detection_wave_vector_antenna_frame[2]**2.0 #where r is assumed to be 1 because working with unit vectors, #Note for many beam patterns likely want vector point TO observation, i.e. negative of this. But for this calculation is doesn't matter.
             
             signal_reduction_factor = polarization_and_attenuation_factor*beam_pattern_factor
-            
-            return signal_reduction_factor
+            if return_polarizations == True:
+                return signal_reduction_factor, polarization_vector_1_ice_frame, polarization_vector_0_ice_frame
+            else:
+                return signal_reduction_factor
             '''
             elif self.antenna_type == 'slot':
                 # TODO: Make this slot antenna make sense.
@@ -1062,6 +1099,7 @@ class Antenna:
                 return signal_reduction_factor
             '''
         elif self.antenna_type == 'old_dipole':
+            
             #This is how is was calculated before the polarization was added. 
             #k_1_ice_frame = gnosim.interaction.polarization.getWaveVector(phi_ray_from_ant_at_antenna,theta_ray_from_ant_at_antenna) #Note for many beam patterns likely want vector point TO observation, i.e. negative of this. But for this calculation is doesn't matter.
             #detection_wave_vector_antenna_frame = antennaFrameCoefficients(self.R_inv, k_1_ice_frame, pre_inv = True)
@@ -1070,19 +1108,34 @@ class Antenna:
             
             signal_reduction_factor = numpy.abs(a_p)*beam_pattern_factor
             
-            return signal_reduction_factor
+            if return_polarizations == True:
+                print('ERROR: Polarization not supported for old_dipole antenna type.  Returning null polarization vectors.')
+                return signal_reduction_factor, numpy.zeros(3), numpy.zeros(3)
+            else:
+                return signal_reduction_factor
 
         else:
             print('ANTENNA TYPE NOT FOUND IN ACCEPTED ANTENNAS, RETURNING 1')
             
             signal_reduction_factor = 1.0
-            
-            return signal_reduction_factor
+
+            if return_polarizations == True:
+                print('ERROR: No accepted antenna type chosen.  Returning null polarization vectors.')
+                return signal_reduction_factor, numpy.zeros(3), numpy.zeros(3)
+            else:
+                return signal_reduction_factor
 
 ############################################################
 
 
 if __name__ == "__main__":
+    import yaml
+    solutions = numpy.array(['direct'])
+    config_file = '/home/dsouthall/Projects/GNOSim/gnosim/detector/station_config/real_config_full_station.py'
+    config = yaml.load(open(config_file))
+    station = Station('ARA5',config,solutions = solutions)
+    station.plotStation()
+    '''
     x = 0.0
     y = 0.0
     z = -200.0
@@ -1091,7 +1144,7 @@ if __name__ == "__main__":
     gamma_deg = 0.0
     antenna_type = 'dipole'
     import yaml
-    config_file = '/home/dsouthall/Projects/GNOSim/gnosim/detector/station_config/real_config.py'
+    config_file = '/home/dsouthall/Projects/GNOSim/gnosim/detector/station_config/real_config_full_station.py'
     config = yaml.load(open(config_file))
     lib_filler = config['antenna_definitions']['dipole0']['lib']
     frequency_low = 30
@@ -1118,3 +1171,4 @@ if __name__ == "__main__":
     station.loadLib(pre_split = True,build_lib = True)
     #station.deleteLib(verbose=True)
     #station = Station(0,0,-200,config,,pre_split = True)
+    '''

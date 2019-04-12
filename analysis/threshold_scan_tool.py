@@ -123,7 +123,7 @@ if __name__ == "__main__":
         digital_sample_times = numpy.arange(numpy.min(noise_times),numpy.max(noise_times),station.digital_sampling_period) + random_time_offset #these + random_time_offset #these
         
         for index_antenna,antenna in enumerate(station.antennas):
-            noise_digital, time_digital = gnosim.detector.fpga.digitizeSignal(noise_times[index_antenna],noise_signals[index_antenna],digital_sample_times,station.sampling_bits,antenna.noise_rms,station.scale_noise_to,dc_offset = dc_offset,plot = False)
+            time_digital , noise_digital = gnosim.detector.fpga.digitizeSignal(noise_times[index_antenna],noise_signals[index_antenna],digital_sample_times,station.sampling_bits,antenna.noise_rms,station.scale_noise_to,dc_offset = dc_offset,plot = False)
             noise_digital_signals.append(noise_digital)
             noise_digital_times.append(time_digital)
             signal_ticks_x.append(numpy.array(noise_times[index_antenna])[signal_tick_x])
@@ -165,7 +165,7 @@ if __name__ == "__main__":
                 pylab.ylabel('Sig (adu)')
                 pylab.xlabel('Times (ns)')
     
-        formed_beam_powers, beam_powersums = gnosim.detector.fpga.fpgaBeamForming(noise_digital_signals,noise_digital_times, station.beam_dict , plot1 = False, plot2 = False, save_figs = False, cap_bits = station.beamforming_power_sum_bit_cap)
+        formed_beam_powers, beam_powersums = gnosim.detector.fpga.fpgaBeamForming(noise_digital_times,noise_digital_signals, station.beam_dict , plot1 = False, plot2 = False, save_figs = False, cap_bits = station.beamforming_power_sum_bit_cap)
         if cut_zeros == True:
             #'''###
             beam_cut = numpy.zeros((len(beam_powersums.keys()),len(beam_powersums[list(beam_powersums.keys())[0]])))
