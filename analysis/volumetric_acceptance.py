@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''
 This file will eventually load in the various configuration types and other information
 to calculate and plot volumetric acceptance of various configuration types as a
@@ -113,8 +113,8 @@ def volumetricAcceptance(reader,verbose = True):
 ############################
 if __name__ == "__main__":
     #Calculation Parameters
-    calculate_data = True
-    in_path = '/scratch/midway2/dsouthall/April9/'
+    calculate_data = False
+    in_path = '/scratch/midway2/dsouthall/April8/'
     config = 'real_config_antarctica_180_rays_signed_fresnel'
     outdir = in_path
     outname = outdir +'volumetric_acceptance_data_%s.h5'%(config)
@@ -123,10 +123,10 @@ if __name__ == "__main__":
     plot_data = True
     label='GNOSim - Current'
     dataname = outname
-    plot_paper_comparison = True
+    plot_paper_comparison = False
     paper_comparison_file = '/home/dsouthall/Projects/GNOSim/gnosim/analysis/DesignPerformancePaperData.py'
     plot_self_comparison = True
-    self_comparison_file = '/home/dsouthall/scratch-midway2/mar_testing_real_config/volumetric_acceptance_data_real_config.h5'
+    self_comparison_file = '/home/dsouthall/scratch-midway2/April9/volumetric_acceptance_data_real_config_antarctica_180_rays_signed_fresnel.h5'
     label_compare = 'GNOSim Old - No polarization'
 
     plot_ratios = True

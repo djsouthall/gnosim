@@ -62,7 +62,7 @@ def angToVec(phi, theta):
 
 ############################################################
 
-def normalize(v):
+def normalize(v, return_original_mag=False):
     '''
     Return the unit vector of the input vector, works for 3-vectors or 4-vectors.
     If v contains multiple vectors each row is expected to be a vector.
@@ -71,17 +71,27 @@ def normalize(v):
     ----------
     in_vector : numpy.ndarray
         Input vector of abitrary length
+    return_original_mag : bool, optional
+        If True then the magnitude of the vector before it was normalized is also returned.  (Default is False).
 
     Returns
     -------
     v : numpy.ndarray
         out_vector of unit length in same direction as input vector.  If v contains multiple vectors
         (each as a different row) then each oupput row represents an input vector row.
+    original_mag : numpy.ndarray of float
+        The magnitude of the original vector.  If multiple vectors are given then this is an array.
     '''
+
     if len(numpy.shape(v)) > 1:
-        return v / numpy.sqrt(numpy.sum(v**2,axis = 1))[:,None]
+        original_mag = numpy.sqrt(numpy.sum(v**2,axis = 1))[:,None]
+        
     else:
-        return v / numpy.sqrt(numpy.sum(v**2))
+        original_mag = numpy.sqrt(numpy.sum(v**2))
+    if return_original_mag == True:
+        return v / original_mag, original_mag
+    else:
+        return v / original_mag
 
 ############################################################
 

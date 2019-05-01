@@ -54,7 +54,7 @@ if __name__ == "__main__":
     #######################
     
     #######################
-    testSim = gnosim.sim.antarcticsim.Sim(config_file,electricFieldDomain = 'time',do_beamforming = True,solutions = solutions)
+    testSim = gnosim.sim.antarcticsim.Sim(config_file, electric_field_domain='time', do_beamforming=True, solutions=solutions)
     #come back and fix once antennas are properly set up
     for index_station, station in enumerate(testSim.stations):
         z_array = []

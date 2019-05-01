@@ -1,6 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
-#refractionlibrarynew
 import sys
 import os
 import glob
@@ -84,7 +83,7 @@ def getConcaveHullStarter():
     concave_hull = {'direct':{'n_bins':1000},'cross':{'n_bins':1500},'reflect':{'n_bins':2000},'direct_2':{'n_bins':500},'cross_2':{'n_bins':400},'reflect_2':{'n_bins':2000}} # worked for 120 rays
     return concave_hull
 
-def fresnelAmplitude(n_1, n_2, incidence_angle, mode, return_power = False):
+def fresnelAmplitude(n_1, n_2, incidence_angle, mode, return_power=False):
     '''
     Given two indices of refraction and an angle of incidence this calculates the fresnel amplitude coefficients
     (or power coefficients if return_power == True) for the s and p polarizations.  Mode selects whether to return
@@ -165,7 +164,7 @@ def fresnelAmplitude(n_1, n_2, incidence_angle, mode, return_power = False):
         else:
             print ('WARNING: mode %s not recognized'%(mode))
 
-def testFresnelSign(n_1 = 1.5,n_2 = 1.0):
+def testFresnelSign(n_1=1.5, n_2=1.0):
     '''
     Plots the fresnel amplitude coefficients over a range of incidence angles for two indices of refraction.
 
@@ -368,7 +367,7 @@ def testFresnel(n_low=1., n_high=1.5):
 
 
 
-def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = None, fresnel_mode = 'amplitude'): 
+def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit=None, fresnel_mode='amplitude'): 
     '''
     Throws a ray in the given direction in the given ice.  Returns information for each point in the calculated ray.
     Calculates key values along a the ray.  THe most common use case of this function is to throw rays from the
@@ -391,8 +390,10 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = N
         The normal time step between each point in the ray propogation.  May vary near boundaries where time step is reduced
         for accuracy.  Use output t_array for times rather than assuming a uniform time step.  Given in ns.  (Default is 1 ns).
     r_limit : float, optional
-        The maximum radius the ray is allowed to propogate.  Computed in celindrical coordinates from the origin.  Given in meters.
-        (Default is None).
+        The maximum radius the ray is allowed to propogate.  Computed in celindrical coordinates from the origin.  If 0 is given (for instance
+        if trying to plot  a ray thrown the direction of a neutrino and set a limit at the radius of the neutrino, but happen to have a neutrino
+        exactly below the antenna with r = 0), then the r_limit will be changed to None.  Given in meters.
+        (Default is None).  
     fresnel_mode : str, optional
         Selects which function is used to calculate the fresnel amplitudes.  
         'power' - Selects the older coefficient calculator which cannot return signs resulting from reflections.
@@ -427,7 +428,9 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = N
     index_reflect_water : int
         Index in the above arrays corresponding to reflections at the ice-water interface.
     '''
-
+    if r_limit is not None:
+        if r_limit == 0:
+            r_limit = None
     t_step_in = t_step
     n_steps =  int(t_max / t_step)
     t_array = numpy.zeros(n_steps + 1) # m
@@ -553,7 +556,7 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = N
             if x_array[ii + 1]**2 + y_array[ii + 1]**2 > r_limit**2:
                 max_ii = ii
                 break
-
+        #TODO: Split the attenuation and fresnel coefficients
         # Test whether the ray is refracted from upward going to downward going
         value = (ice.indexOfRefraction(z_array[ii]) / ice.indexOfRefraction(z_array[ii + 1])) \
                     * numpy.sin(numpy.radians(theta_array[ii]))
@@ -658,7 +661,7 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit = N
         theta_array[0: n_steps], a_p_array[0: n_steps], a_s_array[0: n_steps], \
         index_reflect_air, index_reflect_water)
 
-def plotGeometry(stations,neutrino_loc,info,ice,plot3d = False, neutrino_travel_dir = None, emission_polarization_vecs = None, final_polarization_vecs = None):
+def plotGeometry(stations, neutrino_loc, info, ice, plot3d=False, neutrino_travel_dir=None, emission_polarization_vecs=None, final_polarization_vecs=None):
     '''
     Plots the antennas, rays, and neutrino location for an event.
     
@@ -672,20 +675,20 @@ def plotGeometry(stations,neutrino_loc,info,ice,plot3d = False, neutrino_travel_
         The info object array corresponding to this event. 
     ice : gnosim.earth.ice.Ice
         The ice object containing the appropriate ice model.
-    plot3d : bool
+    plot3d : bool, optional
         If True then the plot will be made in 3d, otherwise it will be plotted in wrapped cylidrical coordinates.
         (Default is False).
-    neutrino_travel_dir : numpy.ndarray
+    neutrino_travel_dir : numpy.ndarray, optional
         A vector in the ice frame that points in the direction of travel of the neutrino.  If present then 
         will be plotted, if None then will not be plotted.   This will only be ploted in 3d mode.  
         (Default is None).
-    emission_polarization_vecs : numpy.ndarray
+    emission_polarization_vecs : numpy.ndarray, optional
         This should be a 3 column numpy array where each row is a vector containing the polarization of
         that rays (corresponding to an antenna) polarization vector as the ray is emitted. The number of
         rows must match the total number of antennas. 
         If present then will be plotted, if None then will not be plotted.   This will only be ploted in 3d mode.  
         (Default is None).
-    final_polarization_vecs : numpy.ndarray
+    final_polarization_vecs : numpy.ndarray, optional
         This should be a 3 column numpy array where each row is a vector containing the polarization of
         that rays (corresponding to an antenna) polarization vector as the ray is emitted. The number of
         rows must match the total number of antennas. 
@@ -708,7 +711,9 @@ def plotGeometry(stations,neutrino_loc,info,ice,plot3d = False, neutrino_travel_
 
     max_xy = 0.0
     min_xy = 0.0
-
+    min_z = 0.0
+    max_z = -1e10
+    line_alpha = 0.5
     linestyle_dict = {'direct':(0, ()),'cross':(0, (3, 1, 1, 1)),'reflect':(0, (1, 1)),'direct_2':(0, (5, 1)),'cross_2':(0, (3, 5, 1, 5)),'reflect_2':(0, (1, 5))}
     neutrino_loc_r = numpy.sqrt(neutrino_loc[0]**2 + neutrino_loc[1]**2)
     if len(numpy.unique(info['eventid'])) == 1:
@@ -749,6 +754,12 @@ def plotGeometry(stations,neutrino_loc,info,ice,plot3d = False, neutrino_travel_
                     elif y[-1] < min_xy:
                         min_xy = y[-1]
 
+                    sorted_z = numpy.sort(z)
+                    if sorted_z[-1] > max_z:
+                        max_z = sorted_z[-1]
+                    if sorted_z[0] < min_z:
+                        min_z = sorted_z[0]
+
                     label = ant_label + ' ' + solution.decode()
                     if numpy.isin(solution.decode(),list(linestyle_dict.keys())):
                         style = linestyle_dict[solution.decode()]
@@ -756,13 +767,13 @@ def plotGeometry(stations,neutrino_loc,info,ice,plot3d = False, neutrino_travel_
                         style = '-'
                     if plot3d == False:
                         r = numpy.sqrt(x**2 + y**2)
-                        ax.plot(r,z,label=label,color=antenna_colors[index_antenna],linestyle = style)
+                        ax.plot(r,z,label=label,color=antenna_colors[index_antenna],linestyle = style,alpha = line_alpha)
                     else:
-                        ax.plot(x,y,z,label=label,color=antenna_colors[index_antenna],linestyle = style)
+                        ax.plot(x,y,z,label=label,color=antenna_colors[index_antenna],linestyle = style,alpha = line_alpha)
                         if emission_polarization_vecs is not None:
                             emission_polarization_vec = vector_length*gnosim.utils.linalg.normalize(emission_polarization_vecs[array_wide_solution_index])
                             ax.quiver(neutrino_loc[0],neutrino_loc[1],neutrino_loc[2],emission_polarization_vec[0],emission_polarization_vec[1],emission_polarization_vec[2],color=antenna_colors[index_antenna],linestyle = style)
-                        if emission_polarization_vecs is not None:
+                        if final_polarization_vecs is not None:
                             final_polarization_vec = vector_length*gnosim.utils.linalg.normalize(final_polarization_vecs[array_wide_solution_index])
                             ax.quiver(antenna_loc[0],antenna_loc[1],antenna_loc[2],final_polarization_vec[0],final_polarization_vec[1],final_polarization_vec[2],color=antenna_colors[index_antenna], linestyle = style)
 
@@ -791,10 +802,17 @@ def plotGeometry(stations,neutrino_loc,info,ice,plot3d = False, neutrino_travel_
             ax.set_ylabel('y(m)',fontsize=20)
             ax.set_zlabel('z(m)',fontsize=20)
 
-            ax.set_xlim([min_xy,max_xy])
-            ax.set_ylim([min_xy,max_xy])
-            #ax.set_zlim([min_xy,max_xy])
-
+            plot_cube = False
+            #Note this fixes scaling of vectors but really makes it look like garbage accept for lucky events where the natural length scales are close.
+            if plot_cube:
+                min_xy = min(min_z,min_xy)
+                max_xy = max(max_z,max_xy)
+                ax.set_xlim([min_xy,max_xy])
+                ax.set_ylim([min_xy,max_xy])
+                ax.set_zlim([min_xy,max_xy])
+            else:
+                ax.set_xlim([min_xy,max_xy])
+                ax.set_ylim([min_xy,max_xy])
             #
             ax = pylab.gca()
             ax.tick_params(axis = 'both',labelsize = 14)
@@ -807,7 +825,7 @@ def plotGeometry(stations,neutrino_loc,info,ice,plot3d = False, neutrino_travel_
         return
 ############################################################
 
-def makeLibrary(z_0, theta_ray_array, ice_model, library_dir='library',r_limit = None):
+def makeLibrary(z_0, theta_ray_array, ice_model, library_dir='library', r_limit=None):
     '''
     Throws rays from a particular depth and throws rays at the specified angles in the specified ice model.
     
@@ -910,7 +928,7 @@ class RefractionLibrary:
         Contains the information about the concave hull, and relavent funtions/limits.
 
     '''
-    def __init__(self, search, solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']), pre_split = True,build_lib = True):
+    def __init__(self, search, solutions=numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']), pre_split=True, build_lib=True):
         self.infiles = glob.glob(search)
         accepted_solutions = getAcceptedSolutions()
         # List attributes of interest
@@ -1110,9 +1128,16 @@ class RefractionLibrary:
                         self.data[solution][key] = numpy.append( self.data[solution][key] , reader[old_key][...] )
             
 
-    def saveEnvelope(self, out_dir,verbose = False, plot_hulls = False):
+    def saveEnvelope(self, out_dir, verbose=False, plot_hulls=False):
         '''
         Should save the necessary information for a libraries hull so it can be used to create a hull later.
+        
+        #TODO: Look into the paper below to see if you can make a better more robust concave hull
+        #   CONCAVE HULL: A K-NEAREST NEIGHBOURS APPROACH
+        #   FOR THE COMPUTATION OF THE REGION OCCUPIED BY A
+        #   SET OF POINTS
+        #   Adriano Moreira and Maribel Yasmina Santos 
+        # This guy seems to have implemented https://github.com/sebastianbeyer/concavehull/blob/master/ConcaveHull.py
 
         Parameters
         ----------
@@ -1123,6 +1148,8 @@ class RefractionLibrary:
         plot_hulls : bool, optional
             Plots the hulls.  (Default is False).
         '''
+
+
         out_dir = out_dir + '/concave_hull'
         os.mkdir(out_dir)
         legend_locs = {'direct':'upper right','cross':'upper right','reflect':'upper right','direct_2':'lower right','cross_2':'lower right','reflect_2':'lower right'}        
@@ -1179,6 +1206,7 @@ class RefractionLibrary:
                 
                 #concave_hull[solution]['f_inner_r_bound'] = scipy.interpolate.interp1d(z_in,r_in,bounds_error=False,fill_value = (r_in[0],r_in[-1])) #fill_value=max(r_in))#,kind='cubic') #given z, give r, want big value for fill, because this is region where solution shouldn't exist, so a test of is this > f_in then solution should be false
                 #concave_hull[solution]['f_outer_r_bound'] = scipy.interpolate.interp1d(z_out,r_out,bounds_error=False,fill_value = (r_out[0],r_out[-1]))# fill_value=min(r_out))#,kind='cubic') These make boundaries weird but I think are a necessary evil?  Unless I match each with an z_min, z_max?  Could do....,  I can give interp1d two fill values so it fits well up to min/max z
+                #TODO: Define a special case here for uniform ice where it just sets the hull as straight vertical lines at 0 and r_sim
                 concave_hull[solution]['z_inner_r_bound'] = z_in
                 concave_hull[solution]['r_inner_r_bound'] = r_in
                 concave_hull[solution]['z_outer_r_bound'] = z_out
@@ -1219,7 +1247,7 @@ class RefractionLibrary:
             outfile.close()
         self.concave_hull = concave_hull
 
-    def loadEnvelope(self, in_dir,store_fit_data = False):
+    def loadEnvelope(self, in_dir, store_fit_data=False):
         '''
         Loads the necessary information and creates the ray tracing hulls.  Each hull is a set of functions
         which are interpolatd boundaries of the ray tracing libraries by solution type.  Returns a dictionary
@@ -1396,17 +1424,18 @@ if __name__ == '__main__':
     # Parameters
     # ----------
 
-    make_library = True     #If True, will compute the libraries and save them.  Otherwise just loads from previously saved libraries if available. (False is useful for plotting previously generated libraries).
-    split_library = True    #If True, will split the libraries by solution type and save them.
-    plot_library = False    #If True, will plot the ray tracing libraries as they are created (or loaded if make_library == False).
-    save_envelope = True    #If True, will calculate the envelope for the ray tracing library and save it.  Advisable to do in advance when ray tracing library is created.
-    plot_envelope = False   #If True, will plot the envelope.
-    z_array = numpy.array([-180.0])#numpy.array([-173.0,-174.0,-175.0,-176.0,-177.0,-179.0,-181.0]) #The list of depths for which to throw rays (or load libraries if make_library == False).
+    make_library = False     #If True, will compute the libraries and save them.  Otherwise just loads from previously saved libraries if available. (False is useful for plotting previously generated libraries).
+    split_library = False    #If True, will split the libraries by solution type and save them.
+    plot_library = True    #If True, will plot the ray tracing libraries as they are created (or loaded if make_library == False).
+    save_envelope = False    #If True, will calculate the envelope for the ray tracing library and save it.  Advisable to do in advance when ray tracing library is created.
+    plot_envelope = True   #If True, will plot the envelope.
+    plot_theta_ant = True  #If True, plots the library colormapped with theta_ant
+    z_array = numpy.array([-173.0])#numpy.array([-173.0,-174.0,-175.0,-176.0,-177.0,-179.0,-181.0]) #The list of depths for which to throw rays (or load libraries if make_library == False).
     n_rays = 180            #The number of rays to be thrown per depth.
     r_limit = None          #Note if this is NOT None, then all thrown rays will quit once they read this particular radius.  Use with care.  
                             #If you want a simulation with r = 6300m, it might be advisable to make r_limit = 7000 so the boundaries of hulls are still well defined
     ice_model = 'antarctica' #The ice model to use when throwing rays.  To see available options see gnosim.earth.ice.getAcceptedIceModels().
-    plot_solution_list = numpy.array(['direct','cross','reflect','direct_2','cross_2','reflect_2']) #The list of solutions types to plot.  To see options see gnosim.trace.refraction_library.getAcceptedSolutions(). 
+    plot_solution_list = numpy.array(['direct','cross','reflect']) #numpy.array(['direct','cross','reflect','direct_2','cross_2','reflect_2']) #The list of solutions types to plot.  To see options see gnosim.trace.refraction_library.getAcceptedSolutions(). 
     
     #Note, it is recommended that you look below the for Library Name Formatting to ensure it is what you want.
 
@@ -1414,7 +1443,7 @@ if __name__ == '__main__':
 
     # Library Builder
     # ---------------
-
+    #TODO: Some of the below function should be added to the lib class.
     ice_model = gnosim.earth.ice.checkIceModel(ice_model) #Checks if ice model exists and replaces as necessary.
     for z_0 in z_array:
 
@@ -1487,6 +1516,26 @@ if __name__ == '__main__':
             pylab.ylim(-3010,10)
             pylab.xlim(-10,6310)
             
+        if plot_theta_ant == True: 
+            color_key = {'direct':'r', 'cross':'darkgreen', 'reflect':'blue', 'direct_2':'gold', 'cross_2':'lawngreen', 'reflect_2':'purple'}           
+            
+            for solution in plot_solution_list:
+                pylab.figure()
+                pylab.title('%s Library (Color Denoting Theta_ant)'%solution)
+                if numpy.logical_and(len(test_lib.data[solution]['r']) > 0, len(test_lib.data[solution]['z']) > 0):
+                    pylab.scatter( test_lib.data[solution]['r'], test_lib.data[solution]['z'],label=solution,c=test_lib.data[solution]['theta_ant'],s=1)
+                    cbar = pylab.colorbar()
+                    cbar.set_label('Theta_ant (deg)')
+                    angle_low = 80.0
+                    angle_high = 100.0
+                    cut = numpy.logical_and(test_lib.data[solution]['theta_ant'] > angle_low, test_lib.data[solution]['theta_ant'] < angle_high)
+                    pylab.scatter( test_lib.data[solution]['r'][cut], test_lib.data[solution]['z'][cut],label='%0.2f < Theta_ant < %0.2f'%(angle_low,angle_high),c='r',s=1)
+                pylab.legend(loc='upper right',fontsize=16)
+                pylab.xlabel('r(m)',fontsize=16)
+                pylab.ylabel('z(m)',fontsize=16)
+                pylab.ylim(-3010,10)
+                pylab.xlim(-10,6310)
+
         if save_envelope == True:
             test_lib.saveEnvelope(library_dir,solution_list = None,verbose = True, plot_hulls = False)
             

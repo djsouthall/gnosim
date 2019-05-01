@@ -107,7 +107,8 @@ The below section discusses the usage of the simulation code.  The general topic
         1.1.1    Dependencies
         ---------------------
 
-            Python Version 3.6.1
+
+            Python Version 3.7.1
 
             Python packages:
             numpy - http://www.numpy.org/
@@ -122,6 +123,12 @@ The below section discusses the usage of the simulation code.  The general topic
 
                 . gnosim/loadpython
 
+            This command will load the appropriate versions of both ROOT and python (compatibly built).
+
+            ROOT 6.16.00 is used when attempting to output data in 'real' Ara formatting.  A module was built on midway2 specifically to be compatible
+            with the uses of GNOSim.
+
+
         1.1.2    Running Scripts
         ------------------------
 
@@ -129,10 +136,13 @@ The below section discusses the usage of the simulation code.  The general topic
 
                 if __name__ == '__main__':
 
-            will be executed.  To run these, open a python terminal from the folder containing gnosim (such that paths like import gnosim.sim work)
-            and enter the command:
+            will be executed.  To run these interactively, open a python terminal from the folder containing gnosim (such that paths like import gnosim.sim work) and enter the command:
 
                 >>> exec(open('./gnosim/MODULE_PATH/MODULE_NAME.py').read())
+
+            Or in an ipython terminal you can use the magic command %run:
+
+                >>> %run ./gnosim/MODULE_PATH/MODULE_NAME.py
 
         1.1.3    Paths
         --------------
@@ -320,8 +330,10 @@ The below section discusses the usage of the simulation code.  The general topic
 
             phased_antennas : dict
                 A dictionary containing the detectors that will be used in the triggering process.  If using beamforming triggering these phased array antennas
-                should all be positions in a single vertical string, otherwise beamforming calculations and preparations may be false.  Each antenna dictionary
-                should be formatted to contain the following:
+                should all be positions in a single vertical string, otherwise beamforming calculations and preparations may be false.  If you want multiple phased
+                strings then you are currently constrained to treating these as seperate stations.  
+
+                Each antenna dictionary should be formatted to contain the following:
 
                 antenna_definitions : dict
                     A dictionary containing each antennas definition dictionary.  
@@ -371,16 +383,16 @@ The below section discusses the usage of the simulation code.  The general topic
                             level for a certain temperature.
                         frequency_low : float, optional
                             The lower frequency bound for the old and unsupported frequency domain calculation of the Askaryan radiation.  Only used if the
-                            selected time domain for the calculation is 'freq'.  electricFieldDomain is specified in the simulation configuration file.
+                            selected time domain for the calculation is 'freq'.  electric_field_domain is specified in the simulation configuration file.
                         frequency_high : float, optional
                             The upper frequency bound for the old and unsupported frequency domain calculation of the Askaryan radiation.  Only used if the
-                            selected time domain for the calculation is 'freq'.  electricFieldDomain is specified in the simulation configuration file.
+                            selected time domain for the calculation is 'freq'.  electric_field_domain is specified in the simulation configuration file.
 
             reconstruction_antennas : dict
                 A dictionary containing the detectors that will be used for reconstruction.  These antennas are only used in the event that the phased array triggers.
-                Unlike phased array antennas, these do not be on a single string and can be placed throughout the ice as desired.  
-                Each antenna should be formatted in the same was as described above for the phased antennas.  Keep in mind that the antenna labels are station-wide,
-                NOT per group.  So you label a phased antenna 'dipole0' an a reconstruction antenna 'dipole0', there WILL be issues.  It is best to keep the labels
+                Unlike phased array antennas, these do not need to be on a single string and can be placed throughout the ice as desired.  
+                Each antenna should be formatted in the same way as described above for the phased antennas.  Keep in mind that the antenna labels are station-wide,
+                NOT per group.  So if you label a phased antenna 'dipole0' and a reconstruction antenna 'dipole0', there WILL be issues.  It is best to keep the labels
                 clear and separate.  For instance 'PA00' v.s. 'RA00'.
 
         
@@ -409,7 +421,7 @@ The below section discusses the usage of the simulation code.  The general topic
             The image extension for any saved images.  Examples: 'svg', 'png', etc.
         image_path_root : str
             The location of the directory for which a new sub-folder with the name of the simulation will be created for output images.
-        electricFieldDomain : str
+        electric_field_domain : str
             Selects the Askaryan calculation type.  Either 'time' (highly recommended) or 'freq'.  'freq' is not fully supported and outdated, will use the 
             frequency domain calculation that was in early builds of GNOSim rather than the new time domain calculation.
         do_beamforming : bool
@@ -467,6 +479,58 @@ The below section discusses the usage of the simulation code.  The general topic
             It is highly recommended that you first run a simulation with you desired settings and pre_trigger_angle set to None.  Then with this
             preliminary simulation analyze the losses you expect by not computing these angles (using gnosim/analysis/pre_trigger_set_tool.py for example).
             Then with this knowledge set the pre trigger for future simulations as you see fit.
+        output_fields : list of str
+            Much of the meta-data for each event is contained within a single structured array.  Internally (while the simulation is running) this array will
+            have the dtype info_dtype, which is specified withinin antarcticsim.  This data type is reduced for ouput, with some fields being required and staying, 
+            and others only being present if specified.  This parameter (output_fields) specifies which of the optional fields to include in the output file.
+
+            Below are the lists of required and optional fields.  The required fields are deemed so because they allow for testing_single_event to run without doing
+            a full grid interpolation, saving considerable time when trying to examine just a few events after a larger simulation has been run.  The rest of the
+            fields can be recalculated within testing_single_event using just these fields, and thus are optional.  It is considerably easier to have an optional
+            field enabled (if it is valuable) then to recalculte it with testing_single_event, so it is recommended that you enable the fields you require.  Note that
+            the more fields that are enabled, the more RAM that will be needed and the larger the output file.  Full descriptions of the data corresponding to each of
+            the following fields can befound in Section 3.3.1.
+
+            Required Fields
+                These fields are already included in the output dtype and do not need to be listed in output_fields.
+                
+                    'eventid'                  
+                    'station'
+                    'antenna'
+                    'has_solution'
+                    'triggered'
+                    'solution'
+                    'time'
+                    'distance'
+                    'theta_ant'
+                    'theta_ray'
+                    'a_s'
+                    'a_p'
+                    'seed'  
+
+            Optional Fields
+                These fields are not included on output by default, and must be listed as utes in output_fields for them to be saved in the info dataset.  If you wish
+                to have none of these then you either put an empty list, or you can set output_fields to None, 'None', or 'none'.  If you wish to have all of the fields then you
+                can simply list them all or set output_fields to 'All' or 'all'. 
+
+                    'pre_triggered'
+                    'observation_angle'
+                    'electric_field'
+                    'electric_field_digitized'
+                    'fpga_max'
+                    'dominant_freq'
+                    'SNR'
+                    'signal_reduction_factor'
+                    'polarization_dot_factor'
+                    'beam_pattern_factor'
+                    'attenuation_factor'
+                    'pol_dot_angle'
+                    'neutrino_travel_dir_vector'
+                    'emission_wave_vector'
+                    'detection_wave_vector'
+                    'emission_polarization_vector'
+                    'detection_polarization_vector'
+
 
 2.0.0    Running the Simulation
 ----------------------------------
@@ -774,15 +838,18 @@ The below section discusses the usage of the simulation code.  The general topic
             A small random jitter in timing to ensure that no systematic error is introduced from perfect timing in the MC simulation.  
             Given in ns.  Length is n_events.
         'info' : info_dtype
-            Contains all meta data about the event for each antenna and solution type (if output_all_solutions == True, which is defined in the 
+            Contains the meta data for the event for each antenna and solution type (if output_all_solutions == True, which is defined in the 
             simulation configuration file).  For more information about the contents of this see Section 3.3.0.  Length is n_events*n_antennas if 
-            output_all_solutions == False, otherwise it is n_events*n_antennas*n_solution_types.
+            output_all_solutions == False, otherwise it is n_events*n_antennas*n_solution_types.  Two info_dtypes will exists within the simulation,
+            the main: info_dtype which contains ALL meta-data fields, and the output: out_info_dtype, which contains only the required fields for
+            reconstruction offline without interpolation, plus those fields selected in the 'output_fields' section of the simulation configuration
+            file.  See Section 1.4.0 for more information on specifying output fields.
 
     3.3.0    Working with info_dtype Objects for Meta-data
     ------------------------------------------------------
 
         Most of the information and meta-data about the individual events is stored in the 'info' dataset of the output files.  The data
-        within this dataset is stored using the info_dtype file.  Section 3.3.1 discusses the contents.  Section 3.3.2 discusses how to
+        within this dataset is stored using the out_info_dtype numpy structured dtype.  Section 3.3.1 discusses the contents.  Section 3.3.2 discusses how to
         work with this data.  
 
         3.3.1    Info Content Descriptions
@@ -799,6 +866,9 @@ The below section discusses the usage of the simulation code.  The general topic
                 The index of the station for each entry.
             antenna : int
                 The index of the antenna for each entry.
+            solution : S10
+                The solution type for this particular entry.  Stored as a fixed with string.  This may need to be decoded for use, as it 
+                will appear as a b-str.  i.e. this might look like b'direct', rather than 'direct'.  So you may need to do solution.decode().
             has_solution : bool
                 True if there is a ray connection the neutrino interaction location to the antenna that is corresponds to this entries
                 solution type (defined in solution).
@@ -806,9 +876,6 @@ The below section discusses the usage of the simulation code.  The general topic
                 Whether this particular solution satisfied the pre trigger.  It passed the pre trigger if True.
             triggered : bool
                 True for all entries of a particular event if the event as a whole was triggered on.
-            solution : S10
-                The solution type for this particular entry.  Stored as a fixed with string.  This may need to be decoded for use, as it 
-                will appear as a b-str.  i.e. this might look like b'direct', rather than 'direct'.  So you may need to do solution.decode().
             time : float
                 The time of flight for this particular entry.  Given in ns.
             distance : float
@@ -833,6 +900,8 @@ The below section discusses the usage of the simulation code.  The general topic
             electric_field_digitized : float
                 The maximum value of the electric field for this entry.  Taken after noise was added (if noise was added), thus for small signals may
                 only be the noise max.  Given in adu.
+            fpga_max : int
+                The maximum measured beamforming value for this event.  Given in adu^2.  If do_beamforming = False then this will be -999.0.
             dominant_freq : float
                 This is the frequency of the bin corresponding to the maximum power in the frequency spectrum of the Askaryan radiation.  Taken 
                 after noise was added (if noise was added).
@@ -851,10 +920,43 @@ The below section discusses the usage of the simulation code.  The general topic
                 The calculation method for this is specific to the detector type selected for the antenna of this entry (defined in the station 
                 configuration file).  See gnosim.detector.detector.Antenna.getAntennaResponseFactor. This is the reduction factor that was 
                 multiplied with the antenna response for this entries Askaryan calculation.
-            fpga_max : int
-                The maximum measured beamforming value for this event.  Given in adu^2.  If do_beamforming = False then this will be -999.0.
+            beam_pattern_factor : float
+                The beam pattern componant of the signal_reduction factor.  I.e. the reduction in signal strength due to the approach angles
+                of the wave vector at the antenna.  This componant may be calculated depending on the type of antenna chosen.
+                If it is not calculated for a particular antenna type then a value of -999.0 is returned.  To see how this factor was
+                specifically calculated for your antenna type see the code below.
+            attenuation_factor : float
+                The attenuation componant of the signal_reduction factor.  The contains the affects of a_s and a_p (the attennuations for 
+                each polarization of light).  Depending on the type of detector chosen this could entail simply returning one of those values,
+                or accounting for the appropriate vectorized proportion of each componant on the final signal.  This componant may be calculated 
+                depending on the type of antenna chosen. If it is not calculated for a particular antenna type then a value of -999.0 is returned.  
+                o see how this factor was specifically calculated for your antenna type see the code below.
+            polarization_dot_factor : float
+                The polarization componant of the signal_reduction factor (i.e. the factor resulting from the dot product between the
+                polarization vector at the antenna and the polarization sensitivity vector set for that antenna).  This componant may 
+                be calculated depending on the type of antenna chosen. If it is not calculated for a particular antenna type then a 
+                value of -999.0 is returned.  To see how this factor was specifically calculated for your antenna type see the appropriate
+                section of gnosim.detector.antenna.getAntennaResponseFactor().
+            pol_dot_angle : float
+                The angle from the dot product of the polarization vector and the polarization sensitivity vector.  Only works for
+                detectors sensitive to polarization, will return -999.0 otherwise. 
             seed : int
                 This is the event specific seed.  
+            neutrino_travel_dir_vector : numpy.ndarray of floats
+                The unit vector for the direction the shower is propogating.  This is returned in ice-frame cartesian coordinates.
+            emission_wave_vector : numpy.ndarray of floats
+                The unit vector for the vector directed towards the antenna along the observation ray.  This is returned in ice-frame cartesian 
+                coordinates.  This should be the wave vector as it was emitted from the neutrino.
+            detection_wave_vector : numpy.ndarray of floats
+                The unit vector for the vector directed towards the antenna along the observation ray at the antenna.  Given in the ice-frame cartesian coordinates.
+            emission_polarization_vector : numpy.ndarray of floats
+                The unit vector for the polarization as it is just after emission at the neutrino. This is a unit vector.
+                This is returned in ice-frame cartesian coordinates.
+            detection_polarization_vector : numpy.ndarray of floats
+                The unit vector for the polarization as it is just before interacting with the antenna. This is a unit vector, magnitudes represent 
+                how the s and p polarizations have been reduced during ray propogation.  The magnitude of this vector originally contained 
+                information about a_s and a_p, however the magnitude has been split from the direction and is stored in attenuation_factor 
+                output value. This vector is returned in ice-frame cartesian coordinates.
 
         3.3.2    Working with the Info Dataset
         --------------------------------------
@@ -994,4 +1096,4 @@ The below section discusses the usage of the simulation code.  The general topic
 
             #TODO : This section should be changed to this different way because of this reason. 
 
-        This way those fleeting thoughts of improvement are not lost and easily found.  
+        This way those fleeting thoughts of improvement are not lost, and can be easily found.  

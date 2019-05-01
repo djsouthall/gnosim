@@ -37,7 +37,7 @@ class Station:
     solutions : numpy.ndarray of str, optional
         A list of the solution types to load.  Often either all accepted solution types (the Default), or the same list omitting
         the _2 strings, which represent libraries of solution that reflect of the bottom of the ice.
-    electricFieldDomain : str, optional
+    electric_field_domain : str, optional
         Selects the type of Askaryan radiation calculation to use.  
         Options:    'time'  for the newer time domain calculation that allows many more options in the simulation and is more maintained, 
                     'freq'  which is the old Askaryan calculation method which does the calculation solely in the frequency domain and 
@@ -63,7 +63,7 @@ class Station:
     solutions : numpy.ndarray of str, optional
         A list of the solution types to load.  Often either all accepted solution types (the Default), or the same list omitting
         the _2 strings, which represent libraries of solution that reflect of the bottom of the ice.
-    electricFieldDomain : str, optional
+    electric_field_domain : str, optional
         Selects the type of Askaryan radiation calculation to use.  
         Options:    'time'  for the newer time domain calculation that allows many more options in the simulation and is more maintained, 
                     'freq'  which is the old Askaryan calculation method which does the calculation solely in the frequency domain and 
@@ -124,15 +124,16 @@ class Station:
     Antenna
     gnosim.detector.fpga
     '''
-    def __init__(self, station_key, config, solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']), electricFieldDomain = 'time'):
+    def __init__(self, station_key, config, solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']), electric_field_domain = 'time'):
         self.label = station_key
         self.config = config['stations'][self.label]
         self.x = self.config['position'][0]
         self.y = self.config['position'][1]
         self.z = self.config['position'][2]
-        self.electricFieldDomain = electricFieldDomain
+        self.electric_field_domain = electric_field_domain
         self.accepted_solutions = gnosim.trace.refraction_library.getAcceptedSolutions()
 
+        #TODO:  THe DAQ options below should be made into a digitizer class, along with the relevant functions.  Each antenna should then be associated with a specific digitizer.
         self.power_calculation_sum_length = self.config['DAQ']['power_calculation_sum_length']
         self.power_calculation_interval = self.config['DAQ']['power_calculation_interval']
         self.beamforming_power_sum_bit_cap = self.config['DAQ']['beamforming_power_sum_bit_cap']
@@ -183,9 +184,9 @@ class Station:
                                 key,
                                 solutions = self.solutions)
             
-            if self.electricFieldDomain == 'freq':
+            if self.electric_field_domain == 'freq':
                 antenna.setUpFrequencyDomain(self.config[antenna_groups[index]][key]['frequency_low'],self.config[antenna_groups[index]][key]['frequency_high'])
-            elif self.electricFieldDomain == 'time':
+            elif self.electric_field_domain == 'time':
                 antenna.addTimingInfo(self.config[antenna_groups[index]][key]['system_response'],self.config[antenna_groups[index]][key]['antenna_response'])
             self.antennas.append(antenna)
         self.antennas = numpy.array(self.antennas) 
@@ -990,30 +991,60 @@ class Antenna:
         signal_reduction_factor : float
             This is the reduction factor that should be multiplied with the antenna response.  This is typically used as the 
             signal_reduction_factor input parameter of the gnosim.interaction.askaryan.quickSignalSingle calculation.
-        polarization_vector_1_ice_frame: numpy.ndarray, optional
+            This contains the determined factors of polarization_dot_factor, beam_pattern_factor, and attenuation_factor,
+            (if intended by the particular antenna type).  Some antenna types will return filler values for the subcomponants
+            of these if those don't actually go into the calculation of this number.  i.e. signal_reduction_factor could be
+            1.0 even though a value of -999.0 is given for beam_pattern_factor if that particular antenna type doesn't have
+            a built in beam_patter_factor.  Because of this, only signal_reduction_factor should be used in calculations, with
+            the other outputs just being store for information.
+        polarization_dot_factor : float
+            The polarization componant of the signal_reduction factor (i.e. the factor resulting from the dot product between the
+            polarization vector at the antenna and the polarization sensitivity vector set for that antenna).  This componant may 
+            be calculated depending on the type of antenna chosen. If it is not calculated for a particular antenna type then a 
+            value of -999.0 is returned.  To see how this factor was specifically calculated for your antenna type see the code below.
+        beam_pattern_factor : float
+            The beam pattern componant of the signal_reduction factor.  I.e. the reduction in signal strength due to the approach angles
+            of the wave vector at the antenna.  This componant may be calculated depending on the type of antenna chosen.
+            If it is not calculated for a particular antenna type then a value of -999.0 is returned.  To see how this factor was
+            specifically calculated for your antenna type see the code below.
+        attenuation_factor : float
+            The attenuation componant of the signal_reduction factor.  The contains the affects of a_s and a_p (the attennuations for 
+            each polarization of light).  Depending on the type of detector chosen this could entail simply returning one of those values,
+            or accounting for the appropriate vectorized proportion of each componant on the final signal.  This componant may be calculated 
+            depending on the type of antenna chosen. If it is not calculated for a particular antenna type then a value of -999.0 is returned.  
+            o see how this factor was specifically calculated for your antenna type see the code below.
+        dot_angle : float
+            The angle from the dot product of the polarization vector and the polarization sensitivity vector.  Only works for
+            detectors sensitive to polarization, will return -999.0 otherwise. 
+        polarization_unit_vector_1_ice_frame: numpy.ndarray, optional
             The unit vector for the polarization as it is just before interacting with the antenna.
-            This is NOT a unit vector, magnitudes represent how the s and p polarizations have been
-            reduced during ray propogation.
-            This is returned in ice-frame cartesian coordinates.
-        polarization_vector_0_ice_frame: numpy.ndarray, optional
-            The unit vector for the polarization as it is just after emissionat the neutrino.
-            This is a unit vector, as the magnitudes have not reduced yet.
+            This is a unit vector, magnitudes represent how the s and p polarizations have been
+            reduced during ray propogation.  The magnitude of this vector originally contained information about a_s and a_p, however
+            the magnitude has been split from the direction and is stored in attenuation_factor output value.
+            This vector is returned in ice-frame cartesian coordinates.
+        polarization_unit_vector_0_ice_frame: numpy.ndarray, optional
+            The unit vector for the polarization as it is just after emission at the neutrino.
+            This is a unit vector.
             This is returned in ice-frame cartesian coordinates.
 
         See Also
         --------
         gnosim.interaction.askaryan
+        gnosim.interaction.polarization
         '''
         if self.antenna_type == 'simple':
 
             #This is attenuation from attenuation length, and for a p polarized light.  Most like what was done with simple before.  No beam pattern.
-            signal_reduction_factor = numpy.abs(a_p)
+            
+            polarization_dot_factor = -999.0
+            beam_pattern_factor = -999.0
+            attenuation_factor = numpy.abs(a_p)
+            signal_reduction_factor = attenuation_factor #ONLY USE THIS FOR CALCULATIONS, AS THE OTHER NUMBERS MIGHT BE PLACEHOLDERS (IN GENERAL).  I.E. TRY NOT TO USE BEAM_PATTERN_FACTOR (E.G.) FOR ANYTHING OTHER THAN STORING IT AFTER OUTPUT BECAUSE DEPENDING ON TYPE OF ANTENNA IT MIGHT BE -999.0
 
             if return_polarizations == True:
-                print('ERROR: Polarization not supported for old_dipole antenna type.  Returning null polarization vectors.')
-                return signal_reduction_factor, numpy.zeros(3), numpy.zeros(3)
+                return signal_reduction_factor, polarization_dot_factor, beam_pattern_factor, attenuation_factor, dot_angle, numpy.zeros(3), numpy.zeros(3)
             else:
-                return signal_reduction_factor
+                return signal_reduction_factor, polarization_dot_factor, beam_pattern_factor, attenuation_factor, dot_angle
 
         elif self.antenna_type == 'dipole':
 
@@ -1021,109 +1052,76 @@ class Antenna:
             #Generic calculations helpful for many antenna types
             #####
             
-            #polarization_vector_0_ice_frame, k_0_ice_frame, vec_neutrino_travel_dir_ice_frame = getInitialPolarization(theta_ray_from_ant_at_neutrino,phi_ray_from_ant_at_neutrino,theta_neutrino_source_dir,phi_neutrino_source_dir)
-            #polarization_vector_1_ice_frame, k_1_ice_frame = gnosim.interaction.polarization.getPolarizationAtAntenna(phi_ray_from_ant_at_neutrino,theta_ray_from_ant_at_neutrino,phi_ray_from_ant_at_antenna,theta_ray_from_ant_at_antenna,phi_neutrino_source_dir,theta_neutrino_source_dir, a_s, a_p, return_k_1 = True)            #This is for a vpol antenna. which is sensitive at polls, 
+            #polarization_unit_vector_0_ice_frame, k_0_ice_frame, vec_neutrino_travel_dir_ice_frame = getInitialPolarization(theta_ray_from_ant_at_neutrino,phi_ray_from_ant_at_neutrino,theta_neutrino_source_dir,phi_neutrino_source_dir)
+            #polarization_unit_vector_1_ice_frame, k_1_ice_frame = gnosim.interaction.polarization.getPolarizationAtAntenna(phi_ray_from_ant_at_neutrino,theta_ray_from_ant_at_neutrino,phi_ray_from_ant_at_antenna,theta_ray_from_ant_at_antenna,phi_neutrino_source_dir,theta_neutrino_source_dir, a_s, a_p, return_k_1 = True)            #This is for a vpol antenna. which is sensitive at polls, 
             #vec_neutrino_travel_dir
             #emission_wave_vector
             #detection_wave_vector
             if return_polarizations == True:
-                polarization_vector_1_ice_frame, polarization_vector_0_ice_frame = gnosim.interaction.polarization.getPolarizationAtAntenna(vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , a_s , a_p, return_initial_polarization = True)            #This is for a vpol antenna. which is sensitive at polls, 
+                polarization_unit_vector_1_ice_frame, attenuation_factor, polarization_unit_vector_0_ice_frame = gnosim.interaction.polarization.getPolarizationAtAntenna(vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , a_s , a_p, return_initial_polarization = True)            #This is for a vpol antenna. which is sensitive at polls,  
             else:
-                polarization_vector_1_ice_frame = gnosim.interaction.polarization.getPolarizationAtAntenna(vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , a_s , a_p)            #This is for a vpol antenna. which is sensitive at polls, 
-
+                polarization_unit_vector_1_ice_frame, attenuation_factor = gnosim.interaction.polarization.getPolarizationAtAntenna(vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , a_s , a_p)            #This is for a vpol antenna. which is sensitive at polls, 
             #Note k_0 and k_1 are the wave vectors along the ray TOWARDS the antenna (from emission), with k_0 being at emission, and k_1 being at antenna
-            #polarization_vector_1_antenna_frame = antennaFrameCoefficients(self.R_inv, polarization_vector_1_ice_frame, pre_inv = True)
-            polarization_vector_1_antenna_frame = self.antennaFrameCoefficients(polarization_vector_1_ice_frame)
+            #polarization_vector_1_antenna_frame = antennaFrameCoefficients(self.R_inv, polarization_unit_vector_1_ice_frame, pre_inv = True)
+            polarization_vector_1_antenna_frame = self.antennaFrameCoefficients(polarization_unit_vector_1_ice_frame)
             detection_wave_vector_antenna_frame = self.antennaFrameCoefficients(detection_wave_vector)
             #Below you should define how your particular antenna interacts with polarization, as well as the beam pattern. 
             #Antennas can be rotated, so be sure to do the calculations in the correct frame.
-            
             #####
             #Specific calculations for this antenna type
             #####
 
             #polarization_sensitivity_theta = 0.0    #Angle from pole (in antenna frame) the antenna is most sensitive to polarization.
             #polarization_sensitivity_phi = 0.0      #Azimuthal angle (from x in antenna frame) the antenna is most sensitive to polarization.
-            dipole_polarization_axis_antenna_frame = numpy.array([0.0,0.0,1.0]) #Fully sensitive if aligned with z-axis of antenna
-            polarization_and_attenuation_factor = numpy.dot(polarization_vector_1_antenna_frame,dipole_polarization_axis_antenna_frame) #CONTAINS THE ATTENUATION
+            dipole_polarization_axis_antenna_frame = numpy.array([0.0,0.0,1.0]) #Fully sensitive if aligned with z-axis of antenna Must be unit vector!!
+            polarization_dot_factor = numpy.dot(polarization_vector_1_antenna_frame,dipole_polarization_axis_antenna_frame) 
+            
+            dot_angle = numpy.rad2deg(numpy.arccos(polarization_dot_factor / (numpy.linalg.norm(polarization_vector_1_antenna_frame))))
+
             #Calculating beam pattern from theta
             #below is the standard explicit way to do this
             #antenna_frame_theta_rad = numpy.arccos(detection_wave_vector_antenna_frame[2])# Typically it is arccos(z/r) but r is 1 for unit vector
-            #beam_pattern_factor = numpy.sin(antenna_frame_theta_rad)**2
+            #beam_pattern_factor = numpy.sin(antenna_frame_theta_rad)  #not squared because wante electric field NOT power
             #Below is a slightly faster way to do this using more geometry
-            #Assumeds detection_wave_vector_antenna_frame is a unit vector
-            beam_pattern_factor = 1.0 - detection_wave_vector_antenna_frame[2]**2.0 #where r is assumed to be 1 because working with unit vectors, #Note for many beam patterns likely want vector point TO observation, i.e. negative of this. But for this calculation is doesn't matter.
-            
-            signal_reduction_factor = polarization_and_attenuation_factor*beam_pattern_factor
+            #Assumes detection_wave_vector_antenna_frame is a unit vector
+            beam_pattern_factor = numpy.sqrt(1.0 - detection_wave_vector_antenna_frame[2]**2.0) #where r is assumed to be 1 because working with unit vectors, #Note for many beam patterns likely want vector point TO observation, i.e. negative of this. But for this calculation is doesn't matter.
+            #This is sqrt because it is being applied to the E field NOT the power (power beam pattern is sin2(theta))
+            signal_reduction_factor = polarization_dot_factor*beam_pattern_factor*attenuation_factor #ONLY USE THIS FOR CALCULATIONS, AS THE OTHER NUMBERS MIGHT BE PLACEHOLDERS (IN GENERAL).  I.E. TRY NOT TO USE BEAM_PATTERN_FACTOR (E.G.) FOR ANYTHING OTHER THAN STORING IT AFTER OUTPUT BECAUSE DEPENDING ON TYPE OF ANTENNA IT MIGHT BE -999.0
             if return_polarizations == True:
-                return signal_reduction_factor, polarization_vector_1_ice_frame, polarization_vector_0_ice_frame
+                return signal_reduction_factor, polarization_dot_factor, beam_pattern_factor, attenuation_factor, dot_angle, polarization_unit_vector_1_ice_frame, polarization_unit_vector_0_ice_frame
             else:
-                return signal_reduction_factor
-            '''
-            elif self.antenna_type == 'slot':
-                # TODO: Make this slot antenna make sense.
-                #####
-                #Generic calculations helpful for many antenna types
-                #####
-
-                #polarization_vector_0_ice_frame, k_0_ice_frame, vec_neutrino_travel_dir_ice_frame = getInitialPolarization(theta_ray_from_ant_at_neutrino,phi_ray_from_ant_at_neutrino,theta_neutrino_source_dir,phi_neutrino_source_dir)
-                polarization_vector_1_ice_frame, k_1_ice_frame = gnosim.interaction.polarization.getPolarizationAtAntenna(theta_ray_from_ant_at_neutrino,phi_ray_from_ant_at_neutrino,theta_ray_from_ant_at_antenna,phi_ray_from_ant_at_antenna,theta_neutrino_source_dir,phi_neutrino_source_dir, a_s, a_p, return_k_1 = True)            #This is for a vpol antenna. which is sensitive at polls, 
-                #Note k_0 and k_1 are the wave vectors along the ray TOWARDS the antenna (from emission), with k_0 being at emission, and k_1 being at antenna
-                #polarization_vector_1_antenna_frame = antennaFrameCoefficients(self.R_inv, polarization_vector_1_ice_frame, pre_inv = True)
-                polarization_vector_1_antenna_frame = self.antennaFrameCoefficients(polarization_vector_1_ice_frame)
-                #detection_wave_vector_antenna_frame = antennaFrameCoefficients(self.R_inv, k_1_ice_frame, pre_inv = True)
-                detection_wave_vector_antenna_frame = self.antennaFrameCoefficients(k_1_ice_frame)
-                
-                k_1_phi_antenna, k_1_theta_antenna = gnosim.utils.linalg.vecToAng(detection_wave_vector_antenna_frame)
-                
-                #####
-                #Specific calculations for this antenna type
-                #####
-
-                polarization_sensitivity_theta = 90.0    #Angle from pole (in antenna frame) the antenna is most sensitive to polarization.  This can be used for an azimuthally symetric polarization sensitivity
-                polarization_sensitivity_vector = gnosim.utils.linalg.angToVec(k_1_phi_antenna, polarization_sensitivity_theta) #Vector aligned with polarization in phi direction at antenna, such that the dot product only polls out how aligned it is along the z axis, not azimuthally.
-
-                polarization_and_attenuation_factor = numpy.dot(polarization_vector_1_antenna_frame,polarization_sensitivity_vector) #CONTAINS THE ATTENUATION
-                
-                #Calculating beam pattern from theta
-                #below is the standard explicit way to do this
-                #antenna_frame_theta_rad = numpy.arccos(detection_wave_vector_antenna_frame[2])# Typically it is arccos(z/r) but r is 1 for unit vector
-                #beam_pattern_factor = numpy.sin(antenna_frame_theta_rad)**2
-                #Below is a slightly faster way to do this using more geometry
-                #Assumeds detection_wave_vector_antenna_frame is a unit vector
-
-                beam_pattern_factor = 1.0 - detection_wave_vector_antenna_frame[2]**2.0 #where r is assumed to be 1 because working with unit vectors, #Note for many beam patterns likely want vector point TO observation, i.e. negative of this. But for this calculation is doesn't matter.
-                
-                signal_reduction_factor = polarization_and_attenuation_factor*beam_pattern_factor
-                
-                return signal_reduction_factor
-            '''
+                return signal_reduction_factor, polarization_dot_factor, beam_pattern_factor, attenuation_factor, dot_angle
         elif self.antenna_type == 'old_dipole':
-            
             #This is how is was calculated before the polarization was added. 
             #k_1_ice_frame = gnosim.interaction.polarization.getWaveVector(phi_ray_from_ant_at_antenna,theta_ray_from_ant_at_antenna) #Note for many beam patterns likely want vector point TO observation, i.e. negative of this. But for this calculation is doesn't matter.
             #detection_wave_vector_antenna_frame = antennaFrameCoefficients(self.R_inv, k_1_ice_frame, pre_inv = True)
             detection_wave_vector_antenna_frame = self.antennaFrameCoefficients(detection_wave_vector)
-            beam_pattern_factor = 1.0 - detection_wave_vector_antenna_frame[2]**2.0 #where r is assumed to be 1 because working with unit vectors
+            beam_pattern_factor = numpy.sqrt(1.0 - detection_wave_vector_antenna_frame[2]**2.0) #where r is assumed to be 1 because working with unit vectors, note this is not sin(theta) because this is NOT power beam pattern. This is applied to the electric field.
+            polarization_dot_factor = -999.0 #Not being calculated.
+            dot_angle = -999.0 #Not putting 90 because that might make people think 90 was being caculated for everything even though it just isn't calculated for this type of antenna.
+            attenuation_factor = numpy.abs(a_p)
+
+            signal_reduction_factor = attenuation_factor*beam_pattern_factor #ONLY USE THIS FOR CALCULATIONS, AS THE OTHER NUMBERS MIGHT BE PLACEHOLDERS (IN GENERAL).  I.E. TRY NOT TO USE BEAM_PATTERN_FACTOR (E.G.) FOR ANYTHING OTHER THAN STORING IT AFTER OUTPUT BECAUSE DEPENDING ON TYPE OF ANTENNA IT MIGHT BE -999.0
             
-            signal_reduction_factor = numpy.abs(a_p)*beam_pattern_factor
             
             if return_polarizations == True:
                 print('ERROR: Polarization not supported for old_dipole antenna type.  Returning null polarization vectors.')
-                return signal_reduction_factor, numpy.zeros(3), numpy.zeros(3)
+                return signal_reduction_factor, polarization_dot_factor, beam_pattern_factor, attenuation_factor, dot_angle, numpy.zeros(3), numpy.zeros(3) #Zeros on the end are for vectors ot being calculated but expected at oupput.
             else:
-                return signal_reduction_factor
-
+                return signal_reduction_factor, polarization_dot_factor, beam_pattern_factor, attenuation_factor, dot_angle
         else:
             print('ANTENNA TYPE NOT FOUND IN ACCEPTED ANTENNAS, RETURNING 1')
             
-            signal_reduction_factor = 1.0
+            polarization_dot_factor = -999.0
+            beam_pattern_factor = -999.0
+            attenuation_factor = -999.0
+            signal_reduction_factor = 1.0 #ONLY USE THIS FOR CALCULATIONS, AS THE OTHER NUMBERS MIGHT BE PLACEHOLDERS (IN GENERAL).  I.E. TRY NOT TO USE BEAM_PATTERN_FACTOR (E.G.) FOR ANYTHING OTHER THAN STORING IT AFTER OUTPUT BECAUSE DEPENDING ON TYPE OF ANTENNA IT MIGHT BE -999.0
 
             if return_polarizations == True:
                 print('ERROR: No accepted antenna type chosen.  Returning null polarization vectors.')
-                return signal_reduction_factor, numpy.zeros(3), numpy.zeros(3)
+                return signal_reduction_factor, polarization_dot_factor, beam_pattern_factor, attenuation_factor, dot_angle, numpy.zeros(3), numpy.zeros(3)
             else:
-                return signal_reduction_factor
+                return signal_reduction_factor, polarization_dot_factor, beam_pattern_factor, attenuation_factor, dot_angle
 
 ############################################################
 

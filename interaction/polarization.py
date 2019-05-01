@@ -29,7 +29,7 @@ def getWaveVector(phi_ray_from_ant,theta_ray_from_ant):
     Returns
     -------
     vec_ray_to_ant: numpy.ndarray
-        The unit vector for the vector direct towards the antenna along the observation ray. 
+        The unit vector for the vector directed towards the antenna along the observation ray. 
         This is returned in ice-frame cartesian coordinates.
     
     See Also
@@ -54,7 +54,7 @@ def getNeutrinoMomentumVector(phi_neutrino_source_dir,theta_neutrino_source_dir)
     Returns
     -------
     vec_ray_to_ant: numpy.ndarray
-        The unit vector for the vector direct towards the antenna along the observation ray. 
+        The unit vector for the vector directed towards the antenna along the observation ray. 
         This is returned in ice-frame cartesian coordinates.
     
     See Also
@@ -91,8 +91,8 @@ def getInitialPolarization(vec_neutrino_travel_dir,emission_wave_vector):
     gnosim.detector.detector
     '''
     #vec_neutrino_travel_dir = getNeutrinoMomentumVector(phi_neutrino_source_dir,theta_neutrino_source_dir)
-    #emission_wave_vector = getWaveVector(phi_ray_from_ant,theta_ray_from_ant) #Vector from neutrino location to observation along ray
-    polarization_vector = numpy.cross(emission_wave_vector, numpy.cross(vec_neutrino_travel_dir,emission_wave_vector))
+    #emission_wave_vector = getWavceVector(phi_ray_from_ant,theta_ray_from_ant) #Vector from neutrino location to observation along ray
+    polarization_vector = gnosim.utils.linalg.normalize(numpy.cross(emission_wave_vector, numpy.cross(vec_neutrino_travel_dir,emission_wave_vector)))
     #polarization_vector = gnosim.utils.linalg.normalize(polarization_vector)
 
     return polarization_vector
@@ -105,7 +105,7 @@ def calculateSPUnitVectors(wave_vector):
     Parameters
     ----------
     wave_vector : numpy.ndarray
-        The unit vector for the vector direct towards the antenna along the observation ray. 
+        The unit vector for the vector directed towards the antenna along the observation ray. 
         Given in the ice-frame cartesian coordinates.
 
     Returns
@@ -119,8 +119,8 @@ def calculateSPUnitVectors(wave_vector):
     --------
     gnosim.detector.detector
     '''
-    s_vector   = numpy.cross(wave_vector,numpy.array([0.0,0.0,1.0]))#gnosim.utils.linalg.normalize(numpy.cross(wave_vector,numpy.array([0,0,1])))
-    p_vector   = numpy.cross(s_vector,wave_vector)#gnosim.utils.linalg.normalize(numpy.cross(s_vector,wave_vector))
+    s_vector   = gnosim.utils.linalg.normalize(numpy.cross(wave_vector,numpy.array([0.0,0.0,1.0])))
+    p_vector   = gnosim.utils.linalg.normalize(numpy.cross(s_vector,wave_vector))
     return s_vector, p_vector
 ############################################################
 
@@ -156,12 +156,15 @@ def getPolarizationAtAntenna( vec_neutrino_travel_dir , emission_wave_vector , d
 
     Returns
     -------
-    polarization_vector_1: numpy.ndarray
-        The unit vector for the polarization as it is just before interacting with the antenna.
-        This is NOT a unit vector, magnitudes represent how the s and p polarizations have been
-        reduced during ray propogation.
-        This is returned in ice-frame cartesian coordinates.
-    polarization_vector_0: numpy.ndarray, optional
+    polarization_vector_1_unit : numpy.ndarray
+        The unit vector for the polarization as it is just before interacting with the antenna.  Returned in
+        ice-frame coordinates.
+    polarization_vector_1_mag : float
+        This is the magnitude of the polarization vector.  This essentially contains information
+        about a_s and a_p (the attenuation of the two polarization modes) and how they go into a final
+        multiplicative factor.  As the polarizations are not simple geometry the proportionate effect of
+        each polarizations attenuation has to be accounted for using vectors.  
+    polarization_vector_0 : numpy.ndarray, optional
         The unit vector for the polarization as it is just after emissionat the neutrino.
         This is a unit vector, as the magnitudes have not reduced yet.
         This is returned in ice-frame cartesian coordinates.
@@ -173,22 +176,24 @@ def getPolarizationAtAntenna( vec_neutrino_travel_dir , emission_wave_vector , d
     #vec_neutrino_travel_dir = getNeutrinoMomentumVector(phi_neutrino_source_dir,theta_neutrino_source_dir)
     #emission_wave_vector = getWaveVector(phi_ray_from_ant,theta_ray_from_ant) #Vector from neutrino location to observation along ray
     #detection_wave_vector = getWaveVector(phi_ray_from_ant_at_antenna,theta_ray_from_ant_at_antenna)
-    polarization_vector_0 = getInitialPolarization(vec_neutrino_travel_dir,emission_wave_vector)
-    
-    s_vector_0, p_vector_0 = calculateSPUnitVectors(emission_wave_vector)
-    s_vector_1, p_vector_1 = calculateSPUnitVectors(detection_wave_vector)
-
+    polarization_vector_0_unit = getInitialPolarization(vec_neutrino_travel_dir,emission_wave_vector) #Inputs to this are confirmed normalized.  Output is also normalized now.
+    s_vector_0_unit, p_vector_0_unit = calculateSPUnitVectors(emission_wave_vector) #Output is now normalized. 
+    s_vector_1_unit, p_vector_1_unit = calculateSPUnitVectors(detection_wave_vector) #Output is now normalized.
     #The p polarization is attenuated by a_p, and changes direction with the ray
-    polarization_vector_1_p = numpy.dot(polarization_vector_0,p_vector_0)*a_p*p_vector_1
+    polarization_vector_1_p = numpy.dot(polarization_vector_0_unit,p_vector_0_unit)*a_p*p_vector_1_unit
     #The s polarization is attenuated by a_s, but maintains direction.
-    polarization_vector_1_s = numpy.dot(polarization_vector_0,s_vector_0)*a_s*s_vector_0
+    polarization_vector_1_s = numpy.dot(polarization_vector_0_unit,s_vector_0_unit)*a_s*s_vector_0_unit
     #The final polarization is the sum of these
     polarization_vector_1 = polarization_vector_1_p + polarization_vector_1_s #Not a unit vector.  The magnitude changes to represent reduction in E field.  a_s and a_p include attenuation in ice.
     
+    polarization_vector_1_unit , polarization_vector_1_mag = gnosim.utils.linalg.normalize(polarization_vector_1,return_original_mag=True)
+    #The magnitude of the above is essentially the effect of attenuation.  The unit vector will be used for the effect due to polarization.
+
+
     if return_initial_polarization == True:
-        return polarization_vector_1, polarization_vector_0
+        return polarization_vector_1_unit, polarization_vector_1_mag, polarization_vector_0_unit
     else:
-        return polarization_vector_1
+        return polarization_vector_1_unit, polarization_vector_1_mag
 
 def testPolarization():
     ice = gnosim.earth.ice.Ice('antarctica',suppress_fun = True)
@@ -217,9 +222,10 @@ def testPolarization():
     emission_wave_vector = getWaveVector(phi_ray_from_ant_at_neutrino,theta_ray_from_ant_at_neutrino) #Vector from neutrino location to observation along ray
     detection_wave_vector = getWaveVector(phi_ray_from_ant_at_antenna,theta_ray_from_ant_at_antenna) #Vector from neutrino location to observation along ray
     polarization_vector_0 = getInitialPolarization(vec_neutrino_travel_dir,emission_wave_vector)
-    polarization_vector_1 = getPolarizationAtAntenna(vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , a_s[-1], a_p[-1])#(phi_ray_from_ant_at_neutrino,theta_ray_from_ant_at_neutrino,phi_ray_from_ant_at_antenna,theta_ray_from_ant_at_antenna,phi_neutrino_source_dir,theta_neutrino_source_dir, a_s[-1], a_p[-1], return_k_1 = True)
+    polarization_vector_1, polarization_attenuation = getPolarizationAtAntenna(vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , a_s[-1], a_p[-1])#(phi_ray_from_ant_at_neutrino,theta_ray_from_ant_at_neutrino,phi_ray_from_ant_at_antenna,theta_ray_from_ant_at_antenna,phi_neutrino_source_dir,theta_neutrino_source_dir, a_s[-1], a_p[-1], return_k_1 = True)
     print(polarization_vector_0)
     print(polarization_vector_1)
+    print(polarization_attenuation)
 
     elev = 1.0 #viewing
     azim = 90.0#-45.0
