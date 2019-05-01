@@ -93,7 +93,9 @@ if __name__ == "__main__":
         else:
             event_seed = numpy.unique(event_info['seed'])[0] #Backwards compatability while building the sim.
         dc_offset = 0 #This feature is not yet implemented really.  It would just be storing zeros if it were.
-        eventid, p_interact, p_earth, p_detect, event_electric_field_max, dic_max, event_observation_angle_max, event_solution_max, event_index_station_max, event_index_antenna_max, info_out, triggered, signals_out, fig_array = \
+
+
+        eventid, p_interact, p_earth, p_detect, info_out, triggered, signals_out, fig_array = \
             testSim.event(reader['energy_neutrino'][eventid], reader['phi_0'][eventid], reader['theta_0'][eventid], reader['x_0'][eventid], reader['y_0'][eventid], reader['z_0'][eventid], \
                         eventid,reader['inelasticity'][eventid], anti=False, include_noise = True,plot_signals=plot_signals,plot_geometry=plot_geometry,\
                         summed_signals = True,trigger_threshold = trigger , trigger_threshold_units = reader.attrs['trigger_mode'].decode(), \

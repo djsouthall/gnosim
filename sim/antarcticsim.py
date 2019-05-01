@@ -287,7 +287,6 @@ class Sim:
                                         ('detection_polarization_vector','f',3)])
 
         
-    #@profile 
     def event(self, energy_neutrino, phi_0, theta_0, x_0, y_0, z_0, eventid, inelasticity, anti=False, include_noise=True, 
             plot_signals=False, plot_geometry=False,plot_geometry_mode_3d=True, summed_signals=True, trigger_threshold=0.0, trigger_threshold_units='fpga', 
             plot_filetype_extension='svg', image_path='./',  random_time_offset=0.0, dc_offset=0.0, do_beamforming=False, 
@@ -374,16 +373,6 @@ class Sim:
             The probability of survival for the neutrino passing through the earth.
         p_detect : bool
             True if the event is obserable at all (i.e. has at least one solution type visible across the array).
-        event_electric_field_max : float
-            The maximum electric field measured for the event across all antennas.
-        dic_max : dict
-            Contains info about 'd', 'r', 't', 'theta', 'theta_ant', 'a_s', 'a_p', and 'z', for the solution type that resulted in event_electric_field_max. 
-        event_solution_max : str
-            The solution type that resulted in event_electric_field_max.
-        event_index_station_max : int
-            The index of the station observed event_electric_field_max.
-        event_index_antenna_max : int
-            The index of the antenna in the station that observed event_electric_field_max.
         info : numpy.ndarray of self.info_dtype
             Contains the meta data about the event for each antenna and solution type (if output_all_solutions == True).  This will be
             a structured numpy dtype.  The fields present is variable depending on the settings/fields chosen in output_fields.  Some
@@ -502,17 +491,9 @@ class Sim:
                 sys.stdout.flush()
                 return 0
         
-        event_electric_field_max = 0.
-        dic_max = {}
-        observation_angle_max = -999.
+
         solution_max = -999.
-        index_station_max = -999.
-        index_antenna_max = -999.
-        event_observation_angle_max = -999.
-        event_solution_max = -999.
-        event_index_station_max = 0
-        event_index_antenna_max = 0
-        SNR_max = -999.
+
         signals_out = {}
         #Note p_interact has no random component
         p_interact = gnosim.earth.earth.probInteract(energy_neutrino, self.ice.density(z_0), anti=anti) #Should not use effective_energy_neutrino, as that only becomes effective AFTER interaction, these test if there is an interaction at all
@@ -564,16 +545,6 @@ class Sim:
             
             if return_fig_array == True:
                 fig_array = []
-
-            '''
-
-            if numpy.all([self.electric_field_domain == 'time', plot_geometry == True, plot_geometry_mode_3d == True]):
-                emission_polarization_vecs = numpy.zeros_like(multi_neutrino_travel_dir_vector)
-                final_polarization_vecs = numpy.zeros_like(multi_neutrino_travel_dir_vector) #Double check here.   Why are the magnitudes weird?  all zeros?
-            else:
-                emission_polarization_vecs = None
-                final_polarization_vecs = None
-            '''
 
             # Loop over stations
             for index_station, station in enumerate(self.stations):
@@ -651,24 +622,6 @@ class Sim:
                                     d = temporary_info[ temp_solution_cut ]['distance'] #m
                                     theta_ant_deg = temporary_info[ temp_solution_cut ]['theta_ant'] #deg
 
-                                    #vec_neutrino_travel_dir     = neutrino_travel_dir_vector
-                                    #emission_wave_vector        = multi_emission_wave_vector[temp_solution_index]
-                                    #detection_wave_vector       = multi_detection_wave_vector[temp_solution_index]
-
-                                    #temporary_info['emission_wave_vector'][ temp_solution_cut ]
-                                    #temporary_info['neutrino_travel_dir_vector'][ temp_solution_cut ]
-                                    #temporary_info['detection_wave_vector'][ temp_solution_cut ]
-                                    '''
-                                    ('emission_polarization_vector','f',3),
-                                    ('detection_polarization_vector','f',3))
-                                    '''
-                                    
-                                    '''
-                                    if numpy.all([emission_polarization_vecs is not None, final_polarization_vecs is not None, antenna.antenna_type == 'dipole']):
-                                        signal_reduction_factor, polarization_dot_angle, final_polarization_vecs[temp_solution_cut], emission_polarization_vecs[temp_solution_cut] = antenna.getAntennaResponseFactor(temporary_info['neutrino_travel_dir_vector'][ temp_solution_cut ] , temporary_info['emission_wave_vector'][ temp_solution_cut ] , temporary_info['detection_wave_vector'][ temp_solution_cut ] , self.in_dic_array[station.label][antenna.label][solution]['a_s'][eventid] , self.in_dic_array[station.label][antenna.label][solution]['a_p'][eventid], return_polarizations = True)
-                                    else:
-                                        signal_reduction_factor, polarization_dot_angle = antenna.getAntennaResponseFactor(temporary_info['neutrino_travel_dir_vector'][ temp_solution_cut ] , temporary_info['emission_wave_vector'][ temp_solution_cut ] , temporary_info['detection_wave_vector'][ temp_solution_cut ] , self.in_dic_array[station.label][antenna.label][solution]['a_s'][eventid] , self.in_dic_array[station.label][antenna.label][solution]['a_p'][eventid], return_polarizations = False)
-                                    '''
                                     #temporary_info['pol_dot_angle'][temp_solution_cut] = polarization_dot_angle
                                     temporary_info['signal_reduction_factor'][temp_solution_cut], \
                                     temporary_info['polarization_dot_factor'][temp_solution_cut],  \
@@ -739,22 +692,15 @@ class Sim:
                                     temporary_info['electric_field_digitized'][temp_solution_index] = electric_field_digitized
                                     temporary_info['dominant_freq'][temp_solution_index]            = dominant_freq
                                     temporary_info['SNR'][temp_solution_index]                      = SNR
-                                    #temporary_info['signal_reduction_factor'][temp_solution_index]  = signal_reduction_factor
                                     
                                     if electric_field >= electric_field_max:
                                         #This is per antenna
                                         electric_field_max = electric_field
-                                        observation_angle_max = observation_angle
-                                        solution_max = ii
                                         solution_type_max = solution
-                                        index_station_max = index_station
-                                        index_antenna_max = index_antenna
-                                        SNR_max = SNR
                                         max_solution_cut = numpy.logical_and(temporary_info['solution'] == solution_type_max.encode(),temp_antenna_cut)
 
                         else:
                             #This event has no solution for this antenna
-                            #has_solution = 0
                             solution_type_max = antenna.solutions[0]
                         
                         #Temporary_info but only the max solution type.  Should defult to the first solution type, with values already filled out previously to be filler values
@@ -762,17 +708,6 @@ class Sim:
                         max_solution_index = numpy.where(max_solution_cut)[0][0]
                         info[ sum([len(self.stations[s].antennas) for s in range(0,index_station)]) + index_antenna] = temporary_info[max_solution_index] 
                         
-                        if electric_field_max >= event_electric_field_max:
-                            #This is for the whole event.
-                            event_electric_field_max = electric_field_max
-                            event_electric_field_max = electric_field_max
-                            event_observation_angle_max = observation_angle_max
-                            event_solution_max = solution_max
-                            event_index_station_max = index_station_max
-                            event_index_antenna_max = index_antenna_max
-                            event_SNR_max = SNR_max
-                            event_max_solution_cut = max_solution_cut
-
                         if index_antenna == last_phased_array_index:
                             #Now I can perform the triggering. If it doesn't trigger it should break from this level of the loop.
                             # Triggering Code below:
@@ -791,8 +726,8 @@ class Sim:
                                                 else:
                                                     u_out , V_out = gnosim.interaction.askaryan.addSignals(u_in,V_in,plot=False)
                                             else:
-                                                u_out = numpy.array(time_analog[station.label][antenna.label][max_E_val_solution_type])
-                                                V_out = numpy.array(V_analog[station.label][antenna.label][max_E_val_solution_type])
+                                                u_out = time_analog[station.label][antenna.label]
+                                                V_out = V_analog[station.label][antenna.label]
                                             
                                             ud_out , Vd_out = gnosim.detector.fpga.digitizeSignal(u_out,V_out,digital_sample_times,station.sampling_bits,antenna.noise_rms,station.scale_noise_to, dc_offset = dc_offset, plot = False)
                                         else:
@@ -826,7 +761,7 @@ class Sim:
                                     formed_beam_powers, beam_powersums = gnosim.detector.fpga.fpgaBeamForming(ud_out_sync, Vd_out_sync, station.beam_dict , plot1 = False, plot2 = False, save_figs = False, cap_bits = station.beamforming_power_sum_bit_cap)
 
                                     #Getting max values
-                                    keep_top = 1
+                                    keep_top = 1 # TODO : This should be an option the the simulation configuration file.  And it should be the beam number or angle.
                                     
                                     beam_label_list = numpy.array(list(beam_powersums.keys()))
                                     stacked_beams = numpy.zeros((len(beam_label_list),len(beam_powersums[beam_label_list[0]])))
@@ -872,8 +807,8 @@ class Sim:
                                         else:
                                             u_out , V_out = gnosim.interaction.askaryan.addSignals(u_in,V_in,plot=False)
                                     else:
-                                        u_out = numpy.array(time_analog[station.label][antenna.label][max_E_val_solution_type])
-                                        V_out = numpy.array(V_analog[station.label][antenna.label][max_E_val_solution_type])
+                                        u_out = time_analog[station.label][antenna.label]
+                                        V_out = V_analog[station.label][antenna.label]
                                     ud_out , Vd_out = gnosim.detector.fpga.digitizeSignal(u_out,V_out,digital_sample_times,station.sampling_bits,antenna.noise_rms,station.scale_noise_to, dc_offset = dc_offset, plot = False)
                                 else:
                                     V_out = numpy.array([])
@@ -1101,25 +1036,7 @@ class Sim:
 
             #After all stations, if at least one passed pre_trigger
 
-            #dic_max declarations should be here
-            dic_max['d'] = temporary_info['distance'][ event_max_solution_cut ]
-            dic_max['r'] = rs[ event_max_solution_cut ]
-            dic_max['t'] = temporary_info['time'][ event_max_solution_cut ]
-            dic_max['theta'] = temporary_info['theta_ray'][ event_max_solution_cut ]
-            dic_max['theta_ant'] = temporary_info['theta_ant'][ event_max_solution_cut ]
-            dic_max['a_s'] = temporary_info['a_s'][ event_max_solution_cut ]
-            dic_max['a_p'] = temporary_info['a_p'][ event_max_solution_cut ]
-            dic_max['z'] = z_0#self.in_dic_array[station.label][antenna.label][solution_type_max]['z'][eventid]
 
-        else:
-            dic_max['d'] = temporary_info['distance'][0]
-            dic_max['r'] = rs[0]
-            dic_max['t'] = temporary_info['time'][0]
-            dic_max['theta'] = temporary_info['theta_ray'][0]
-            dic_max['theta_ant'] = temporary_info['theta_ant'][0]
-            dic_max['a_s'] = temporary_info['a_s'][0]
-            dic_max['a_p'] = temporary_info['a_p'][0]
-            dic_max['z'] = z_0#self.in_dic_array[station.label][antenna.label][solution_type_max]['z'][eventid]
         if output_all_solutions == True:
             info = temporary_info
 
@@ -1129,12 +1046,11 @@ class Sim:
         event_triggered = numpy.any(info['triggered'])
 
         #TODO: Decide if I want to separate phased array and reconstruction array info on output.  Could do a cut here before output. 
-
         if return_fig_array == True:
-            return eventid, p_interact, p_earth, p_detect, event_electric_field_max, dic_max, event_observation_angle_max, event_solution_max, event_index_station_max, event_index_antenna_max, info, event_triggered, signals_out, fig_array
+            return eventid, p_interact, p_earth, p_detect, info, event_triggered, signals_out, fig_array
         else:
-            return eventid, p_interact, p_earth, p_detect, event_electric_field_max, dic_max, event_observation_angle_max, event_solution_max, event_index_station_max, event_index_antenna_max, info, event_triggered, signals_out
-    
+            return eventid, p_interact, p_earth, p_detect, info, event_triggered, signals_out
+
     def makeFlagArray(self, x_query, y_query , z_query):
         '''
         This function takes a set of x,y,z coordinates and determines whether each set
@@ -1681,31 +1597,6 @@ class Sim:
         #inelasticity = numpy.zeros(self.n_events)
         inelasticity = gnosim.interaction.inelasticity.inelasticityArray(energy_neutrinos, mode='cc') ## GENERALIZE THIS LATER for anti neutrino, etc. 
         
-        # TODO : The fields below should be removed in future.  Redundent.
-        electric_field_max = numpy.zeros(self.n_events)
-        observation_angle_max = numpy.zeros(self.n_events)
-        solution_max = numpy.zeros(self.n_events)
-        index_station_max = numpy.zeros(self.n_events)
-        index_antenna_max = numpy.zeros(self.n_events)
-        t_max = numpy.zeros(self.n_events)
-        d_max = numpy.zeros(self.n_events)
-        theta_ray_max = numpy.zeros(self.n_events)
-        theta_ant_max = numpy.zeros(self.n_events)
-        a_p_max = numpy.zeros(self.n_events)
-        a_s_max = numpy.zeros(self.n_events)
-
-        #'index_station'
-        #'index_antenna'
-        #'electric_field'
-        #'observation_angle'
-        #'solution'
-        #'t'
-        #'d'
-        #'theta_ray'
-        #'theta_ant'
-        #'a_p'
-        #'a_s'
-
         #Below is determining what output fields to have for info.
         required_fields = [ \
             'eventid',                  
@@ -1720,27 +1611,7 @@ class Sim:
             'theta_ray',
             'a_s',
             'a_p']
-        #output_fields should be given at input.  If 'all' then should return all.
-        '''
-        optional_fields = [\
-            'pre_triggered',
-            'observation_angle',
-            'electric_field',
-            'electric_field_digitized',
-            'fpga_max',
-            'dominant_freq',
-            'SNR',
-            'signal_reduction_factor',
-            'polarization_dot_factor',
-            'beam_pattern_factor',
-            'attenuation_factor',
-            'pol_dot_angle',
-            'neutrino_travel_dir_vector',
-            'emission_wave_vector',
-            'detection_wave_vector',
-            'emission_polarization_vector',
-            'detection_polarization_vector']
-        '''
+
         if numpy.size( output_fields ) == 1:
             if numpy.char.lower(str(output_fields)) == 'none':
                 info_out_fields = numpy.array(required_fields)
@@ -1749,7 +1620,7 @@ class Sim:
         else:
             if type(output_fields) is list:
                 output_fields = numpy.array(output_fields)
-            info_out_fields = numpy.append(required_fields,numpy.array(list(self.info_dtype.names))[numpy.isin(numpy.array(list(self.info_dtype.names)),output_fields)]) #This should keep the ordering of the fields the same as defined in info_dtype.
+            info_out_fields = numpy.array(list(self.info_dtype.names))[numpy.isin(numpy.array(list(self.info_dtype.names)),numpy.append(required_fields,output_fields))] #This should keep the ordering of the fields the same as defined in info_dtype.
         
         ordered_unique_indices = numpy.sort(numpy.unique(info_out_fields, return_index=True)[1])
         info_out_fields = info_out_fields[ordered_unique_indices]
@@ -1791,7 +1662,6 @@ class Sim:
             else:
                 self.file.attrs['pre_trigger_angle'] = pre_trigger_angle
 
-
             self.file.create_dataset('event_seeds', (self.n_events,), dtype=numpy.uint32, compression='gzip', compression_opts=9, shuffle=True)
             self.file.create_dataset('energy_neutrino', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             self.file.create_dataset('inelasticity', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
@@ -1800,28 +1670,11 @@ class Sim:
             self.file.create_dataset('z_0', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             self.file.create_dataset('theta_0', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             self.file.create_dataset('phi_0', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-
             self.file.create_dataset('p_interact', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             self.file.create_dataset('p_earth', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             self.file.create_dataset('p_detect', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            
-            self.file.create_dataset('index_station', (self.n_events,), dtype='i', compression='gzip', compression_opts=9, shuffle=True)
-            self.file.create_dataset('index_antenna', (self.n_events,), dtype='i', compression='gzip', compression_opts=9, shuffle=True)
-
-            self.file.create_dataset('electric_field', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            self.file.create_dataset('observation_angle', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            self.file.create_dataset('solution', (self.n_events,), dtype='i', compression='gzip', compression_opts=9, shuffle=True)
-            self.file.create_dataset('t', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            self.file.create_dataset('d', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            self.file.create_dataset('theta_ray', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            self.file.create_dataset('theta_ant', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            self.file.create_dataset('a_p', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            self.file.create_dataset('a_s', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-
             self.file.create_dataset('random_time_offsets', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            
             self.file.create_dataset('info', ( self.n_events * self.len_info_per_event , ) , dtype=self.out_info_dtype, compression='gzip', compression_opts=9, shuffle=True)
-
             self.file.create_group('signals')
         
         
@@ -1875,21 +1728,10 @@ class Sim:
 
             for future in concurrent.futures.as_completed(futures):
                 #Note eventid must be first output for other outputs to use it properly
-                eventid, p_interact[eventid], p_earth[eventid], p_detect[eventid], electric_field_max[eventid], dic_max, observation_angle_max[eventid], \
-                solution_max[eventid], index_station_max[eventid], index_antenna_max[eventid], info[(eventid * self.len_info_per_event ):((eventid+1) * self.len_info_per_event )], \
-                triggered, signals_out = future.result()
+
+                eventid, p_interact[eventid], p_earth[eventid], p_detect[eventid], info[(eventid * self.len_info_per_event ):((eventid+1) * self.len_info_per_event )], triggered, signals_out = future.result()
                 event_label = 'event%i'%eventid
                 
-                if p_detect[eventid] == 1.:
-                    t_max[eventid]          = dic_max['t']
-                    d_max[eventid]          = dic_max['d']
-                    theta_ray_max[eventid]  = dic_max['theta']
-                    theta_ant_max[eventid]  = dic_max['theta_ant']
-                    a_p_max[eventid]        = dic_max['a_p']
-                    a_s_max[eventid]        = dic_max['a_s']
-                    
-
-
                 if self.outfile: 
                     if numpy.logical_and(self.save_signals == True,triggered == True):
                         #This region I will need to be careful adjustig when/if I add multithreading per event. 
@@ -1917,9 +1759,8 @@ class Sim:
                 else:
                     print ('Event (%i/%i) Time: %0.2f s ( %0.4f h)'%(ii, self.n_events,current_time,current_time/3600.0))
                     sys.stdout.flush()
-                eventid, p_interact[ii], p_earth[ii], p_detect[ii], electric_field_max[ii], dic_max, observation_angle_max[ii], \
-                    solution_max[ii], index_station_max[ii], index_antenna_max[ii], info[(ii * self.len_info_per_event ):((ii+1) * self.len_info_per_event )], \
-                    triggered, signals_out \
+                
+                eventid, p_interact[ii], p_earth[ii], p_detect[ii], info[(ii * self.len_info_per_event ):((ii+1) * self.len_info_per_event )], triggered, signals_out \
                     = self.event(energy_neutrinos[ii], phi_0[ii], theta_0[ii], x_0[ii], y_0[ii], z_0[ii], \
                                 ii,inelasticity[ii], anti=anti, include_noise = include_noise,plot_signals=plot_signals,plot_geometry=plot_geometry,\
                                 summed_signals = summed_signals,trigger_threshold = trigger_threshold, trigger_threshold_units = trigger_threshold_units, \
@@ -1927,7 +1768,7 @@ class Sim:
                                 random_time_offset = random_time_offsets[ii],\
                                 dc_offset = dc_offsets[ii], do_beamforming = self.do_beamforming, output_all_solutions = output_all_solutions,
                                 pre_trigger_angle = pre_trigger_angle, event_seed = event_seeds[ii])
-                #print(info[(ii * self.len_info_per_event ):((ii+1) * self.len_info_per_event )])
+
                 if numpy.logical_and(self.save_signals == True,triggered == True):
                     #This region I will need to be careful adjustig when/if I add multithreading per event. 
                     #Note to future self, there is a section in 'Python and HDF5' about multithreading with HDF5
@@ -1941,13 +1782,6 @@ class Sim:
                             self.file['signals'][event_label][station.label].create_dataset(antenna.label, numpy.shape(signals_out[station.label][antenna_cut]), dtype='f', compression='gzip', compression_opts=9, shuffle=True)  
                             self.file['signals'][event_label][station.label][antenna.label][...] = signals_out[station.label][antenna_cut]
 
-                if p_detect[ii] == 1.:
-                    t_max[ii] = dic_max['t']
-                    d_max[ii] = dic_max['d']
-                    theta_ray_max[ii] = dic_max['theta']
-                    theta_ant_max[ii] = dic_max['theta_ant']
-                    a_p_max[ii] = dic_max['a_p']
-                    a_s_max[ii] = dic_max['a_s']
         sys.stdout.flush()
                 
         if self.outfile:
@@ -1997,50 +1831,6 @@ class Sim:
             print('Writing p_detect after %0.3f s'%(time.time() - self.throw_start_time))
             sys.stdout.flush()
             self.file['p_detect'][...] = p_detect
-
-            print('Writing index_station after %0.3f s'%(time.time() - self.throw_start_time))
-            sys.stdout.flush()
-            self.file['index_station'][...] = index_station_max
-            
-            print('Writing index_antenna after %0.3f s'%(time.time() - self.throw_start_time))
-            sys.stdout.flush()
-            self.file['index_antenna'][...] = index_antenna_max
-
-            print('Writing electric_field after %0.3f s'%(time.time() - self.throw_start_time))
-            sys.stdout.flush()
-            self.file['electric_field'][...] = electric_field_max
-            
-            print('Writing observation_angle after %0.3f s'%(time.time() - self.throw_start_time))
-            sys.stdout.flush()
-            self.file['observation_angle'][...] = observation_angle_max
-            
-            print('Writing solution types after %0.3f s'%(time.time() - self.throw_start_time))
-            sys.stdout.flush()
-            self.file['solution'][...] = solution_max
-            
-            print('Writing t after %0.3f s'%(time.time() - self.throw_start_time))
-            sys.stdout.flush()
-            self.file['t'][...] = t_max
-            
-            print('Writing d after %0.3f s'%(time.time() - self.throw_start_time))
-            sys.stdout.flush()
-            self.file['d'][...] = d_max
-            
-            print('Writing theta_ray after %0.3f s'%(time.time() - self.throw_start_time))
-            sys.stdout.flush()
-            self.file['theta_ray'][...] = theta_ray_max
-            
-            print('Writing theta_ant after %0.3f s'%(time.time() - self.throw_start_time))
-            sys.stdout.flush()
-            self.file['theta_ant'][...] = theta_ant_max
-            
-            print('Writing a_p after %0.3f s'%(time.time() - self.throw_start_time))
-            sys.stdout.flush()
-            self.file['a_p'][...] = a_p_max
-            
-            print('Writing a_s after %0.3f s'%(time.time() - self.throw_start_time))
-            sys.stdout.flush()
-            self.file['a_s'][...] = a_s_max
 
             print('Writing random_time_offsets after %0.3f s'%(time.time() - self.throw_start_time))
             sys.stdout.flush()
