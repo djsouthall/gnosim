@@ -18,6 +18,8 @@ for file_root in file_roots:
     dic_attrs = {}
     dic_data = {}
     runs = glob.glob(file_root + '*.h5')
+    if len(runs) == 1:
+        print('Skipping file_root: %s\nOnly one file to merge.'%file_root)
     n_events = int(runs[0].split('_')[-5])
     writer_name = file_root.replace(str(n_events)+'_events_seed',str(n_events*len(runs))+'_events_') + '_merged.h5'
     
@@ -71,8 +73,10 @@ for file_root in file_roots:
                     sys.stdout.flush()
                     writer['signals'].create_group(event_label)
                     for station_label in list(reader['signals'][signal_key].keys()):
-                        writer['signals'][event_label].create_dataset(station_label, numpy.shape(reader['signals'][signal_key][station_label][...]), dtype='f', compression='gzip', compression_opts=9, shuffle=True)  
-                        writer['signals'][event_label][station_label][...] = reader['signals'][signal_key][station_label][...]
+                        writer['signals'][event_label].create_group(station_label)
+                        for antenna_label in list(reader['signals'][signal_key][station_label].keys()):
+                            writer['signals'][event_label][station_label].create_dataset(antenna_label, numpy.shape(reader['signals'][signal_key][station_label][antenna_label][...]), dtype='f', compression='gzip', compression_opts=9, shuffle=True)  
+                            writer['signals'][event_label][station_label][antenna_label][...] = reader['signals'][signal_key][station_label][antenna_label][...]
             else:
                 len_key = len(reader[key][...])
                 left = index*len_key

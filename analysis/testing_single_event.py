@@ -23,6 +23,7 @@ pylab.ion()
 if __name__ == "__main__":
     pylab.close('all')
     #Parameters
+    #results_2019_testingMay1_real_config_antarctica_180_rays_signed_fresnel_3.00e+09_GeV_1000000_events_1_seed_1.h5
     infile = '/home/dsouthall/scratch-midway2/results_2019_testingApril18_real_config_antarctica_180_rays_signed_fresnel_3.00e+09_GeV_2_events_4.h5'#results_2019_April15_real_config_full_station_3.00e+09_GeV_10000_events_1_seed_1.h5'#'/home/dsouthall/scratch-midway2/April8/results_2019_April_real_config_antarctica_180_rays_signed_fresnel_1.00e+08_GeV_1000000_events_0_seed_1.h5'#'/home/dsouthall/scratch-midway2/results_2019_April_real_config_full_station_3.00e+09_GeV_10000_events_5_seed_1.h5'#'/home/dsouthall/scratch-midway2/results_2019_April_real_config_full_station_3.00e+09_GeV_10000_events_1_seed_1.h5'#results_2019_Mar_config_dipole_octo_-200_antarctica_180_rays_3.00e+09_GeV_10000_events_1.h5
     plot_geometry = True
     plot_signals = True

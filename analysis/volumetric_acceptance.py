@@ -114,16 +114,18 @@ def volumetricAcceptance(reader,verbose = True):
 if __name__ == "__main__":
     #Calculation Parameters
     calculate_data = False
-    in_path = '/scratch/midway2/dsouthall/April8/'
-    config = 'real_config_antarctica_180_rays_signed_fresnel'
+    plot_data = True
+
+    in_path = '/home/dsouthall/scratch-midway2/new_pol/'
+    config = 'new_polarization'#'results_2019_testingMay1_real_config_antarctica_180_rays_signed_fresnel_3.00e+09_GeV_1000000_events_1_seed_1.h5'
     outdir = in_path
     outname = outdir +'volumetric_acceptance_data_%s.h5'%(config)
     #expect_merged = False
     #Plotting Parameters
-    plot_data = True
+    
     label='GNOSim - Current'
     dataname = outname
-    plot_paper_comparison = False
+    plot_paper_comparison = True
     paper_comparison_file = '/home/dsouthall/Projects/GNOSim/gnosim/analysis/DesignPerformancePaperData.py'
     plot_self_comparison = True
     self_comparison_file = '/home/dsouthall/scratch-midway2/April9/volumetric_acceptance_data_real_config_antarctica_180_rays_signed_fresnel.h5'
@@ -152,9 +154,9 @@ if __name__ == "__main__":
         print('Saving as %s'%outname)
         writer = h5py.File(outname , 'w')
 
-        writer.create_dataset('volumetric_acceptance', (len(infiles),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-        writer.create_dataset('error', (len(infiles),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-        writer.create_dataset('energy_neutrino', (len(infiles),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+        writer.create_dataset('volumetric_acceptance', (len(infiles),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)  
+        writer.create_dataset('error', (len(infiles),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)  
+        writer.create_dataset('energy_neutrino', (len(infiles),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)  
 
         for index, infile in enumerate(infiles):
             print('Loading reader:\n%s'%infile)

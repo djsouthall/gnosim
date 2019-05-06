@@ -8,7 +8,7 @@ import yaml
 #----------
 username = 'dsouthall'
 
-simulation_config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/sim/sim_config/sim_settings_old_dipole.py'] #List of all config files to use.  Simulations will be run for each config file.
+simulation_config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/sim/sim_config/sim_settings.py'] #List of all config files to use.  Simulations will be run for each config file.
 energy_neutrino_array =  10**numpy.arange(7., 12.1, 0.5)#10**numpy.arange(6.5, 11.1, 0.5) # GeV
 cpu_per_task = 16
 mem_per_cpu = 1500 #1000 = 1GB, looks like the total MaxRSS for 1M events was 13GB total, so 2000-3000 per cpu for that.  

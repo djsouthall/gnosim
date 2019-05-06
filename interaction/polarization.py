@@ -182,7 +182,7 @@ def getPolarizationAtAntenna( vec_neutrino_travel_dir , emission_wave_vector , d
     #The p polarization is attenuated by a_p, and changes direction with the ray
     polarization_vector_1_p = numpy.dot(polarization_vector_0_unit,p_vector_0_unit)*a_p*p_vector_1_unit
     #The s polarization is attenuated by a_s, but maintains direction.
-    polarization_vector_1_s = numpy.dot(polarization_vector_0_unit,s_vector_0_unit)*a_s*s_vector_0_unit
+    polarization_vector_1_s = numpy.dot(polarization_vector_0_unit,s_vector_0_unit)*a_s*s_vector_1_unit
     #The final polarization is the sum of these
     polarization_vector_1 = polarization_vector_1_p + polarization_vector_1_s #Not a unit vector.  The magnitude changes to represent reduction in E field.  a_s and a_p include attenuation in ice.
     

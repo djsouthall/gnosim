@@ -1085,7 +1085,7 @@ class Sim:
 
                 for solution in antenna.solutions:
                     print('\tSolution Type:', solution)
-                    atol = 1e-6 #If the point is within 1 um of the the hull boundary than it is inside the hull.  Catches weird roundings near 0.
+                    atol = 0#1e-6 #If the point is within 1 um of the the hull boundary than it is inside the hull.  Catches weird roundings near 0.
                     in_bound = numpy.logical_and((z_query >= antenna.concave_hull[solution]['z_min'] - atol),z_query <= antenna.concave_hull[solution]['z_max'] + atol)
                     r_in_hull = numpy.logical_and((r_query >= antenna.concave_hull[solution]['f_inner_r_bound'](z_query) - atol),(r_query <= antenna.concave_hull[solution]['f_outer_r_bound'](z_query)) + atol)
                     has_solution = numpy.logical_and(in_bound,r_in_hull)
@@ -2003,7 +2003,7 @@ if __name__ == '__main__':
                     trigger_threshold_units = sim_config['trigger_threshold_units'],
                     plot_filetype_extension = sim_config['image_extension'],
                     image_path              = image_path,
-                    use_interp_threading    = sim_config['use_event_threading'],
+                    use_interp_threading    = sim_config['use_interp_threading'],
                     use_event_threading     = sim_config['use_event_threading'],
                     output_all_solutions    = sim_config['output_all_solutions'],
                     save_signals            = sim_config['save_signals'],
