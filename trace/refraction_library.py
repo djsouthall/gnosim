@@ -744,6 +744,18 @@ def plotGeometry(stations, neutrino_loc, info, ice, plot3d=False, neutrino_trave
                     array_wide_solution_index += 1
                     x, y, z, t, d, phi, theta, a_p, a_s, index_reflect_air, index_reflect_water = rayTrace(antenna_loc, phi_throw, ssub_info['theta_ant'][ssub_info['solution'] == solution],ice, r_limit = 1.001*neutrino_loc_r)
                     
+                    #The below incidence angles are for the ray going towards the antenna as would be put into snells law.
+                    if index_reflect_air != 0:
+                        incidence_angle_air = 180.0 - theta[index_reflect_air]
+                    else: 
+                        incidence_angle_air = -999.0
+                    if index_reflect_water != 0:
+                        incidence_angle_water = theta[index_reflect_water]
+                    else: 
+                        incidence_angle_water = -999.0
+                    #import pdb
+                    #pdb.set_trace()
+                    
                     if x[-1] > max_xy:
                         max_xy = x[-1]
                     elif x[-1] < min_xy:
@@ -760,7 +772,12 @@ def plotGeometry(stations, neutrino_loc, info, ice, plot3d=False, neutrino_trave
                     if sorted_z[0] < min_z:
                         min_z = sorted_z[0]
 
-                    label = ant_label + ' ' + solution.decode()
+                    label = ant_label + ' ' + solution.decode() 
+                    if incidence_angle_air != -999.0:
+                        label += '\n$\\theta_\mathrm{air}$ = %0.3f'%incidence_angle_air
+                    if incidence_angle_water != -999.0:
+                        label += '\n$\\theta_\mathrm{water}$ = %0.3f'%incidence_angle_water
+
                     if numpy.isin(solution.decode(),list(linestyle_dict.keys())):
                         style = linestyle_dict[solution.decode()]
                     else:

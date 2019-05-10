@@ -20,6 +20,7 @@ for file_root in file_roots:
     runs = glob.glob(file_root + '*.h5')
     if len(runs) == 1:
         print('Skipping file_root: %s\nOnly one file to merge.'%file_root)
+        continue
     n_events = int(runs[0].split('_')[-5])
     writer_name = file_root.replace(str(n_events)+'_events_seed',str(n_events*len(runs))+'_events_') + '_merged.h5'
     

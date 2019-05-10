@@ -1,5 +1,5 @@
 {'outfile_dir'          :   '/home/dsouthall/scratch-midway2/', #Where the data files will be saved.  Should end in /
-'outfile_name_root'     :   'results_2019_testing_May3', #This will be the first part of the outfiles name.  It will be followed by information about the simulation such as station_config_file_name and the number of neutrino events.
+'outfile_name_root'     :   'results_2019_testing_', #This will be the first part of the outfiles name.  It will be followed by information about the simulation such as station_config_file_name and the number of neutrino events.
 'station_config_file'   :   '/home/dsouthall/Projects/GNOSim/gnosim/detector/station_config/real_config_antarctica_180_rays_signed_fresnel.py', #The address of the station configuration file
 'solutions'             :   ['direct', 'cross', 'reflect'],#The solutions to work with in the simulation #['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']
 'image_extension'       :   'svg',  #The file type for any saved images.

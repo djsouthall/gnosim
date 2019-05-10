@@ -1,11 +1,54 @@
 #!/usr/bin/env python3
 '''
-This file will eventually load in the various configuration types and other information
-to calculate and plot volumetric acceptance of various configuration types as a
-function of neutrino energy.
+Purpose and Description
+-----------------------
+This analysis script computes the volumetric acceptance for a set of simulations.  The current version
+will calculate a different volumetric acceptance for each file in the directory given, so if you wish 
+to calculate VA for many simulations at a single energy simultaneously then you should use quick_merge
+first to combine them into a single file.  This script also currently also supports the comparison with
+other volumetric acceptance curves created say, between different configurations, or data from papers.
+This feature is not particularly generic however and may require some tinkering.
 
-Run in python command line:
-exec(open('./gnosim/sim/volumetric_acceptance_dsouthall.py').read())
+Running
+-------
+It is recommended that you run this in a command line interface like ipython with the %run command or using the 
+command exec(open('./script_path/script.py').read()) .
+
+Main Parameters
+---------------
+calculate_data : bool
+    Enables the actual calculations to be performed.  If you have already done them and saved them
+    then this should be set to False and the data should be loaded in.
+in_path : str
+    Where the simulation output files are located that you want to perform calculations on.
+name : str
+    An identifier to add to the output volumetric acceptance data file name.
+outdir : str
+    The directory you wish to save the volumetric acceptance values in.
+outname : str
+    The name out the volumetric acceptance values file.
+infiles : str
+    The list of files for which to calculate volumetric acceptance.
+plot_data : bool
+    Enables the plotting of VA.  This should be set to True after the values are actually calculated and saved.
+label : str
+    The label in plots corresponding to the data that dataname points to.
+dataname : str
+    The location of a set of volumetric acceptance values.  Often this is the most recent set of VA calculations, which
+    will be compared to older VA calculations.
+plot_paper_comparison : bool
+    This will also add the data from the Design and Performance Paper paper.
+paper_comparison_file : str
+    This is the path of the papers data.  This data is NOT formatted in the same way as the data that this script produces
+    and is treated differently to account for this.
+plot_self_comparison : bool
+    Enables the plotting of some specified older version of volumetric acceptance values as calculated by this code.
+self_comparison_file : str
+    The list of other volumetric acceptance data to plot.
+label_compare : str
+    The label for this data in plots.
+plot_ratios : bool
+    Will attempt to plot the ratios of volumetric acceptance where energies line up.
 
 
 '''
@@ -44,12 +87,11 @@ def volumetricAcceptance(reader,verbose = True):
     Returns
     -------
     VA : float
-        The calc
+        The calculated volumetric acceptance given in units of km^3 sr.
     error : float
-
+        The calculated error for the volumetric acceptance given in units of km^3 sr.
     energy_neutrino : float
-
-
+        The energy of the neutrino for which this volumetric acceptance was calcualted.  Given in GeV.
     '''
     if numpy.isin('config',list(reader.attrs)):
         config = yaml.load(open(reader.attrs['config']))
@@ -108,41 +150,49 @@ def volumetricAcceptance(reader,verbose = True):
         print( 'E = %0.3g GeV'%energy_neutrino)
         print( 'VA = %0.4g km^3 sr +/- %0.4g km^3 sr'%(VA, error))
         print( 'VA = %0.4g km^3 sr +/- %0.4g percent'%(VA, 100.0 * error/VA))
+
     return VA, error, energy_neutrino
 
 ############################
 if __name__ == "__main__":
-    #Calculation Parameters
-    calculate_data = False
-    plot_data = True
+    ###------------------------###
+    ### Calculation Parameters ###
+    ###------------------------###
 
-    in_path = '/home/dsouthall/scratch-midway2/new_pol/'
-    config = 'new_polarization'#'results_2019_testingMay1_real_config_antarctica_180_rays_signed_fresnel_3.00e+09_GeV_1000000_events_1_seed_1.h5'
-    outdir = in_path
-    outname = outdir +'volumetric_acceptance_data_%s.h5'%(config)
-    #expect_merged = False
-    #Plotting Parameters
-    
-    label='GNOSim - Current'
-    dataname = outname
+    calculate_data  = False
+    in_path     = '/home/dsouthall/scratch-midway2/May3/'
+    name        = 'new_polarization' 
+    outdir      = in_path
+    outname     = outdir +'volumetric_acceptance_data_%s.h5'%(name)
+
+    #Below is the list of files for which you wish to calcualt VA.  
+    #Either make an array over your own or choose the wildcard string appropriately.
+    infiles     = glob.glob(in_path + 'results*.h5')
+
+
+    ###---------------------###
+    ### Plotting Parameters ###
+    ###---------------------###
+
+    plot_data = True
+    label     = 'GNOSim - Current'
+    dataname  = outname
+
     plot_paper_comparison = True
     paper_comparison_file = '/home/dsouthall/Projects/GNOSim/gnosim/analysis/DesignPerformancePaperData.py'
-    plot_self_comparison = True
-    self_comparison_file = '/home/dsouthall/scratch-midway2/April9/volumetric_acceptance_data_real_config_antarctica_180_rays_signed_fresnel.h5'
-    label_compare = 'GNOSim Old - No polarization'
+
+    plot_self_comparison  = True
+    self_comparison_file  = '/home/dsouthall/scratch-midway2/April9/volumetric_acceptance_data_real_config_antarctica_180_rays_signed_fresnel.h5'
+    label_compare         = 'GNOSim Old - No polarization'
 
     plot_ratios = True
 
+
+    ###--------------###
+    ### Calculations ###
+    ###--------------###
+
     if calculate_data == True:
-        ######
-        '''
-        if expect_merged == True:
-            infiles = glob.glob('./*merged*.h5')
-        else:
-            infiles = glob.glob('./*seed*.h5')
-        '''
-        #infiles = glob.glob('./results*.h5')
-        infiles = glob.glob(in_path + 'results*.h5')
         print('Attempting to calculate volumetric acceptance for the following files:')
         for infile in infiles:
             print(infile)
@@ -168,6 +218,11 @@ if __name__ == "__main__":
             writer['energy_neutrino'][index] = energy_neutrino
          
         writer.close()
+
+
+    ###----------###
+    ### Plotting ###
+    ###----------###
     
     if numpy.logical_or(plot_data,plot_ratios):
         markersize = 10
@@ -215,9 +270,7 @@ if __name__ == "__main__":
         pylab.errorbar(energy_neutrino[sorted_cut]/1e6, VA[sorted_cut], yerr=error[sorted_cut],fmt='go-',label=label,capsize=5,markersize=markersize,linewidth=linewidth)
                     
             
-        pylab.legend(loc = 'lower right',fontsize = 16)
-        #pylab.ylim(8e-7,1.5e2)
-        #pylab.xlim(8e5,2e10)
+        pylab.legend(loc = 'lower right',fontsize = 9)
         ax = pylab.gca()
         ax.minorticks_on()
         ax.set_xscale('log')
@@ -227,13 +280,6 @@ if __name__ == "__main__":
         pylab.ylabel('V$\Omega$ (km$^3$ sr)',fontsize = 20)
         pylab.grid(b=True, which='major', color='k', linestyle='-')
         pylab.grid(b=True, which='minor', color='tab:gray', linestyle='--',alpha=0.5)
-        #ax.patch.set_alpha(0.)
-        #fig.patch.set_alpha(0.)
-        #pylab.legend(loc = 'lower left',fontsize = 16)
-        #pylab.xlim(8e5,2e10)
-        #pylab.ylim(5e-3,5e1)
-        #ax = pylab.gca()
-        #ax.minorticks_on()
             
     if plot_ratios:
 
@@ -283,8 +329,6 @@ if __name__ == "__main__":
                     
         if not plot_data:
             pylab.legend(loc = 'upper right',fontsize = 16)
-        #pylab.ylim(8e-7,1.5e2)
-        #pylab.xlim(8e5,2e10)
         ax = pylab.gca()
         ax.minorticks_on()
         ax.set_xscale('log')

@@ -502,6 +502,9 @@ class Sim:
         #note p_earth has no random components
         p_earth = gnosim.earth.earth.probSurvival(energy_neutrino, theta_0, self.ice, elevation=z_0, anti=anti) #Should not use effective_energy_neutrino, as that only becomes effective AFTER interaction, these test if there is an interaction at all
 
+        if return_fig_array == True:
+                fig_array = []
+
         #Only do triggering if any pass pre_trigger
         if numpy.any(temporary_info['pre_triggered'] == True):
 
@@ -543,9 +546,6 @@ class Sim:
             multi_vector_rays_to_neutrino_at_antenna = gnosim.utils.linalg.angToVec(phi_rays, temporary_info['theta_ant']) #at antenna event, I think theta_ray points along ray towards neutrino.  So for an upward going wave vector ray towards the antenna, theta_ray > 90.0, directly downward ray towards antenna is 0.0 deg  
             temporary_info['detection_wave_vector'] = - multi_vector_rays_to_neutrino_at_antenna #Unit vectors along ray towards antenna as observed at antenna.  In the ice frame.
             
-            if return_fig_array == True:
-                fig_array = []
-
             # Loop over stations
             for index_station, station in enumerate(self.stations):
                 triggered = False
@@ -955,7 +955,6 @@ class Sim:
                                 table.set_fontsize(10)
                                 
                                 
-                                
                                 #TABLE 3: Making observed angles and attenuations table
                                 table_fig = pylab.subplot(gs_right[5])
                                 
@@ -1040,7 +1039,10 @@ class Sim:
         if output_all_solutions == True:
             info = temporary_info
 
-        info = info[list(self.out_info_dtype.names)] #Cutting out the desired fields.
+        try:
+            info = info[list(self.out_info_dtype.names)] #Cutting out the desired fields.
+        except:
+            print('self.out_info_dtype.names note defined, outputting all info fields.')
 
         p_detect = numpy.any(info['has_solution'])
         event_triggered = numpy.any(info['triggered'])
@@ -1097,7 +1099,7 @@ class Sim:
                     in_flag_array[station.label][antenna.label][solution] = has_solution
         self.in_flag_array = in_flag_array
 
-    def makeFlagDicArrayFromInfo(self,info):
+    def makeFlagDicArrayFromInfo(self, info, eventids=None):
         '''
         This is intended for use in offline mode.  Given the info = reader['info'][...] array
         from a previously computed simulation, this can recreate the in_dic_array and in_flag_array
@@ -1107,6 +1109,10 @@ class Sim:
         ---------
         info : numpy.ndarray of self.info_dtype
             Contains all meta data about the event for each antenna and solution type (if output_all_solutions was True when this was generated).
+        eventids : numpy.ndarray of ints
+            This should contain a list of the events to load into the dic and flag arrays.  Everything else
+            is given a filler value.  This allows you to speed up the process if only looking at a few
+            events.
         '''
         key_dict = {
                 'theta':'theta_ray',
@@ -1122,8 +1128,23 @@ class Sim:
         elif numpy.isin('a_p',list(info.dtype.fields.keys())):
             key_dict['a_p'] = 'a_p'
 
+        keys = numpy.append(['eventid','station', 'antenna', 'solution','has_solution'] ,[key_dict[k] for k in list(key_dict.keys())])
+        info = info[ keys ]
+
+
         in_dic_array = {}
-        in_flag_array = {}   
+        in_flag_array = {}  
+
+        max_id = numpy.max(info['eventid'])
+
+        if eventids is not None:
+            eventid_cut = numpy.isin(info['eventid'],eventids)
+
+        else:
+            eventid_cut = numpy.ones_like(info['eventid'],dtype=bool)
+
+        info = info[eventid_cut]
+
         for index_station, station in enumerate(self.stations):
             station_cut = info['station'] == index_station
             in_dic_array[station.label] = {}
@@ -1136,14 +1157,17 @@ class Sim:
                     in_dic_array[station.label][antenna.label][solution] = {}
                     solution_cut = info['solution'] == solution.encode()
                     cut = numpy.logical_and(solution_cut,numpy.logical_and(antenna_cut,station_cut))
+                    _info = info[cut]
 
+                    in_flag_array[station.label][antenna.label][solution] = numpy.zeros(max_id+1,dtype=bool)
                     if sum(cut) != 0:
-                        in_flag_array[station.label][antenna.label][solution] = info[cut]['has_solution']
-                        
-                    else:
-                        in_flag_array[station.label][antenna.label][solution] = False
+                        in_flag_array[station.label][antenna.label][solution][_info['eventid']] = _info['has_solution']
+
                     for key in list(key_dict.keys()):
-                        in_dic_array[station.label][antenna.label][solution][key] = info[cut][key_dict[key]]
+                        in_dic_array[station.label][antenna.label][solution][key] = -999.0*numpy.ones(max_id+1,dtype=info.dtype[key_dict[key]])
+                        in_dic_array[station.label][antenna.label][solution][key][_info['eventid']] = _info[key_dict[key]]
+        
+
         self.in_dic_array = in_dic_array
         self.in_flag_array = in_flag_array
 
@@ -1657,6 +1681,10 @@ class Sim:
             self.file.attrs['trigger_threshold'] = trigger_threshold
             self.file.attrs['full_info_dtype'] = str(self.info_dtype) #stored as string.  Can be retrieved as dict later using ast.literal_eval 
             self.file.attrs['output_info_dtype'] = str(self.out_info_dtype) #stored as string.  Can be retrieved as dict later using ast.literal_eval 
+            
+            if numpy.size( pre_trigger_angle ) == 1:
+                if numpy.char.lower(str(pre_trigger_angle)) == 'none':
+                    pre_trigger_angle = None
             if pre_trigger_angle is None:
                 self.file.attrs['pre_trigger_angle'] = numpy.string_('None')
             else:
