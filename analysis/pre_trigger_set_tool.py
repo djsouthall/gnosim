@@ -1,18 +1,18 @@
+import os
+import sys
+sys.path.append(os.environ['GNOSIM_DIR'])
+import os.path
 import numpy
 import pylab
-import sys
 import numpy
 import h5py
 import pylab
 import yaml
-import os
-import os.path
 import glob
 import scipy
 import time
 import math
 import copy
-sys.path.append("/home/dsouthall/Projects/GNOSim/")
 from matplotlib import gridspec
 from matplotlib.colors import LogNorm
 

@@ -50,15 +50,15 @@ trigger_threshold_units : str
     This selects the units you wish to use for the current recalculation.  If this is set to None the the original threshold
     is used.
 '''
-
+import os
 import sys
+sys.path.append(os.environ['GNOSIM_DIR'])
+import os.path
 import numpy
 import h5py
 import matplotlib
 import pylab
 import yaml
-import os
-import os.path
 import glob
 import gnosim.sim.antarcticsim
 import ast

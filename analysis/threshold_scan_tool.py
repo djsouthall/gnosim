@@ -1,14 +1,14 @@
-
+import os
+import sys
+sys.path.append(os.environ['GNOSIM_DIR'])
+import os.path
 import numpy
 import pylab
-import sys
 import numpy
 import h5py
 import pylab
 import json
 import yaml
-import os
-import os.path
 import glob
 import scipy
 import scipy.signal

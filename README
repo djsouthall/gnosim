@@ -1,4 +1,5 @@
 === READ ME 4.0 ===
+#TODO : Convert this to Markdown.
 
 === People ===
 
@@ -147,15 +148,14 @@ The below section discusses the usage of the simulation code.  The general topic
         1.1.3    Paths
         --------------
 
-            Much of the simulation uses paths for imports such as:
+            In order for GNOSim to reliably find files as intended you must set and export the following system variable
+            in your .bashrc file:
 
-                import gnosim.earth.ice
+                GNOSIM_DIR="/PATH_TO_GNOSIM"
+                export GNOSIM_DIR
 
-            Such commands required the script calling them to be executed from the folder containing gnosim.  If you
-            wish to run these scripts from a different location then you must add the following command before any
-            imports of gnosim are called in the script.
-
-                sys.path.append('/PATH_TO_GNOSIM/')
+            Where PATH_TO_GNOSIM is the path that the folder where the git directory is located.  I.e the folder containing gnosim (which should be 
+            one directory up from the location of this README).
 
     1.2.0    Creating a Ray Tracing Library for the Simulation
     ----------------------------------------------------------

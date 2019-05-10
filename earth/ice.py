@@ -4,8 +4,9 @@ As well as functions for using these models.
 
 This combines what were previously rhe antarctic.py and greenland.py files.
 '''
+import os
 import sys
-sys.path.append("/home/dsouthall/Projects/GNOSim/")
+sys.path.append(os.environ['GNOSIM_DIR'])
 import numpy
 import pylab
 import scipy.interpolate

@@ -5,9 +5,7 @@ Simulation
 '''
 import os
 import sys
-#sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))).split('gnosim')[0])
-#print('Appended path:',os.path.dirname(os.path.dirname(os.path.abspath(__file__))).split('gnosim')[0])
-sys.path.append('/home/dsouthall/Projects/GNOSim')
+sys.path.append(os.environ['GNOSIM_DIR'])
 import numpy
 import h5py
 import matplotlib

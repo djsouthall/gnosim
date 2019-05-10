@@ -65,6 +65,9 @@ def getGitRootPath():
         So if you wish to just have the path of the folder containing gnosim you should remove the last bit.
     '''
     root_path = subprocess.Popen(['git', 'rev-parse', '--show-toplevel'], stdout=subprocess.PIPE).communicate()[0].rstrip().decode('utf-8')
+    if root_path == '':
+        print('Returning path from system variable GNOSIM_DIR which should be one directory up from the main git root path.')
+        root_path = sys.path.append(os.environ['GNOSIM_DIR'])
     return root_path
 
 def getColorMap(n):
