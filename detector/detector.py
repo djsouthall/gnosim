@@ -1,11 +1,11 @@
 """
 Detector object
 """
-
+import os
+import sys
+sys.path.append(os.environ['GNOSIM_DIR'])
 import numpy
 import scipy.interpolate
-import sys
-import os 
 from matplotlib import gridspec
 from mpl_toolkits.mplot3d import Axes3D
 import pylab
@@ -1129,7 +1129,7 @@ class Antenna:
 if __name__ == "__main__":
     import yaml
     solutions = numpy.array(['direct'])
-    config_file = '/home/dsouthall/Projects/GNOSim/gnosim/detector/station_config/real_config_full_station.py'
+    config_file = os.environ['GNOSIM_DIR'] + '/gnosim/detector/station_config/real_config_full_station.py'
     config = yaml.load(open(config_file))
     station = Station('ARA5',config,solutions = solutions)
     station.plotStation()
@@ -1142,7 +1142,7 @@ if __name__ == "__main__":
     gamma_deg = 0.0
     antenna_type = 'dipole'
     import yaml
-    config_file = '/home/dsouthall/Projects/GNOSim/gnosim/detector/station_config/real_config_full_station.py'
+    config_file = os.environ['GNOSIM_DIR'] + '/gnosim/detector/station_config/real_config_full_station.py'
     config = yaml.load(open(config_file))
     lib_filler = config['antenna_definitions']['dipole0']['lib']
     frequency_low = 30

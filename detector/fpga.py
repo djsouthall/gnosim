@@ -2,7 +2,9 @@
 Practical and Accurate Calculations of Askaryan Radiation
 Source: Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283
 '''
-
+import os
+import sys
+sys.path.append(os.environ['GNOSIM_DIR'])
 import numpy
 import pylab
 import sys
@@ -336,7 +338,7 @@ def getScaleSystemResponseScale(station, desired_noise_rms = 20.4E-3, save_new_r
 if __name__ == '__main__':
     pylab.close('all')
 
-    config_file = '/home/dsouthall/Projects/GNOSim/gnosim/detector/station_config/config_dipole_octo_-200_polar_120_rays.py'
+    config_file = os.environ['GNOSIM_DIR'] + '/gnosim/detector/station_config/config_dipole_octo_-200_polar_120_rays.py'
     testSim = gnosim.sim.antarcticsim.Sim(config_file,electric_field_domain = 'time',do_beamforming = True)
 
     slope,sys_fft = getScaleSystemResponseScale(testSim.stations[0],desired_noise_rms = 20.4E-3,save_new_response = False)

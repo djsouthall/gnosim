@@ -26,8 +26,8 @@ pylab.ion()
 if __name__ == "__main__":
     pylab.close('all')
     #Paremeters
-    config_file = '/home/dsouthall/Projects/GNOSim/gnosim/detector/station_config/config_dipole_octo_-200_polar_120_rays.py'
-    #config_file = '/home/dsouthall/Projects/GNOSim/gnosim/detector/station_config/test.py'
+    config_file = os.environ['GNOSIM_DIR'] + '/gnosim/detector/station_config/config_dipole_octo_-200_polar_120_rays.py'
+    #config_file = os.environ['GNOSIM_DIR'] + '/gnosim/detector/station_config/test.py'
     config = yaml.load(open(config_file))
     solutions = numpy.array(['direct', 'cross', 'reflect'])
     

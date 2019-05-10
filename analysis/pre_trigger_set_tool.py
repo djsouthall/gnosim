@@ -31,7 +31,7 @@ if __name__ == "__main__":
     start_time = time.time()
     if load_reader == True:
         print('(%0.2f s)'%(time.time() - start_time) + '	Loading Reader')    
-        reader = h5py.File('/home/dsouthall/scratch-midway2/feb_testing_real_config_108/results_2019_Feb_real_config_1.00e+08_GeV_1000000_events_merged.h5' , 'r')
+        reader = h5py.File(os.environ['GNOSIM_DATA'] + '/feb_testing_real_config_108/results_2019_Feb_real_config_1.00e+08_GeV_1000000_events_merged.h5' , 'r')
         config = yaml.load(open(reader.attrs['config_0']))
     
     if load_values == True:

@@ -157,6 +157,10 @@ The below section discusses the usage of the simulation code.  The general topic
             Where PATH_TO_GNOSIM is the path that the folder where the git directory is located.  I.e the folder containing gnosim (which should be 
             one directory up from the location of this README).
 
+            It may also be useful to add a path to the root location of where data is stored (for instance if you store a lot of data on scratch).
+
+                GNOSIM_DATA="/PATH_TO_GNOSIM_DATA"
+                export GNOSIM_DATA
     1.2.0    Creating a Ray Tracing Library for the Simulation
     ----------------------------------------------------------
 

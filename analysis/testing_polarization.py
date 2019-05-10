@@ -32,7 +32,7 @@ if __name__ == "__main__":
     figsize = (20.,12.5)#(16.,11.2)
     #TODO:  Make this have seperate plots per antenna incase they are oriented different and have different expected shapes.
     #Parameters
-    infile = '/home/dsouthall/scratch-midway2/May3/results_2019_testing_May3_real_config_antarctica_180_rays_signed_fresnel_3.16e+09_GeV_1000000_events_0_seed_1.h5'
+    infile = os.environ['GNOSIM_DATA'] + '/May3/results_2019_testing_May3_real_config_antarctica_180_rays_signed_fresnel_3.16e+09_GeV_1000000_events_0_seed_1.h5'
     try:
         print('Pre_loaded = %i, skipping loading',pre_loaded)
     except:

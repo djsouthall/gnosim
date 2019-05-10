@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-import sys
 import os
+import sys
+sys.path.append(os.environ['GNOSIM_DIR'])
 import glob
 import numpy
 import scipy.interpolate
@@ -1465,7 +1466,7 @@ if __name__ == '__main__':
     for z_0 in z_array:
 
         #Library Name Formatting
-        library_dir = 'library_%i_%s_%i_rays_signed_fresnel'%(int(z_0),ice_model,n_rays)
+        library_dir = os.environ['GNOSIM_DIR'] + '/gnosim/trace/library_%i_%s_%i_rays_signed_fresnel'%(int(z_0),ice_model,n_rays)
        
         theta_array = numpy.linspace(0., 180., n_rays) 
 

@@ -160,7 +160,7 @@ if __name__ == "__main__":
     ###------------------------###
 
     calculate_data  = False
-    in_path     = '/home/dsouthall/scratch-midway2/May3/'
+    in_path     = os.environ['GNOSIM_DATA'] + '/May3/'
     name        = 'new_polarization' 
     outdir      = in_path
     outname     = outdir +'volumetric_acceptance_data_%s.h5'%(name)
@@ -179,10 +179,10 @@ if __name__ == "__main__":
     dataname  = outname
 
     plot_paper_comparison = True
-    paper_comparison_file = '/home/dsouthall/Projects/GNOSim/gnosim/analysis/DesignPerformancePaperData.py'
+    paper_comparison_file = os.environ['GNOSIM_DIR'] + '/gnosim/analysis/DesignPerformancePaperData.py'
 
     plot_self_comparison  = True
-    self_comparison_file  = '/home/dsouthall/scratch-midway2/April9/volumetric_acceptance_data_real_config_antarctica_180_rays_signed_fresnel.h5'
+    self_comparison_file  = os.environ['GNOSIM_DATA'] + '/April9/volumetric_acceptance_data_real_config_antarctica_180_rays_signed_fresnel.h5'
     label_compare         = 'GNOSim Old - No polarization'
 
     plot_ratios = True

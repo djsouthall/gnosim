@@ -11,7 +11,9 @@ Source: Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283
 info: Calculates E in the time domain for eventual phasing
 '''
 
-
+import os
+import sys
+sys.path.append(os.environ['GNOSIM_DIR'])
 import numpy
 import pylab
 import math
@@ -95,8 +97,8 @@ def loadSignalResponse(mode='vpol'):
     '''
     if mode == 'vpol':
         print('Loading Signal Response vpol')
-        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_vpol.npy')
-        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_vpol.npy')
+        antenna_response = numpy.load(os.environ['GNOSIM_DIR'] + '/gnosim/sim/response/ara_antenna_response_vpol.npy')
+        electronic_response = numpy.load(os.environ['GNOSIM_DIR'] + '/gnosim/sim/response/ara_system_response_vpol.npy')
         freqs, h_fft = numpy.hsplit(antenna_response, 2)
         freqs, sys_fft = numpy.hsplit(electronic_response, 2)
         h_fft = numpy.ravel(h_fft)
@@ -104,8 +106,8 @@ def loadSignalResponse(mode='vpol'):
         freqs =  numpy.ravel(freqs).astype(float)
     else:
         print('Error: No other responses available yet other than vpol, defaulting to loading Signal Response vpol')
-        antenna_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_vpol.npy')
-        electronic_response = numpy.load('/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_vpol.npy')
+        antenna_response = numpy.load(os.environ['GNOSIM_DIR'] + '/gnosim/sim/response/ara_antenna_response_vpol.npy')
+        electronic_response = numpy.load(os.environ['GNOSIM_DIR'] + '/gnosim/sim/response/ara_system_response_vpol.npy')
         freqs, h_fft = numpy.hsplit(antenna_response, 2)
         freqs, sys_fft = numpy.hsplit(electronic_response, 2)
         h_fft = numpy.ravel(h_fft)

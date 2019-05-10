@@ -25,6 +25,8 @@ partition : str
     The partition of midway you want to run the simulations on.
 jobname : str
     The name of the job that will show up on squeue/midway.
+outpath : str
+    The location you want output files to be saved.
 n_events : int
     The number of events to throw for each simulation.  Common values used in development: 1000000
 simulation_config_file_array : list of str
@@ -49,8 +51,9 @@ seeds : numpy.ndarray of int
     EXACT same soulation n_trials number of times), but should be consistently applied across all energies such that results are directly
     comparable.  
 '''
-
 import os
+import sys
+sys.path.append(os.environ['GNOSIM_DIR'])
 import subprocess
 import time
 import numpy
@@ -68,9 +71,10 @@ if __name__ == "__main__":
     mem_per_cpu = 1500 #1000 = 1GB, looks like the total MaxRSS for 1M events was 13GB total, so 2000-3000 per cpu for that.  
     partition = 'broadwl'
     jobname = 'gnosim'
+    outpath = os.environ['GNOSIM_DATA'] + '/'
 
     n_events = 1000000
-    simulation_config_file_array = ['/home/dsouthall/Projects/GNOSim/gnosim/sim/sim_config/sim_settings.py'] #List of all config files to use.  Simulations will be run for each config file.
+    simulation_config_file_array = [os.environ['GNOSIM_DIR'] + '/gnosim/sim/sim_config/sim_settings.py'] #List of all config files to use.  Simulations will be run for each config file.
     energy_neutrino_array =  10**numpy.arange(7., 12.1, 0.5)#10**numpy.arange(6.5, 11.1, 0.5) # GeV
     
     n_trials = numpy.ones(len(energy_neutrino_array),dtype=int) #should be same length as energy_neutrino.  Can allow for different number of trials for different energies.
@@ -95,13 +99,12 @@ if __name__ == "__main__":
             for index, index_name in enumerate(range(1, n_trials[index_energy]+1)):
                 batch = 'sbatch --partition=%s --cpus-per-task=%i --mem-per-cpu=%i --job-name=%s '%(partition,cpu_per_task,mem_per_cpu, jobname)
                 if use_seed == True:
-                    command = '/home/dsouthall/Projects/GNOSim/gnosim/sim/antarcticsim.py %s %.2e %i %i %i'%(sim_config_file, energy_neutrino, n_events, index_name, seeds[index])
+                    command = os.environ['GNOSIM_DIR'] + '/gnosim/sim/antarcticsim.py %s %.2e %i %i %i'%(sim_config_file, energy_neutrino, n_events, index_name, seeds[index])
                 else:
-                    command = '/home/dsouthall/Projects/GNOSim/gnosim/sim/antarcticsim.py %s %.2e %i %i'%(sim_config_file, energy_neutrino, n_events, index_name)
+                    command = os.environ['GNOSIM_DIR'] + '/gnosim/sim/antarcticsim.py %s %.2e %i %i'%(sim_config_file, energy_neutrino, n_events, index_name)
                 command_queue = batch + command
                 print(command)
 
-                outpath = '/home/dsouthall/scratch-midway2/'
 
                 #The formatting below should match that used in ANTARCTICSIM!
                 if use_seed == True:
@@ -124,7 +127,7 @@ if __name__ == "__main__":
                     continue
 
                 #print '(%i/%i) %s'%(ii, len(files), command_queue)
-                #os.system('/home/dsouthall/Projects/GNOSim/gnosim/sim/' + command) # Run locally
+                #os.system(os.environ['GNOSIM_DIR'] + '/gnosim/sim/' + command) # Run locally
                 os.system(command_queue) # Submit to queue
 
                 #break
