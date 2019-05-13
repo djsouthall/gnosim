@@ -12,8 +12,8 @@ def decibel(amplitude):
     '''
     Converts the amplitude of voltage to decibels.  Note that you should be careful using this,
     as definitions of decibels are complicated.
-
-    Paramters
+    
+    Parameters
     ---------
     amplitude : float
         The amplitude of the signal.  Given in Voltage.
@@ -31,8 +31,8 @@ def decibel(amplitude):
 def amplitude(decibel):
     '''
     Converts the decibels to amplitude of voltage.
-
-    Paramters
+    
+    Parameters
     ---------
     decibel : float
         The amplitude of the signal.  Given in decibels.
@@ -54,7 +54,7 @@ def thermalNoise(resistance, temp, bandwidth):
     I cannot say I entirely understand why, but at some point it was impressed upon me that it should not be there
     for out applications.  In our case, the system response is scaled to achieve a particular noise level that
     matches the observed noise anyways, so this does not matter.
-
+    
     Parameters
     ----------
     resistance : float
@@ -63,7 +63,7 @@ def thermalNoise(resistance, temp, bandwidth):
         The temperature.  Given in K.
     Bandwidth : float
         The bandwidth for which the noise should be calculated.
-
+    
     Returns
     -------
     noise : float

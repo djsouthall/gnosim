@@ -58,7 +58,7 @@ def digitizeSignal(u,V,sample_times,digitizer_bits,scale_noise_from,scale_noise_
         An offset to be given to any signals.  Given in V. (Default is 0).
     plot : bool, optional
         Enables plotting.  (Default is False).
-
+    
     Returns
     -------
     V_bit : numpy.ndarray
@@ -98,8 +98,8 @@ def syncSignals(u_in , V_in, min_time, max_time, u_step ):
     Given a dictionary with an array (or empty array) for each antenna, This will extend the temporal range of each signal to be the same, 
     and produce an ndarray with each row representing a signal andappropriately place the V_in along this extended timeline.  This should 
     be used before beam summing.  Reformats the data as expected in the next portion of the code.
-
-    Paramters
+    
+    Parameters
     ---------
     u_in : dict
         A dict of with a key/signal for each antenna.  Contains the times corresponding to V_in.  Given in ns.
@@ -111,7 +111,7 @@ def syncSignals(u_in , V_in, min_time, max_time, u_step ):
         The maximum time for which the set of signals span.
     u_step : float,
         The time step for the signals.
-
+    
     Returns
     -------
     u_out : numpy.ndarray
@@ -136,8 +136,8 @@ def fpgaBeamForming(u_in , V_in, beam_dict , plot1 = False, plot2 = False, save_
     avoid the extra time from calling multiple functions. Expects u_in and V_in to be the same dimensions, with the same numberof rows 
     as there are antennas. The shallowest detector should be thefirst row of the input matrix. beam_dict should come from the getBeams 
     function, and is not included herebecause it only needs to be called once, whereas this should be called foreach signal.
-
-    Paramters
+    
+    Parameters
     ---------
     u_in : numpy.ndarray
         The corresponding times for the voltage signals.  Should be a single row, as the above signals are synched and the timing
@@ -145,7 +145,7 @@ def fpgaBeamForming(u_in , V_in, beam_dict , plot1 = False, plot2 = False, save_
     V_in : numpy.ndarray
         Synced voltage signals.  Each row corresponds to a voltage signal for an individual antenna.  Given in V.
     beam_dict : dict
-
+    
     plot1 : bool, optional
         Enables plotting.  (Default is False).
     plot2 : bool, optional
@@ -154,7 +154,7 @@ def fpgaBeamForming(u_in , V_in, beam_dict , plot1 = False, plot2 = False, save_
         Enables the saving of the produced figures.
     cap_bits : int, optional
         This sets number of bits to cap the power sum calculation (which will have units of adu^2).  (Default is 5).
-
+    
     Returns
     -------
     formed_beam_powers : dict
@@ -288,7 +288,7 @@ def getScaleSystemResponseScale(station, desired_noise_rms = 20.4E-3, save_new_r
     a 3adu noise rms the desired_noise_rms = 20.4mV. The mode selects which version of the responses you are calculating this factor for. 
     A scaling value will be calculated for each antenna in the station (which will often be redundent as currently most antennnas
     share responses). 
-
+    
     Parameters
     ----------
     station : gnosim.detector.detector.Station

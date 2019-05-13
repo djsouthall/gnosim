@@ -1,5 +1,6 @@
 #!/bin/bash 
 module unload python
+module unload ROOT
 #The below package of ROOT was built specifically for our purposes to support a recent build of python and ROOT.  It will load python 3.7.1.
 module load ROOT/6.16.00
 echo "ROOT/6.16.00 and Python 3.7.1 Loaded"

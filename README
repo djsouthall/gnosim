@@ -1,5 +1,6 @@
 === READ ME 4.0 ===
 #TODO : Convert this to Markdown.
+#TODO : Use sphinx or some other tool to make html docs.
 
 === People ===
 
@@ -108,8 +109,12 @@ The below section discusses the usage of the simulation code.  The general topic
         1.1.1    Dependencies
         ---------------------
 
+            The code was developed using compatible builds of Python 3.7.1 and ROOT 6.16.00.  A module has
+            been built on Midway2 specifically for this project and can be loaded using the command:
 
-            Python Version 3.7.1
+                . gnosim/loadmodules
+
+            This will unload the current ROOT and Python modules and load the recommended versions.
 
             Python packages:
             numpy - http://www.numpy.org/
@@ -118,16 +123,7 @@ The below section discusses the usage of the simulation code.  The general topic
             matplotlib / pylab - http://matplotlib.org/
 
             Certain portions of the code require large amounts of memory.  If the code is breaking this may be something to check.
-
-            If running on Midway then the correct version of python can be loaded by executing the loadpython script in the gnosim
-            directory.  This can be done from the folder containing gnosim using the command:
-
-                . gnosim/loadpython
-
-            This command will load the appropriate versions of both ROOT and python (compatibly built).
-
-            ROOT 6.16.00 is used when attempting to output data in 'real' Ara formatting.  A module was built on midway2 specifically to be compatible
-            with the uses of GNOSim.
+            See Section 2.2.0 for more on memory concerns.
 
 
         1.1.2    Running Scripts
@@ -1069,9 +1065,10 @@ The below section discusses the usage of the simulation code.  The general topic
         -------------
 
         Each function and module should be properly documented with both contributors and users in mind.  The formatting
-        should follow the NumPy Style for Python Docstrings roughly.  It is recommended that you look at some of the main
+        should follow the NumPy Style for Python Docstrings.  It is recommended that you look at some of the main
         modules to see examples of how the documentation is intended to look. 
-        Typically single quotes are used over double quotes.
+        Typically single quotes are used over double quotes.  Eventually it would be good to use a tool like sphinx and
+        the sphinx.ext.napoleon parser to turn these docstrings into a navigable html structure.  
 
 
         Coordinates
