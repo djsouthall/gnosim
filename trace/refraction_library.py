@@ -949,8 +949,21 @@ class RefractionLibrary:
     def __init__(self, search, solutions=numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']), pre_split=True, build_lib=True):
         self.infiles = glob.glob(search)
         accepted_solutions = getAcceptedSolutions()
-        # List attributes of interest
+        
+        #Checking if pre_split is possible:
+        if pre_split == True:
+            for solution in self.solutions:
+                if (os.path.isdir(search.replace('*.h5',solution + '/')) == False):
+                    print('WARNING! No directory' , search.replace('*.h5',solution + '/'))
+                    pre_split = False
+            if pre_split == False:
+                solutions = accepted_solutions
+                print('Cannot run pre_split library, running unsorted library')
+                print('All solution types will be used.')
+        self.pre_split = pre_split
         self.solutions = accepted_solutions[numpy.isin(accepted_solutions,solutions)]
+        
+        # List attributes of interest
         if len(self.solutions) == 0:
             print('Selection of solution types did not match predefined values.  Using default types.')
             self.solutions = accepted_solutions
@@ -970,16 +983,6 @@ class RefractionLibrary:
         # Ice model
         self.ice_model = None
         
-        #Checking if pre_split is possible:
-        if pre_split == True:
-            for solution in self.solutions:
-                if (os.path.isdir(search.replace('*.h5',solution + '/')) == False):
-                    print('WARNING! No directory' , search.replace('*.h5',solution + '/'))
-                    pre_split = False
-                    self.solutions = accepted_solutions
-            if pre_split == False:
-                print('Cannot run pre_split library, running unsorted library')
-        self.pre_split = pre_split
         if build_lib == True:
             self.buildLib()
 
