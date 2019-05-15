@@ -950,9 +950,18 @@ class RefractionLibrary:
         self.infiles = glob.glob(search)
         accepted_solutions = getAcceptedSolutions()
         
+        # List attributes of interest
+        if len(solutions) == 0:
+            print('Selection of solution types did not match predefined values.  Using default types.')
+            solutions = accepted_solutions
+        # List attributes of interest
+        if numpy.logical_and(pre_split == False,numpy.logical_not(len(solutions) == len(accepted_solutions))):
+            print('Limiting Solution Types Currently only works for pre_split = True, using default solution types.')
+            solutions = accepted_solutions
+
         #Checking if pre_split is possible:
         if pre_split == True:
-            for solution in self.solutions:
+            for solution in solutions:
                 if (os.path.isdir(search.replace('*.h5',solution + '/')) == False):
                     print('WARNING! No directory' , search.replace('*.h5',solution + '/'))
                     pre_split = False
@@ -960,17 +969,10 @@ class RefractionLibrary:
                 solutions = accepted_solutions
                 print('Cannot run pre_split library, running unsorted library')
                 print('All solution types will be used.')
+
         self.pre_split = pre_split
         self.solutions = accepted_solutions[numpy.isin(accepted_solutions,solutions)]
         
-        # List attributes of interest
-        if len(self.solutions) == 0:
-            print('Selection of solution types did not match predefined values.  Using default types.')
-            self.solutions = accepted_solutions
-        elif numpy.logical_and(pre_split == False,numpy.logical_not(len(self.solutions) == len(accepted_solutions))):
-            print('Limiting Solution Types Currently only works for pre_split = True, using default solution types.')
-            self.solutions = accepted_solutions
-            
         self.keys = ['r', 'z', 't', 'd', 'theta', 'theta_ant', 'a_p', 'a_s']
 
         # Dictionary to store data
