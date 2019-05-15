@@ -2056,12 +2056,6 @@ if __name__ == '__main__':
             print('Failed to save image %s%s_array_geometry.%s'%(image_path,outfile.split('/')[-1].replace('.h5',''),sim_config['image_extension']))
             print(e)
     
-    print('Trying to create index.html file for new images')
-    try:
-        gnosim.utils.misc.makeIndexHTML(path = image_path ,filetype = sim_config['image_extension'])
-    except Exception as e:
-        print('Something went wrong in making index.html')
-        print(e)
     sys.stdout.flush()
 
 ############################################################

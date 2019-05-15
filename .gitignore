@@ -1,4 +1,5 @@
 *.pyc
 *.DS_Store
 **/*~
-**/trace/libraries
+**/trace/libraries/*
+../utils/misc_private.py
