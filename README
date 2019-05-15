@@ -703,8 +703,21 @@ The below section discusses the usage of the simulation code.  The general topic
         3.1.2    Attributes and Datasets in h5py Files
         ----------------------------------------------
 
-            The h5py files used in this simulation utilized both h5py's support for 'attrs' (attributes), and datasets.  The differences of these
-            are discussed below:
+            The h5py files used in this simulation store meta information as either 'attrs' (attributes) or datasets.
+            To quickly see the contents of an h5py file, open it using python and the following commands:
+
+                import h5py
+                reader = h5py.File('/PATH/TO/FILE.h5' , 'r')
+
+            Then you can list the available attrs and data sets using the following:
+
+                print(list(reader.attrs)) #Prints attribute labels
+
+                print(list(reader.keys())) #Prints name of datasets available
+                
+                print(reader['info'].dtype) #Prints the fields available in the info dataset
+
+            Attributes and datasets are described broadly below, with more details in the following sections.
 
             Attrs
             -----
@@ -716,7 +729,8 @@ The below section discusses the usage of the simulation code.  The general topic
 
             And can later be accessed from a loaded file using the command:
 
-                station_configuration_file = station_file.attrs['config'] 
+                station_configuration_file = station_file.attrs['config']
+
 
             Datasets
             --------
