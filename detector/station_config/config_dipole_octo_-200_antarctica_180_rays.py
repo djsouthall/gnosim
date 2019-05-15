@@ -17,11 +17,11 @@
                 'phased_antennas' : { #Antennas in this should be in one vertical string/line, they are used for the phased array calculations.
                         'dipole0': {
                                     'antenna_type':'dipole',
-                                    'lib': '/home/dsouthall/Projects/GNOSim/gnosim/trace/libraries/library_-200_antarctica_180_rays_signed_fresnel/*.h5',
+                                    'lib': '${GNOSIM_DIR}/gnosim/trace/libraries/library_-200_antarctica_180_rays_signed_fresnel/*.h5',
                                     'position':[0.0,0.0,-0.0],
                                     'orientation':[0.0,0.0,0.0], #alpha, beta, gamma Euler angles in degrees for zxz rotation, all zeros to match ice frame
-                                    'system_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_vpol.npy',
-                                    'antenna_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_vpol.npy',
+                                    'system_response':'${GNOSIM_DIR}/gnosim/sim/response/ara_system_response_vpol.npy',
+                                    'antenna_response':'${GNOSIM_DIR}/gnosim/sim/response/ara_antenna_response_vpol.npy',
                                     'noise_temperature': 320.,#K
                                     'resistance':50, #Ohm
                                     'frequency_low': 0.1, # GHz
@@ -29,11 +29,11 @@
                                     },
                         'dipole1': {
                                     'antenna_type':'dipole',
-                                    'lib': '/home/dsouthall/Projects/GNOSim/gnosim/trace/libraries/library_-201_antarctica_180_rays_signed_fresnel/*.h5',
+                                    'lib': '${GNOSIM_DIR}/gnosim/trace/libraries/library_-201_antarctica_180_rays_signed_fresnel/*.h5',
                                     'position':[0.0,0.0,-1.0],
                                     'orientation':[0.0,0.0,0.0],
-                                    'system_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_vpol.npy',
-                                    'antenna_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_vpol.npy',
+                                    'system_response':'${GNOSIM_DIR}/gnosim/sim/response/ara_system_response_vpol.npy',
+                                    'antenna_response':'${GNOSIM_DIR}/gnosim/sim/response/ara_antenna_response_vpol.npy',
                                     'noise_temperature': 320.,#K
                                     'resistance':50, #Ohm
                                     'frequency_low': 0.1, # GHz
@@ -41,11 +41,11 @@
                                     },
                         'dipole2': {
                                     'antenna_type':'dipole',
-                                    'lib': '/home/dsouthall/Projects/GNOSim/gnosim/trace/libraries/library_-202_antarctica_180_rays_signed_fresnel/*.h5',
+                                    'lib': '${GNOSIM_DIR}/gnosim/trace/libraries/library_-202_antarctica_180_rays_signed_fresnel/*.h5',
                                     'position':[0.0,0.0,-2.0],
                                     'orientation':[0.0,0.0,0.0],
-                                    'system_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_vpol.npy',
-                                    'antenna_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_vpol.npy',
+                                    'system_response':'${GNOSIM_DIR}/gnosim/sim/response/ara_system_response_vpol.npy',
+                                    'antenna_response':'${GNOSIM_DIR}/gnosim/sim/response/ara_antenna_response_vpol.npy',
                                     'noise_temperature': 320.,#K
                                     'resistance':50, #Ohm
                                     'frequency_low': 0.1, # GHz
@@ -53,11 +53,11 @@
                                     },
                         'dipole3': {
                                     'antenna_type':'dipole',
-                                    'lib': '/home/dsouthall/Projects/GNOSim/gnosim/trace/libraries/library_-203_antarctica_180_rays_signed_fresnel/*.h5',
+                                    'lib': '${GNOSIM_DIR}/gnosim/trace/libraries/library_-203_antarctica_180_rays_signed_fresnel/*.h5',
                                     'position':[0.0,0.0,-3.0],
                                     'orientation':[0.0,0.0,0.0],
-                                    'system_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_vpol.npy',
-                                    'antenna_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_vpol.npy',
+                                    'system_response':'${GNOSIM_DIR}/gnosim/sim/response/ara_system_response_vpol.npy',
+                                    'antenna_response':'${GNOSIM_DIR}/gnosim/sim/response/ara_antenna_response_vpol.npy',
                                     'noise_temperature': 320.,#K
                                     'resistance':50, #Ohm
                                     'frequency_low': 0.1, # GHz
@@ -65,11 +65,11 @@
                                     },
                         'dipole4': {
                                     'antenna_type':'dipole',
-                                    'lib': '/home/dsouthall/Projects/GNOSim/gnosim/trace/libraries/library_-204_antarctica_180_rays_signed_fresnel/*.h5',
+                                    'lib': '${GNOSIM_DIR}/gnosim/trace/libraries/library_-204_antarctica_180_rays_signed_fresnel/*.h5',
                                     'position':[0.0,0.0,-4.0],
                                     'orientation':[0.0,0.0,0.0],
-                                    'system_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_vpol.npy',
-                                    'antenna_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_vpol.npy',
+                                    'system_response':'${GNOSIM_DIR}/gnosim/sim/response/ara_system_response_vpol.npy',
+                                    'antenna_response':'${GNOSIM_DIR}/gnosim/sim/response/ara_antenna_response_vpol.npy',
                                     'noise_temperature': 320.,#K
                                     'resistance':50, #Ohm
                                     'frequency_low': 0.1, # GHz
@@ -77,11 +77,11 @@
                                     },
                         'dipole5': {
                                     'antenna_type':'dipole',
-                                    'lib': '/home/dsouthall/Projects/GNOSim/gnosim/trace/libraries/library_-205_antarctica_180_rays_signed_fresnel/*.h5',
+                                    'lib': '${GNOSIM_DIR}/gnosim/trace/libraries/library_-205_antarctica_180_rays_signed_fresnel/*.h5',
                                     'position':[0.0,0.0,-5.0],
                                     'orientation':[0.0,0.0,0.0],
-                                    'system_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_vpol.npy',
-                                    'antenna_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_vpol.npy',
+                                    'system_response':'${GNOSIM_DIR}/gnosim/sim/response/ara_system_response_vpol.npy',
+                                    'antenna_response':'${GNOSIM_DIR}/gnosim/sim/response/ara_antenna_response_vpol.npy',
                                     'noise_temperature': 320.,#K
                                     'resistance':50, #Ohm
                                     'frequency_low': 0.1, # GHz
@@ -89,11 +89,11 @@
                                     },
                         'dipole6': {
                                     'antenna_type':'dipole',
-                                    'lib': '/home/dsouthall/Projects/GNOSim/gnosim/trace/libraries/library_-206_antarctica_180_rays_signed_fresnel/*.h5',
+                                    'lib': '${GNOSIM_DIR}/gnosim/trace/libraries/library_-206_antarctica_180_rays_signed_fresnel/*.h5',
                                     'position':[0.0,0.0,-6.0],
                                     'orientation':[0.0,0.0,0.0],
-                                    'system_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_vpol.npy',
-                                    'antenna_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_vpol.npy',
+                                    'system_response':'${GNOSIM_DIR}/gnosim/sim/response/ara_system_response_vpol.npy',
+                                    'antenna_response':'${GNOSIM_DIR}/gnosim/sim/response/ara_antenna_response_vpol.npy',
                                     'noise_temperature': 320.,#K
                                     'resistance':50, #Ohm
                                     'frequency_low': 0.1, # GHz
@@ -101,11 +101,11 @@
                                     },
                         'dipole7': {
                                     'antenna_type':'dipole',
-                                    'lib': '/home/dsouthall/Projects/GNOSim/gnosim/trace/libraries/library_-207_antarctica_180_rays_signed_fresnel/*.h5',
+                                    'lib': '${GNOSIM_DIR}/gnosim/trace/libraries/library_-207_antarctica_180_rays_signed_fresnel/*.h5',
                                     'position':[0.0,0.0,-7.0],
                                     'orientation':[0.0,0.0,0.0],
-                                    'system_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_system_response_vpol.npy',
-                                    'antenna_response':'/home/dsouthall/Projects/GNOSim/gnosim/sim/response/ara_antenna_response_vpol.npy',
+                                    'system_response':'${GNOSIM_DIR}/gnosim/sim/response/ara_system_response_vpol.npy',
+                                    'antenna_response':'${GNOSIM_DIR}/gnosim/sim/response/ara_antenna_response_vpol.npy',
                                     'noise_temperature': 320.,#K
                                     'resistance':50, #Ohm
                                     'frequency_low': 0.1, # GHz

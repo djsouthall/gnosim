@@ -14,12 +14,11 @@ bechtol@kicp.uchicago.edu
 Shoshana Chipman 
 chipmansb@uchicago.edu
 
-Current Contributor:
+Current Contributors:
 
 Dan Southall (contact if there are problems)
 dsouthall@uchicago.edu
 
-Other Dan
 
 === OVERVIEW ===
 
@@ -99,6 +98,8 @@ The below section discusses the usage of the simulation code.  The general topic
         -   Section 3.4.0 discusses previously developed analysis scripts that you should in theory be able to run on
             your data to start working with it.  The code contained in these also shows how the data can be worked with
             so you can form your own analysis scripts as necessary.
+        -   If in early testing you see no events triggering, double check that you are running at reasonable energies.
+            Energies less than 1e7 GeV will have every small trigger rates.  
 
 1.0.0    General Preparations
 -----------------------------
@@ -159,6 +160,17 @@ The below section discusses the usage of the simulation code.  The general topic
 
                 GNOSIM_DATA="/PATH_TO_GNOSIM_DATA"
                 export GNOSIM_DATA
+
+            Paths may be used that refer to an environment variable such as:
+
+                image_path = '${GNOSIM_DATA}/figures'
+
+            However when this is done whatever us being used to evaluate/interpret this path should use:
+
+                path = os.path.expandvars(path)
+
+            Ideally this is done in the code where, but if it is missed and you get an error this may be the problem.
+
     1.2.0    Creating a Ray Tracing Library for the Simulation
     ----------------------------------------------------------
 
@@ -269,6 +281,13 @@ The below section discusses the usage of the simulation code.  The general topic
 
         Station configuration files should be located in gnosim/detector/station_config.  Below is a description of the keys to include in the configuration file.
         It is recommended that you copy and modify existing configuration files locally, rather than creating your own from scratch.
+
+        Note that certain fields of the station configuration files will be paths to other files.  To use relative paths you should put ${GNOSIM_DIR} in the
+        paths.  These paths are interpreted using os.expandvars which will replace portions of strings with ${VAR} with the corresponding system variable VAR.
+
+        For example:
+
+            'system_response':'${GNOSIM_DIR}/gnosim/sim/response/ara_system_response_vpol.npy'
 
         Station Configuration Parameters
         --------------------------------

@@ -18,11 +18,11 @@ from matplotlib import gridspec
 pylab.ion()
   
 if __name__ == "__main__":
-    pylab.close('all')
+    #pylab.close('all')
     show_Red_Fact_v_Pol_Dot = False
     show_Ang_Range = False
     show_Pol_Dot_v_Theta_Ant = True
-    show_Emission_Pol_Dot_v_Theta_Ant = True
+    show_Emission_Pol_Dot_v_Theta_Ant = False
     show_Emission_Pol_Dot_v_Theta_Emit = True
     show_Attenuation_v_D = False
     show_Em_v_Det_Pol_Angles = False
@@ -37,6 +37,7 @@ if __name__ == "__main__":
         print('Pre_loaded = %i, skipping loading',pre_loaded)
     except:
         reader = h5py.File(infile , 'r')
+        #cut = numpy.logical_and(reader['info']['has_solution'][...],reader['info']['triggered'][...])
         cut = reader['info']['has_solution'][...]
         info = reader['info'][cut]
         x = reader['x_0'][...]

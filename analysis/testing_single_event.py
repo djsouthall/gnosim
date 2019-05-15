@@ -157,10 +157,8 @@ if __name__ == "__main__":
     else:
         station_config = yaml.load(open(sim_config['station_config_file']))
 
-    testSim = gnosim.sim.antarcticsim.Sim(station_config, solutions = solutions, electric_field_domain = 'time',do_beamforming = True)
-    for station in testSim.stations:
-        station.loadLib(pre_split = True, build_lib = False)
-        #station.loadConcaveHull()
+    testSim = gnosim.sim.antarcticsim.Sim(station_config, solutions = solutions, electric_field_domain = 'time',do_beamforming = True, pre_split = True, load_lib = False)
+
     testSim.makeFlagDicArrayFromInfo(info,eventids = do_events) #Necessary for running events without interpolation (calling throw)
 
     if trigger_threshold == None:

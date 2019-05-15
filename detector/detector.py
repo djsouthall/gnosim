@@ -187,7 +187,7 @@ class Station:
             if self.electric_field_domain == 'freq':
                 antenna.setUpFrequencyDomain(self.config[antenna_groups[index]][key]['frequency_low'],self.config[antenna_groups[index]][key]['frequency_high'])
             elif self.electric_field_domain == 'time':
-                antenna.addTimingInfo(self.config[antenna_groups[index]][key]['system_response'],self.config[antenna_groups[index]][key]['antenna_response'])
+                antenna.addTimingInfo(os.path.expandvars(self.config[antenna_groups[index]][key]['system_response']),os.path.expandvars(self.config[antenna_groups[index]][key]['antenna_response']))
             self.antennas.append(antenna)
         self.antennas = numpy.array(self.antennas) 
         self.antenna_keys = numpy.array(self.antenna_keys)
@@ -664,7 +664,7 @@ class Antenna:
         self.alpha_deg = alpha_deg
         self.beta_deg  = beta_deg
         self.gamma_deg = gamma_deg
-        self.lib_dir = lib_dir
+        self.lib_dir = os.path.expandvars(lib_dir)
         self.label = label
         self.noise_temperature = noise_temperature
         self.resistance = resistance 
@@ -746,7 +746,7 @@ class Antenna:
         if numpy.logical_and(pre_split == False,numpy.logical_not(len(self.solutions) == len(self.accepted_solutions))):
             print('Limiting Solution Types Currently only works for pre_split = True, using default solution types.')
             self.solutions = self.accepted_solutions
-        self.lib = gnosim.trace.refraction_library.RefractionLibrary(self.lib_dir,solutions=self.solutions,pre_split = pre_split,build_lib = build_lib)
+        self.lib = gnosim.trace.refraction_library.RefractionLibrary(os.path.expandvars(self.lib_dir),solutions=self.solutions,pre_split = pre_split,build_lib = build_lib)
         self.solutions = self.lib.solutions #Catches mistakes if the refraction library has a varying number of antennas.
 
     def deleteLib(self,verbose=False):
@@ -840,10 +840,14 @@ class Antenna:
         '''
         print('Loading Hull For:',self.lib_dir)
         self.concave_hull = {}
-        indir = self.lib_dir.replace('*.h5','concave_hull')
+        indir = self.lib_dir.replace('*.h5','')
+        if os.path.expandvars(indir)[-1] == '/':
+            indir = os.path.expandvars(indir) + 'concave_hull'
+        else:
+            indir = os.path.expandvars(indir) + '/concave_hull'
         if os.path.isdir(indir) == False:
             print('Hull not previously generated, calculating now.')
-            self.lib.saveEnvelope( self.lib_dir.replace('*.h5','') )
+            self.lib.saveEnvelope( self.lib_dir.replace('/*.h5','') )
         chull = self.lib.loadEnvelope( indir ,store_fit_data = False)
         for dkey in self.lib.data.keys():
             self.concave_hull[dkey] = {}
@@ -870,8 +874,8 @@ class Antenna:
         --------
         gnosim.sim.response
         '''
-        self.antenna_response_dir = antenna_response_dir
-        self.system_response_dir = system_response_dir
+        self.antenna_response_dir = os.path.expandvars(antenna_response_dir)
+        self.system_response_dir = os.path.expandvars(system_response_dir)
 
         antenna_response = numpy.load(self.antenna_response_dir)
         electronic_response = numpy.load(self.system_response_dir)

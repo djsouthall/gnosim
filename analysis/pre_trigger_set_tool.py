@@ -1,3 +1,7 @@
+'''
+This is a tool to help you determine the appropriate pre-trigger for your situation.
+'''
+
 import os
 import sys
 sys.path.append(os.environ['GNOSIM_DIR'])

@@ -85,6 +85,12 @@ class Sim:
     sim_config : dict, optional
         This is the dictionary containing the properties used in initiating the simulation and throw call.  If it is included as an
         input parameter then it will be written to the outout file when throw is called.  (Default is None).
+    pre_split : bool, optional
+        Determines whether to attempt to load from pre split libraries.  If true (and the pre split libraries are calculated and 
+        saved appropriately) this avoids lengthy calculations which seperate the rays ito the different solution types.  (Default is False).
+    load_lib : bool, ooptional
+        Enables the loading of the ray tracing libraries per antenna.  This should be set to True if running the simulation.  Helpful
+        to have if you are doing something offline and don't need the libraries loaded.  (Default is True).
     
     Attributes
     ----------
@@ -150,12 +156,21 @@ class Sim:
     For more info about how to work with info_dtype check out HDF5's discussion of custome dtypes in O'Reilly, Python and HDF5: Chapter 7. More About Types - Compound Types
     '''
 
-    def __init__(self, station_config,solutions = numpy.array([]),electric_field_domain = 'time',do_beamforming = True, sim_config = None):
+    def __init__(self, station_config,solutions = numpy.array([]),electric_field_domain = 'time',do_beamforming = True, sim_config = None, pre_split = True, load_lib = True):
         #pre_split False unless using a library already sorted into different
         #directories by solution type.
+        self.pre_split = pre_split
         self.station_config = station_config
         self.ice = gnosim.earth.ice.Ice(self.station_config['detector_volume']['ice_model'])
         
+        accepted_domains = numpy.array(['time','freq'])
+        electric_field_domain = accepted_domains[numpy.isin(accepted_domains,electric_field_domain)]
+        if len(electric_field_domain) == 0:
+            print('Selection of domain type did not match predefined values.  Using default type \'%s\''%accepted_domains[0])
+            self.electric_field_domain = accepted_domains[0]
+        else:
+            self.electric_field_domain = electric_field_domain[0]
+
         #Filtering solutions to acceptable values.
         accepted_solutions = gnosim.trace.refraction_library.getAcceptedSolutions()
         if numpy.size(solutions) == 0:
@@ -167,25 +182,32 @@ class Sim:
             print(self.solutions)
         else:
             self.solutions = solutions
-
-        accepted_domains = numpy.array(['time','freq'])
-        electric_field_domain = accepted_domains[numpy.isin(accepted_domains,electric_field_domain)]
-        if len(electric_field_domain) == 0:
-            print('Selection of domain type did not match predefined values.  Using default type \'%s\''%accepted_domains[0])
-            self.electric_field_domain = accepted_domains[0]
-        else:
-            self.electric_field_domain = electric_field_domain[0]
-
+            
         self.stations = []
 
         for station_label in list(self.station_config['stations'].keys()):
             station = gnosim.detector.detector.Station(station_label, self.station_config, solutions = self.solutions,electric_field_domain = self.electric_field_domain)
             self.stations.append(station)
-        
+
+        if load_lib == True:
+            print('Loading ray tracing libraries for interpolation.')
+            #Might want to do this one at a time rather than all at once.
+            for station in self.stations:
+                station.loadLib(pre_split = self.pre_split)
+                station.loadConcaveHull()
+
         self.stations = numpy.array(self.stations)            
-        self.n_antenna = sum([len(s.antennas) for s in self.stations])
-        self.n_antenna_PA = sum([sum(s.phased_cut) for s in self.stations])
-        self.n_antenna_RA = sum([sum(s.reconstruction_cut) for s in self.stations])
+
+        self.n_antenna = 0
+        self.n_antenna_PA = 0
+        self.n_antenna_RA = 0
+        self.n_solutions = 0
+        for s in self.stations:
+            self.n_antenna_PA += sum(s.phased_cut)
+            self.n_antenna_RA += sum(s.reconstruction_cut)
+            for a_index, a in enumerate(s.antennas):
+                self.n_antenna += 1
+                self.n_solutions += len(a.solutions) #must be done after libraries are loaded for it to be accurate.
 
         print('Total Number of Antennas = ', self.n_antenna)
         max_bits = 0
@@ -392,14 +414,14 @@ class Sim:
         #Pretrigger should be on observation angle to check how on-cone each solution will be
         #Eventually hope to add a dependance on E/d
         
-        info = numpy.zeros(  self.n_antenna  , dtype = self.info_dtype) 
-        temporary_info = numpy.zeros(  len(self.solutions)*self.n_antenna  , dtype = self.info_dtype)
+        info = numpy.zeros( self.n_antenna  , dtype = self.info_dtype) 
+        temporary_info = numpy.zeros( self.n_solutions , dtype = self.info_dtype)
 
-        ant_labels         = numpy.array(['']*len(self.solutions)*self.n_antenna)
-        x_antennas         = numpy.zeros( len(self.solutions)*self.n_antenna )
-        y_antennas         = numpy.zeros( len(self.solutions)*self.n_antenna )
-        z_antennas         = numpy.zeros( len(self.solutions)*self.n_antenna )
-        has_solution_array = numpy.zeros( len(self.solutions)*self.n_antenna )
+        ant_labels         = numpy.array(['']* self.n_solutions)
+        x_antennas         = numpy.zeros( self.n_solutions )
+        y_antennas         = numpy.zeros( self.n_solutions )
+        z_antennas         = numpy.zeros( self.n_solutions )
+        has_solution_array = numpy.zeros( self.n_solutions )
         station_wide_solution_index = -1
         for index_station, station in enumerate(self.stations):
             for index_antenna, antenna in enumerate(station.antennas):
@@ -845,7 +867,7 @@ class Sim:
                                         fig_array.append(fig)
 
                                     try:
-                                        fig.savefig('%s%s_all_antennas-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
+                                        fig.savefig('%s%s_all_antennas-event%i.%s'%(os.path.expandvars(image_path),self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
                                         pylab.close(fig)
                                     except Exception as e:
                                         print('Failed to save image for plotGeometry on event %i'%(eventid))
@@ -1012,9 +1034,8 @@ class Sim:
                                     fig_array.append(fig)
 
                                 try:
-                                    pylab.savefig('%s%s-event%i.%s'%(image_path,self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
+                                    pylab.savefig('%s%s-event%i.%s'%(os.path.expandvars(image_path),self.outfile.split('/')[-1].replace('.h5',''),eventid,plot_filetype_extension),bbox_inches='tight')
                                     pylab.close(fig)
-                                    #print('Saved image %s%s-event%i.%s'%(image_path,self.outfile,eventid,plot_filetype_extension))
                                 except Exception as e:
                                     print('Failed to save image for plotSignals on event %i'%(eventid))
                                     print(e)
@@ -1358,7 +1379,7 @@ class Sim:
     def throw(self, energy_neutrino=1.e9, 
               theta_0=None, phi_0=None, x_0=None, y_0=None, z_0=None, phi_vertex=None, r_vertex=None,
               anti=False, n_events=100000, detector_volume_radius=6000., detector_volume_depth=3000., 
-              outfile=None,seed=None,pre_split=True, method='cubic', include_noise=True,summed_signals=True,
+              outfile=None,seed=None, method='cubic', include_noise=True,summed_signals=True,
               plot_geometry=False, plot_signals=False, trigger_threshold=0.0, trigger_threshold_units='fpga', 
               plot_filetype_extension='svg', image_path='./', use_interp_threading=True, use_event_threading=True, 
               output_all_solutions=True,output_fields=None, save_signals=True, pre_trigger_angle=None):
@@ -1408,9 +1429,6 @@ class Sim:
         seed : int, optional
             The seed used for setting the random state of the simulation.  This will allow for testing with reproducable randomly generated neutrinos,
             noise, etc.
-        pre_split : bool, optional
-            Determines whether to attempt to load from pre split libraries.  If true (and the pre split libraries are calculated and 
-            saved appropriately) this avoids lengthy calculations which seperate the rays ito the different solution types.  (Default is False).
         method : str, optional
             The selected method of interpolation.  (Default is 'cubic').
         include_noise : bool, optional
@@ -1500,8 +1518,7 @@ class Sim:
         if type(pre_trigger_angle) is str:
             #Catches pre_trigger_angle = 'None'
             pre_trigger_angle = None
-
-        self.pre_split = pre_split
+        
         self.outfile = outfile
         self.save_signals = save_signals
         self.n_events = n_events
@@ -1609,14 +1626,13 @@ class Sim:
         #Preparing output arrays
         
         if output_all_solutions == False:
-            self.len_info_per_event = self.n_antenna#self.n_antenna_PA
+            self.len_info_per_event = self.n_antenna 
         else:
-            self.len_info_per_event = len(self.solutions)*self.n_antenna#self.n_antenna_PA
+            self.len_info_per_event =  self.n_solutions 
 
         p_interact = numpy.zeros(self.n_events)
         p_earth = numpy.zeros(self.n_events)
         p_detect = numpy.zeros(self.n_events)
-        #inelasticity = numpy.zeros(self.n_events)
         inelasticity = gnosim.interaction.inelasticity.inelasticityArray(energy_neutrinos, mode='cc') ## GENERALIZE THIS LATER for anti neutrino, etc. 
         
         #Below is determining what output fields to have for info.
@@ -1674,6 +1690,10 @@ class Sim:
             # NEW CURVATURE
             #TODO: Write both configuration files to the outfile.  
             self.file.attrs['station_config'] = str(self.station_config) #stored as string.  Can be retrieved as dict later using ast.literal_eval 
+            try:
+                self.file.attrs['GNOSIM_DIR'] = str(os.environ('GNOSIM_DIR')) #The station config will not have parsed this so may be helpful to store.
+            except:
+                print('Error in saving GNOSIM_DIR environment variable to output file.  Skipping.')
             self.file.attrs['ice_model'] = self.ice.ice_model
             self.file.attrs['trigger_mode'] = numpy.string_(trigger_threshold_units)
             self.file.attrs['trigger_threshold'] = trigger_threshold
@@ -1712,11 +1732,6 @@ class Sim:
         ############################################################################
         #Interpolating values from using griddata:
         ############################################################################
-        print('Loading ray tracing libraries for interpolation.')
-        #Might want to do this one at a time rather than all at once.
-        for station in self.stations:
-            station.loadLib(pre_split = self.pre_split)
-            station.loadConcaveHull()
 
         #If memory becomes an issue this might need to be adapted to run for chunks of events 
         if use_interp_threading == True:
@@ -1747,7 +1762,7 @@ class Sim:
                     futures.append(executor.submit(self.event, energy_neutrinos[ii], phi_0[ii], theta_0[ii], x_0[ii], y_0[ii], z_0[ii], \
                                     ii,inelasticity[ii], anti=anti,include_noise = include_noise,plot_signals=plot_signals,plot_geometry=plot_geometry,\
                                     summed_signals = summed_signals,trigger_threshold = trigger_threshold, trigger_threshold_units = trigger_threshold_units, \
-                                    plot_filetype_extension=plot_filetype_extension, image_path = image_path,
+                                    plot_filetype_extension=plot_filetype_extension, image_path = os.path.expandvars(image_path),
                                     random_time_offset = random_time_offsets[ii],\
                                     dc_offset = dc_offsets[ii], do_beamforming = self.do_beamforming, output_all_solutions = output_all_solutions,
                                     pre_trigger_angle = pre_trigger_angle, event_seed = event_seeds[ii]))
@@ -1790,7 +1805,7 @@ class Sim:
                     = self.event(energy_neutrinos[ii], phi_0[ii], theta_0[ii], x_0[ii], y_0[ii], z_0[ii], \
                                 ii,inelasticity[ii], anti=anti, include_noise = include_noise,plot_signals=plot_signals,plot_geometry=plot_geometry,\
                                 summed_signals = summed_signals,trigger_threshold = trigger_threshold, trigger_threshold_units = trigger_threshold_units, \
-                                plot_filetype_extension=plot_filetype_extension, image_path = image_path,
+                                plot_filetype_extension=plot_filetype_extension, image_path = os.path.expandvars(image_path),
                                 random_time_offset = random_time_offsets[ii],\
                                 dc_offset = dc_offsets[ii], do_beamforming = self.do_beamforming, output_all_solutions = output_all_solutions,
                                 pre_trigger_angle = pre_trigger_angle, event_seed = event_seeds[ii])
@@ -1990,7 +2005,7 @@ if __name__ == '__main__':
                                                                                     n_events,
                                                                                     index)
         print('Outfile Name: \n', outfile)
-
+    outfile = os.path.expandvars(outfile)
     if os.path.isfile(outfile):
         #print('Outfile Name %s is taken, saving in current directory and appending \'_new\' if necessary'%(outfile))
         #outfile = './' + outfile.split('/')[-1]
@@ -1999,7 +2014,7 @@ if __name__ == '__main__':
             outfile = outfile.replace('.h5','_new.h5')
     
     #making image directory
-    image_path = sim_config['image_path_root'] + outfile.replace('.h5','').split('/')[-1] #should end with a / before inputting into throw
+    image_path = os.path.expandvars(sim_config['image_path_root']) + outfile.replace('.h5','').split('/')[-1] #should end with a / before inputting into throw
     if os.path.exists(image_path):
         print('Image Directory Name %s is taken, saving in current directory and appending \'_new\' if necessary'%(image_path))
         image_path = image_path + '_new'
@@ -2011,7 +2026,7 @@ if __name__ == '__main__':
     print('Images will be saved to ', image_path)
 
     #Creating Sim and throwing events
-    my_sim = Sim(station_config, solutions=numpy.array(sim_config['solutions']),electric_field_domain = sim_config['electric_field_domain'],do_beamforming = sim_config['do_beamforming'],sim_config = sim_config)
+    my_sim = Sim(station_config, solutions=numpy.array(sim_config['solutions']),electric_field_domain = sim_config['electric_field_domain'],do_beamforming = sim_config['do_beamforming'],sim_config = sim_config, pre_split = sim_config['pre_split'], load_lib = True)
 
     sys.stdout.flush()
     my_sim.throw(   energy_neutrino,
@@ -2022,7 +2037,6 @@ if __name__ == '__main__':
                     seed                    = seed, 
                     include_noise           = sim_config['include_noise'],
                     summed_signals          = sim_config['summed_signals'],
-                    pre_split               = sim_config['pre_split'],
                     plot_geometry           = sim_config['plot_geometry'],
                     plot_signals            = sim_config['plot_signals'],
                     trigger_threshold       = sim_config['trigger_threshold'],

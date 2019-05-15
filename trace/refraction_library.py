@@ -1175,103 +1175,109 @@ class RefractionLibrary:
             Plots the hulls.  (Default is False).
         '''
 
-
-        out_dir = out_dir + '/concave_hull'
-        os.mkdir(out_dir)
-        legend_locs = {'direct':'upper right','cross':'upper right','reflect':'upper right','direct_2':'lower right','cross_2':'lower right','reflect_2':'lower right'}        
-        concave_hull = getConcaveHullStarter()
-            
-        for solution in self.solutions:
-            if verbose:
-                print('\tSolution Type: %10s \tNumber of points: %i'%( solution , len(self.data[solution]['z'])))
-            if (len(self.data[solution]['z']) == 0):
-                print('\tNot enough points, returning 0 value hull')
-                z_out = [0]
-                r_out = [0]
-                z_in = [0]
-                r_in = [0]
-                concave_hull[solution]['z_inner_r_bound'] = z_in
-                concave_hull[solution]['r_inner_r_bound'] = r_in
-                concave_hull[solution]['z_outer_r_bound'] = z_out
-                concave_hull[solution]['r_outer_r_bound'] = r_out
-                concave_hull[solution]['z_min'] = 0
-                concave_hull[solution]['z_max'] = 0
-            else:
-                test_z = self.data[solution]['z']
-                test_r = self.data[solution]['r']
+        if os.path.expandvars(out_dir)[-1] == '/':
+            out_dir = os.path.expandvars(out_dir) + 'concave_hull'
+        else:
+            out_dir = os.path.expandvars(out_dir) + '/concave_hull'
+        try:
+            os.mkdir(out_dir)
+            legend_locs = {'direct':'upper right','cross':'upper right','reflect':'upper right','direct_2':'lower right','cross_2':'lower right','reflect_2':'lower right'}        
+            concave_hull = getConcaveHullStarter()
                 
-                z_bins = numpy.linspace(min(test_z),max(test_z),concave_hull[solution]['n_bins'])
-                z_out = numpy.zeros(concave_hull[solution]['n_bins']-1)
-                r_out = numpy.zeros(concave_hull[solution]['n_bins']-1)
-                z_in = numpy.zeros(concave_hull[solution]['n_bins']-1)
-                r_in = numpy.zeros(concave_hull[solution]['n_bins']-1)
+            for solution in self.solutions:
+                if verbose:
+                    print('\tSolution Type: %10s \tNumber of points: %i'%( solution , len(self.data[solution]['z'])))
+                if (len(self.data[solution]['z']) == 0):
+                    print('\tNot enough points, returning 0 value hull')
+                    z_out = [0]
+                    r_out = [0]
+                    z_in = [0]
+                    r_in = [0]
+                    concave_hull[solution]['z_inner_r_bound'] = z_in
+                    concave_hull[solution]['r_inner_r_bound'] = r_in
+                    concave_hull[solution]['z_outer_r_bound'] = z_out
+                    concave_hull[solution]['r_outer_r_bound'] = r_out
+                    concave_hull[solution]['z_min'] = 0
+                    concave_hull[solution]['z_max'] = 0
+                else:
+                    test_z = self.data[solution]['z']
+                    test_r = self.data[solution]['r']
+                    
+                    z_bins = numpy.linspace(min(test_z),max(test_z),concave_hull[solution]['n_bins'])
+                    z_out = numpy.zeros(concave_hull[solution]['n_bins']-1)
+                    r_out = numpy.zeros(concave_hull[solution]['n_bins']-1)
+                    z_in = numpy.zeros(concave_hull[solution]['n_bins']-1)
+                    r_in = numpy.zeros(concave_hull[solution]['n_bins']-1)
+                    
+                    #tz = numpy.tile(test_z,(len(z_bins)-1,1))
+                    #bz = numpy.tile(z_bins, (len(test_z),1)).T
+                    #cut = numpy.logical_and(numpy.greater_equal(tz, bz[0:-1]),numpy.less_equal(tz , bz[1:]))
+                    #use_in_interp = numpy.where(numpy.sum(cut,axis=1)!=0)[0]
+                    use_in_interp = numpy.zeros(concave_hull[solution]['n_bins']-1,dtype=bool)               
+                    for bin in range(1,concave_hull[solution]['n_bins']):
+                        cut = numpy.logical_and(numpy.greater_equal(test_z, z_bins[bin-1]),numpy.less_equal(test_z, z_bins[bin]))
+                        use_in_interp[bin-1] = numpy.any(cut)
+                        if use_in_interp[bin-1] == True:
+                            r_out[bin-1] = max(test_r[cut])
+                            r_in[bin-1] = min(test_r[cut])
+                            z_in[bin-1] = max(numpy.unique(test_z[cut][ numpy.where(test_r[cut] == r_in[bin-1])]))
+                            z_out[bin-1] = max(numpy.unique(test_z[cut][ numpy.where(test_r[cut] == r_out[bin-1])]))
+                            if (bin == concave_hull[solution]['n_bins']-1):
+                                #shallowest
+                                #print('Trying to adjust shallowest')
+                                r_out[bin-1] = max(test_r[numpy.isclose(test_z,max(test_z),atol = 0.5)])
+                                z_out[bin-1] = max(test_z)
+                    #These could be calculated and stored in the original h5 file, then called to make interp1d and max/min within the library, this would save time.
+                    z_out = z_out[use_in_interp]
+                    r_out = r_out[use_in_interp]
+                    z_in = z_in[use_in_interp]
+                    r_in = r_in[use_in_interp]
+                    
+                    #concave_hull[solution]['f_inner_r_bound'] = scipy.interpolate.interp1d(z_in,r_in,bounds_error=False,fill_value = (r_in[0],r_in[-1])) #fill_value=max(r_in))#,kind='cubic') #given z, give r, want big value for fill, because this is region where solution shouldn't exist, so a test of is this > f_in then solution should be false
+                    #concave_hull[solution]['f_outer_r_bound'] = scipy.interpolate.interp1d(z_out,r_out,bounds_error=False,fill_value = (r_out[0],r_out[-1]))# fill_value=min(r_out))#,kind='cubic') These make boundaries weird but I think are a necessary evil?  Unless I match each with an z_min, z_max?  Could do....,  I can give interp1d two fill values so it fits well up to min/max z
+                    #TODO: Define a special case here for uniform ice where it just sets the hull as straight vertical lines at 0 and r_sim
+                    concave_hull[solution]['z_inner_r_bound'] = z_in
+                    concave_hull[solution]['r_inner_r_bound'] = r_in
+                    concave_hull[solution]['z_outer_r_bound'] = z_out
+                    concave_hull[solution]['r_outer_r_bound'] = r_out
+                    
+                    concave_hull[solution]['z_min'] = min(z_in[0],z_out[0])
+                    concave_hull[solution]['z_max'] = max(z_in[-1],z_out[-1])
+                    
+                if plot_hulls:
+                    fig1, ax1 = pylab.subplots()
+                    if numpy.logical_and((len(self.data[solution]['r']) != 0),(len(self.data[solution]['z']) != 0)):
+                        pylab.scatter(self.data[solution]['r'],self.data[solution]['z'],c='k',s=1,label='Trace Library Points')
+                    pylab.xlabel('r(m)',fontsize=20)
+                    pylab.ylabel('z(m)',fontsize=20)
+                    pylab.title('Convex Hull for %s'%(solution),fontsize=20)
+                    pylab.scatter(concave_hull[solution]['r_outer_r_bound'],concave_hull[solution]['z_outer_r_bound'],c='r',label = 'Points Used To\nCreate Outter Bound' )
+                    pylab.scatter(concave_hull[solution]['r_inner_r_bound'],concave_hull[solution]['z_inner_r_bound'],c='b',label = 'Points Used To\nCreate Inner Bound')
+                    lines = pylab.hlines([concave_hull[solution]['z_min'],concave_hull[solution]['z_max']],ax1.get_xlim()[0],ax1.get_xlim()[1],lw='1.5',colors='r',linestyles = 'dotted',label='Accepted Depth Window')
+                    
+                    pylab.legend(loc = legend_locs[solution],fontsize=16)
                 
-                #tz = numpy.tile(test_z,(len(z_bins)-1,1))
-                #bz = numpy.tile(z_bins, (len(test_z),1)).T
-                #cut = numpy.logical_and(numpy.greater_equal(tz, bz[0:-1]),numpy.less_equal(tz , bz[1:]))
-                #use_in_interp = numpy.where(numpy.sum(cut,axis=1)!=0)[0]
-                use_in_interp = numpy.zeros(concave_hull[solution]['n_bins']-1,dtype=bool)               
-                for bin in range(1,concave_hull[solution]['n_bins']):
-                    cut = numpy.logical_and(numpy.greater_equal(test_z, z_bins[bin-1]),numpy.less_equal(test_z, z_bins[bin]))
-                    use_in_interp[bin-1] = numpy.any(cut)
-                    if use_in_interp[bin-1] == True:
-                        r_out[bin-1] = max(test_r[cut])
-                        r_in[bin-1] = min(test_r[cut])
-                        z_in[bin-1] = max(numpy.unique(test_z[cut][ numpy.where(test_r[cut] == r_in[bin-1])]))
-                        z_out[bin-1] = max(numpy.unique(test_z[cut][ numpy.where(test_r[cut] == r_out[bin-1])]))
-                        if (bin == concave_hull[solution]['n_bins']-1):
-                            #shallowest
-                            #print('Trying to adjust shallowest')
-                            r_out[bin-1] = max(test_r[numpy.isclose(test_z,max(test_z),atol = 0.5)])
-                            z_out[bin-1] = max(test_z)
-                #These could be calculated and stored in the original h5 file, then called to make interp1d and max/min within the library, this would save time.
-                z_out = z_out[use_in_interp]
-                r_out = r_out[use_in_interp]
-                z_in = z_in[use_in_interp]
-                r_in = r_in[use_in_interp]
+                #save data into outdir
+                outname = out_dir + '/concave_hull_data_' + solution + '.h5'
+                outfile  = h5py.File(outname, 'w')
+                outfile.attrs['z_min'] = concave_hull[solution]['z_min']
+                outfile.attrs['z_max'] = concave_hull[solution]['z_max']
                 
-                #concave_hull[solution]['f_inner_r_bound'] = scipy.interpolate.interp1d(z_in,r_in,bounds_error=False,fill_value = (r_in[0],r_in[-1])) #fill_value=max(r_in))#,kind='cubic') #given z, give r, want big value for fill, because this is region where solution shouldn't exist, so a test of is this > f_in then solution should be false
-                #concave_hull[solution]['f_outer_r_bound'] = scipy.interpolate.interp1d(z_out,r_out,bounds_error=False,fill_value = (r_out[0],r_out[-1]))# fill_value=min(r_out))#,kind='cubic') These make boundaries weird but I think are a necessary evil?  Unless I match each with an z_min, z_max?  Could do....,  I can give interp1d two fill values so it fits well up to min/max z
-                #TODO: Define a special case here for uniform ice where it just sets the hull as straight vertical lines at 0 and r_sim
-                concave_hull[solution]['z_inner_r_bound'] = z_in
-                concave_hull[solution]['r_inner_r_bound'] = r_in
-                concave_hull[solution]['z_outer_r_bound'] = z_out
-                concave_hull[solution]['r_outer_r_bound'] = r_out
+                outfile.create_dataset('z_inner_r_bound', (len(z_in),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+                outfile.create_dataset('r_inner_r_bound', (len(r_in),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+                outfile.create_dataset('z_outer_r_bound', (len(z_out),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+                outfile.create_dataset('r_outer_r_bound', (len(r_out),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
                 
-                concave_hull[solution]['z_min'] = min(z_in[0],z_out[0])
-                concave_hull[solution]['z_max'] = max(z_in[-1],z_out[-1])
+                outfile['z_inner_r_bound'][...] = concave_hull[solution]['z_inner_r_bound']
+                outfile['r_inner_r_bound'][...] = concave_hull[solution]['r_inner_r_bound']
+                outfile['z_outer_r_bound'][...] = concave_hull[solution]['z_outer_r_bound']
+                outfile['r_outer_r_bound'][...] = concave_hull[solution]['r_outer_r_bound']
                 
-            if plot_hulls:
-                fig1, ax1 = pylab.subplots()
-                if numpy.logical_and((len(self.data[solution]['r']) != 0),(len(self.data[solution]['z']) != 0)):
-                    pylab.scatter(self.data[solution]['r'],self.data[solution]['z'],c='k',s=1,label='Trace Library Points')
-                pylab.xlabel('r(m)',fontsize=20)
-                pylab.ylabel('z(m)',fontsize=20)
-                pylab.title('Convex Hull for %s'%(solution),fontsize=20)
-                pylab.scatter(concave_hull[solution]['r_outer_r_bound'],concave_hull[solution]['z_outer_r_bound'],c='r',label = 'Points Used To\nCreate Outter Bound' )
-                pylab.scatter(concave_hull[solution]['r_inner_r_bound'],concave_hull[solution]['z_inner_r_bound'],c='b',label = 'Points Used To\nCreate Inner Bound')
-                lines = pylab.hlines([concave_hull[solution]['z_min'],concave_hull[solution]['z_max']],ax1.get_xlim()[0],ax1.get_xlim()[1],lw='1.5',colors='r',linestyles = 'dotted',label='Accepted Depth Window')
-                
-                pylab.legend(loc = legend_locs[solution],fontsize=16)
-            
-            #save data into outdir
-            outname = out_dir + '/concave_hull_data_' + solution + '.h5'
-            outfile  = h5py.File(outname, 'w')
-            outfile.attrs['z_min'] = concave_hull[solution]['z_min']
-            outfile.attrs['z_max'] = concave_hull[solution]['z_max']
-            
-            outfile.create_dataset('z_inner_r_bound', (len(z_in),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            outfile.create_dataset('r_inner_r_bound', (len(r_in),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            outfile.create_dataset('z_outer_r_bound', (len(z_out),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            outfile.create_dataset('r_outer_r_bound', (len(r_out),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
-            
-            outfile['z_inner_r_bound'][...] = concave_hull[solution]['z_inner_r_bound']
-            outfile['r_inner_r_bound'][...] = concave_hull[solution]['r_inner_r_bound']
-            outfile['z_outer_r_bound'][...] = concave_hull[solution]['z_outer_r_bound']
-            outfile['r_outer_r_bound'][...] = concave_hull[solution]['r_outer_r_bound']
-            
-            outfile.close()
-        self.concave_hull = concave_hull
+                outfile.close()
+            self.concave_hull = concave_hull
+        except Exception as e:
+            print('Error in saveEnvelope')
+            print(e)
 
     def loadEnvelope(self, in_dir, store_fit_data=False):
         '''
