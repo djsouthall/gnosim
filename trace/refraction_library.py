@@ -1042,7 +1042,8 @@ class RefractionLibrary:
                             else:
                                 old_key = key
                             # Upward-going rays from reflection off ice-water interface 
-                            self.data['reflect_2'][key].append(reader[old_key][cut])
+                            if numpy.isin('reflect_2', list(self.data.keys())):
+                                self.data['reflect_2'][key].append(reader[old_key][cut])
                     else:
                         # No reflection off ice-water interface
                         cut = numpy.zeros(n, bool)
@@ -1082,7 +1083,8 @@ class RefractionLibrary:
                             else:
                                 old_key = key
                             # Upward-going rays after reflection off ice-water interface 
-                            self.data['direct_2'][key].append(reader[old_key][cut])
+                            if numpy.isin('direct_2', list(self.data.keys())):
+                                self.data['direct_2'][key].append(reader[old_key][cut])
                     else:
                         # No reflection off ice-water interface
                         cut = numpy.ones(n, bool)
@@ -1113,14 +1115,15 @@ class RefractionLibrary:
 
             print ('Sort solutions...')
 
-            if len(self.data['direct_2']['t']) > 0:
-                theta_ant_divide = self.data['direct']['theta_ant'][numpy.argmax(self.data['direct']['r'])]
-                cut = self.data['direct_2']['theta_ant'] < theta_ant_divide
-                for key in self.keys:
-                    self.data['cross_2'][key] = self.data['direct_2'][key][cut]
-                cut = numpy.logical_not(cut)
-                for key in self.keys:
-                    self.data['direct_2'][key] = self.data['direct_2'][key][cut]
+            if numpy.isin('direct_2', list(self.data.keys())):
+                if len(self.data['direct_2']['t']) > 0:
+                    theta_ant_divide = self.data['direct']['theta_ant'][numpy.argmax(self.data['direct']['r'])]
+                    cut = self.data['direct_2']['theta_ant'] < theta_ant_divide
+                    for key in self.keys:
+                        self.data['cross_2'][key] = self.data['direct_2'][key][cut]
+                    cut = numpy.logical_not(cut)
+                    for key in self.keys:
+                        self.data['direct_2'][key] = self.data['direct_2'][key][cut]
             
         else:
             #Below is what happens if the solution types are already sorted into subfolders
