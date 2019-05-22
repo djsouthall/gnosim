@@ -124,7 +124,7 @@ class Station:
     Antenna
     gnosim.detector.fpga
     '''
-    def __init__(self, station_key, config, solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']), electric_field_domain = 'time'):
+    def __init__(self, station_key, config, solutions = numpy.array(['direct', 'cross', 'reflect', 'direct_2', 'cross_2', 'reflect_2']), electric_field_domain = 'time'):        
         self.label = station_key
         self.config = config['stations'][self.label]
         self.x = self.config['position'][0]
@@ -526,7 +526,7 @@ def getAcceptedAntennaTypes():
     accepted_types : numpy.ndarray of floats
         A list of the accepted antenna types (labels).
     '''
-    accepted_types = numpy.array(['simple', 'dipole','old_dipole'])
+    accepted_types = numpy.array(['simple', 'dipole','old_dipole', 'angular_dependent'])
     return accepted_types
 
 class Antenna:
@@ -679,7 +679,7 @@ class Antenna:
             print('Selection of antenna type did not match predefined values.  Using default type:')
             self.antenna_type = accepted_types[0]
             print(self.antenna_type)
-
+    
         self.accepted_solutions = gnosim.trace.refraction_library.getAcceptedSolutions()
 
         # List attributes of interest
@@ -856,6 +856,53 @@ class Antenna:
             self.concave_hull[dkey]['f_inner_r_bound'] = chull[dkey]['f_inner_r_bound']
             self.concave_hull[dkey]['f_outer_r_bound'] = chull[dkey]['f_outer_r_bound']
 
+
+    def loadAngularAntennaResponse(self, angle=90.0, mode='vpol'):
+        '''
+        Loads antenna impulse response (related to gain) for a given angle. 
+
+        Parameters
+        ----------
+        angle : float
+            Incident observed angle in degrees
+        
+        mode : str, optional
+            The label for a particular response function loading operation.  (Default is 'vpol').
+            Currently unused parameter.
+        
+        '''    
+
+        # Various Failure modes. 
+        if(numpy.isnan(angle)):
+            print(angle, "is nan. Using 90. ")
+            angle = 90.0
+        else:
+            if(angle < 0.0):
+                print(angle, "is less than 0. Taking Absolute value. ")
+                angle = numpy.abs(angle)
+            if(angle > 180.0):
+                print(angle, "is greater than 180.")
+                while(angle > 180.0): 
+                    angle -= 180.0
+
+        # Find index based on given angle. 
+        entry_1 = int(numpy.floor(angle/10.0))
+        entry_2 = int(numpy.ceil(angle/10.0))
+        weight_1 = 1.0 - numpy.abs(angle - entry_1*10.0)/10.0
+        weight_2 = 1.0 - weight_1
+
+        # Various failure modes.
+        if(entry_2 > 18): 
+            print(entry_2, "is too high, out of range. ")
+            entry_1 = 18
+            weight_1 = 1.0
+            entry_2 = 18
+            weight_2 = 0.0
+        
+        # Return the linear interpolation
+        self.h_fft = (self.response_vs_angle[entry_1]*weight_1 + self.response_vs_angle[entry_2]*weight_2) / 2.0
+        self.freqs_response = self.response_freqs  # Terrible naming scheme
+
     def addTimingInfo(self, system_response_dir, antenna_response_dir):
         '''
         This loads the system response, antenna response, and corresponding frequencies, 
@@ -875,20 +922,36 @@ class Antenna:
         gnosim.sim.response
         '''
         self.antenna_response_dir = os.path.expandvars(antenna_response_dir)
+
         self.system_response_dir = os.path.expandvars(system_response_dir)
-
-        antenna_response = numpy.load(self.antenna_response_dir)
         electronic_response = numpy.load(self.system_response_dir)
-
-        freqs, h_fft = numpy.hsplit(antenna_response, 2)
         freqs, sys_fft = numpy.hsplit(electronic_response, 2)
-        self.h_fft = numpy.ravel(h_fft)
         self.sys_fft = numpy.ravel(sys_fft)
         self.freqs_response =  numpy.absolute(numpy.ravel(freqs).astype(float))
-
         t_step = 1/(2*max(self.freqs_response))*1e9 #ns
         self.signal_times = numpy.arange(-(len(self.freqs_response)-1),(len(self.freqs_response)-1))*t_step #To increase time duration of signal I should just need to upsample?
 
+        # If antenna is angularly dependent, going to load G_realized(f, theta) into memory. 
+        if(self.antenna_type == 'angular_dependent'):
+
+            # Cheap way to check if the file type is correct
+            if not("npz" in self.antenna_response_dir):
+                print("Angularly dependent antenna type selected but no response file / wrong file specified. Using defult type:")
+                self.antenna_type = accepted_types[0]
+                print(self.antenna_type)
+            else:
+                response_file = numpy.load(self.antenna_response_dir)
+                self.response_vs_angle = response_file['response_vs_angle']
+                self.response_freqs = response_file['desired_freqs']
+                self.response_angs = response_file['response_angs']
+
+            self.loadAngularAntennaResponse()
+
+        else:
+            self.antenna_response_dir = os.path.expandvars(antenna_response_dir)
+            antenna_response = numpy.load(self.antenna_response_dir)
+            freqs, h_fft = numpy.hsplit(antenna_response, 2)
+            self.h_fft = numpy.ravel(h_fft)
 
     def calculateNoiseRMS(self):
         '''
@@ -1113,6 +1176,36 @@ class Antenna:
                 return signal_reduction_factor, polarization_dot_factor, beam_pattern_factor, attenuation_factor, dot_angle, numpy.zeros(3), numpy.zeros(3) #Zeros on the end are for vectors ot being calculated but expected at oupput.
             else:
                 return signal_reduction_factor, polarization_dot_factor, beam_pattern_factor, attenuation_factor, dot_angle
+        elif(self.antenna_type == 'angular_dependent'):
+
+            #####
+            #Generic calculations helpful for many antenna types
+            #####
+            
+            if return_polarizations == True:
+                polarization_unit_vector_1_ice_frame, attenuation_factor, polarization_unit_vector_0_ice_frame = gnosim.interaction.polarization.getPolarizationAtAntenna(vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , a_s , a_p, return_initial_polarization = True)            #This is for a vpol antenna. which is sensitive at polls,  
+            else:
+                polarization_unit_vector_1_ice_frame, attenuation_factor = gnosim.interaction.polarization.getPolarizationAtAntenna(vec_neutrino_travel_dir , emission_wave_vector , detection_wave_vector , a_s , a_p)            #This is for a vpol antenna. which is sensitive at polls, 
+
+            polarization_vector_1_antenna_frame = self.antennaFrameCoefficients(polarization_unit_vector_1_ice_frame)
+            detection_wave_vector_antenna_frame = self.antennaFrameCoefficients(detection_wave_vector)
+
+            #####
+            #Specific calculations for this antenna type
+            #####
+
+            dipole_polarization_axis_antenna_frame = numpy.array([0.0,0.0,1.0]) #Fully sensitive if aligned with z-axis of antenna Must be unit vector!!
+            polarization_dot_factor = numpy.dot(polarization_vector_1_antenna_frame,dipole_polarization_axis_antenna_frame) 
+            
+            dot_angle = numpy.rad2deg(numpy.arccos(polarization_dot_factor / (numpy.linalg.norm(polarization_vector_1_antenna_frame))))
+
+            beam_pattern_factor = 1.0 # Reduction is done in full antenna beam pattern
+            signal_reduction_factor = polarization_dot_factor*beam_pattern_factor*attenuation_factor
+            if return_polarizations == True:
+                return signal_reduction_factor, polarization_dot_factor, beam_pattern_factor, attenuation_factor, dot_angle, polarization_unit_vector_1_ice_frame, polarization_unit_vector_0_ice_frame
+            else:
+                return signal_reduction_factor, polarization_dot_factor, beam_pattern_factor, attenuation_factor, dot_angle
+            
         else:
             print('ANTENNA TYPE NOT FOUND IN ACCEPTED ANTENNAS, RETURNING 1')
             

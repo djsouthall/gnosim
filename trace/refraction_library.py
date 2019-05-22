@@ -1387,7 +1387,7 @@ class RefractionLibrary:
         z_intersect = numpy.array(z_intersect)
         dic_direct = {}
         dic_cross = {}
-        cross_cut = numpy.zeros(len(dic[self.keys[0]][...]),dtype=bool)
+        cross_cut = numpy.zeros(len(dic[self.keys[0]]),dtype=bool)
         cross_cut[select_cross] = True
         if len(r_intersect) == 0:
             # No intersections found, so do nothing
