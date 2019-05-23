@@ -577,7 +577,9 @@ The below section discusses the usage of the simulation code.  The general topic
             This should be the address of the simulation file.  For example:
                 ./gnosim/sim/sim_settings.py
         ENERGY_NEUTRINO : float
-            This is the energy of the neutrinos to be thrown.  Given in GeV.  
+            This is the energy of the neutrinos to be thrown.  Given in GeV.  Note that in practice within the simulation the energy
+            that actually goes into the calculation of the Askaryan radiation is a reduced energy that accounts for inelasticity of
+            the interaction in the ice. 
         N_EVENTS : int
             The number of neutrinos to throw for this simulation.
         INDEX : int
@@ -806,9 +808,13 @@ The below section discusses the usage of the simulation code.  The general topic
 
         Datasets
         --------
-
+        'event_seeds' : int
+            The seeds that set the states of the random objects to be used internally for each event, allowing it to be reproducable regardless 
+            of the number of times random calls were made externally.  This is calculated using 
+            numpy.random.randint(numpy.iinfo(numpy.uint32).max,size=self.n_events), where the seed of this random call is set by the simulation 
+            seed.
         'energy_neutrino' : float
-            Energy of each event.  Given in GeV.  Length is n_events.
+            Energy of each event.  Given in GeV.  Length is n_events.  This is the full energy before inelasticity is accounted for.
         'inelasticity' : float
             Inelasticity of each event.  Length is n_events.
         'x_0' : float
@@ -833,42 +839,6 @@ The below section discusses the usage of the simulation code.  The general topic
             A bool for each event signifying if the event is observable (meaning there is at least one ray connecting the neutrino interaction
             site an antenna in the array).  True if the event is observable at all (i.e. has at least one solution type visible across the array).
             Length is n_events.
-        'index_station' : int
-            The index of the station for which the maximum signal strength was measured per event.  Length is n_events.
-        'index_antenna' : float
-            The index of the antenna within the above station for which the maximum signal strength was measured per event.  Length is n_events.
-        'electric_field' : float
-            The maximum measured signal strength across the entire array for each event.  Given in V.  Length is n_events.
-        'observation_angle' : float
-            The polar angle at which the ray with the maximum measured signal hit the antenna it was measured at for each event.  Given in degrees.
-              Length is n_events.
-        'solution' : int
-            The index of solution type of the maximum signal for each event.  This index corresponds the ordering of the input solution types.
-            Solution types for each event are better viewed in the 'info' dataset.  Length is n_events.
-        't' : float
-            The time of flight for the maximum amplitude signal.  Given in ns.  Length is n_events.
-        'd' : float
-            The distance traveled by the maximum amplitude signal.  Given in m.  Length is n_events.
-        'theta_ray' : float
-            The spherical polar coordinate of the momentum vector of the ray pointing along the ray towards the neutrino event in the ice frame
-            at the neutrino.
-            In other words: The spherical polar angle of the direction of the ray connecting the neutrino and the antenna as interpolated to 
-            be at the neutrino interaction location.  This points in the opposite direction of the pulse travel direction (i.e. opposite to 'towards
-            the antenna from the neutrino').  Corresponds to max signal.  Given in degrees.  Length is n_events.
-        'theta_ant' : float
-            The spherical polar coordinate of the momentum vector of the ray pointing along the ray towards the neutrino event in the ice frame
-            at the antenna.
-            In other words: The spherical polar angle of the direction of the ray connecting the neutrino and the antenna as interpolated to 
-            be at the antenna location.  This points in the opposite direction of the pulse travel direction (i.e. opposite to 'towards
-            the antenna from the neutrino').  Corresponds to max signal.  Given in degrees.  Length is n_events.
-        a_p : float
-            p polarization attenuation factor.  Includes effects from general attenuation in ice due to attenuation length (currently only for 300 MHz), 
-            as well as reduction in signal resulting from Fresnel coefficients (as well as sign flips resulting from Fresnel amplitudes). 
-            Corresponds to max signal.  Length is n_events.
-        a_s : float
-            s polarization attenuation factor.  Includes effects from general attenuation in ice due to attenuation length (currently only for 300 MHz), 
-            as well as reduction in signal resulting from Fresnel coefficients (as well as sign flips resulting from Fresnel amplitudes). 
-            Corresponds to max signal.  Length is n_events.
         'random_time_offsets' : float
             A small random jitter in timing to ensure that no systematic error is introduced from perfect timing in the MC simulation.  
             Given in ns.  Length is n_events.

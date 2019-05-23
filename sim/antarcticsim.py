@@ -1709,7 +1709,7 @@ class Sim:
                 self.file.attrs['pre_trigger_angle'] = pre_trigger_angle
 
             self.file.create_dataset('event_seeds', (self.n_events,), dtype=numpy.uint32, compression='gzip', compression_opts=9, shuffle=True)
-            self.file.create_dataset('energy_neutrino', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
+            self.file.create_dataset('energy_neutrino', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True) #This probably doesn't need to be an output value for each event.
             self.file.create_dataset('inelasticity', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             self.file.create_dataset('x_0', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             self.file.create_dataset('y_0', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)

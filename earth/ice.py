@@ -565,6 +565,9 @@ class Ice:
 if __name__ == "__main__":
     z = numpy.linspace(-3000., 100., 10000) # Array of elevations (m)
     ice_antarctica = Ice('antarctica')
+    index_of_refraction_at_neutrino = ice_antarctica.indexOfRefraction(-173.0)
+    cherenkov_angle_deg = numpy.rad2deg(numpy.arccos(1./index_of_refraction_at_neutrino))
+    print(cherenkov_angle_deg)
     ice_ross = Ice('ross')
     ice_greenland = Ice('greenland')
     ice_parametric = Ice('parametric_greenland')
