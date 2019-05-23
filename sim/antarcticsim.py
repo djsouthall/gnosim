@@ -157,6 +157,7 @@ class Sim:
     '''
 
     def __init__(self, station_config,solutions = numpy.array([]),electric_field_domain = 'time',do_beamforming = True, sim_config = None, pre_split = True, load_lib = True):
+
         #pre_split False unless using a library already sorted into different
         #directories by solution type.
         self.pre_split = pre_split
@@ -483,7 +484,7 @@ class Sim:
         #observation_angles = gnosim.utils.linalg.angTwoVec(multi_vector_to_neutrino_source, multi_vector_rays_to_neutrino_at_neutrino) # deg
         observation_angles = gnosim.utils.linalg.angTwoVec(temporary_info['neutrino_travel_dir_vector'], temporary_info['emission_wave_vector']) # deg
         observation_angles[~has_solution_array.astype(bool)] = -999.0
-        
+
         if pre_trigger_angle is None:
             #Pre trigger passes for everything with solution
             pre_triggers = has_solution_array 
@@ -642,6 +643,10 @@ class Sim:
                                     d = temporary_info[ temp_solution_cut ]['distance'] #m
                                     theta_ant_deg = temporary_info[ temp_solution_cut ]['theta_ant'] #deg
 
+                                    # If the antenna type wants a angular-dependant gain pattern as calculated in simulation, load it now
+                                    if(antenna.antenna_type == 'angular_dependent'):
+                                        antenna.loadAngularAntennaResponse(theta_ant_deg)
+
                                     #temporary_info['pol_dot_angle'][temp_solution_cut] = polarization_dot_angle
                                     temporary_info['signal_reduction_factor'][temp_solution_cut], \
                                     temporary_info['polarization_dot_factor'][temp_solution_cut],  \
@@ -658,9 +663,10 @@ class Sim:
                                             self.in_dic_array[station.label][antenna.label][solution]['a_p'][eventid], \
                                             return_polarizations = True)
                                     
-
                                     if self.electric_field_domain == 'time':                                                                        
+
                                         if include_noise == True:
+
                                             #TODO: anything using in_dic_array at this point should use info
                                             u , V_noiseless, dominant_freq, V_noise, SNR = gnosim.interaction.askaryan.quickSignalSingle( numpy.deg2rad(observation_angle),\
                                               temporary_info[ temp_solution_cut ]['distance'],effective_energy_neutrino,index_of_refraction_at_neutrino,\
