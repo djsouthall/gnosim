@@ -71,11 +71,10 @@ if __name__ == "__main__":
     ### Parameters ###
     ###------------###
 
-    infile = os.environ['GNOSIM_DATA'] + '/May3/results_2019_testing_May3_real_config_antarctica_180_rays_signed_fresnel_3.16e+11_GeV_1000000_events_0_seed_1.h5'
+    infile = '/home/dsouthall/scratch-midway2/results_2019_testing_input_event_locations_real_config_antarctica_180_rays_signed_fresnel_1.00e+08_GeV_0_events_1.h5'
     plot_geometry = True
     plot_signals = True
-    choose_n = 2 #How many of the triggered events to run
-    solutions = gnosim.trace.refraction_library.getAcceptedSolutions()[0:3]#numpy.array(['direct'])#gnosim.trace.refraction_library.getAcceptedSolutions()[0:3]
+    choose_n = 1 #How many of the triggered events to run
     trigger_threshold = 0
     trigger_threshold_units = None
     draw_order = 'random' #'ordered'
@@ -86,6 +85,7 @@ if __name__ == "__main__":
 
     reader = h5py.File(infile , 'r')
     info = reader['info'][...]
+    solutions = numpy.array([s.decode() for s in numpy.unique(info['solution'])])#gnosim.trace.refraction_library.getAcceptedSolutions()[0:3]#numpy.array(['direct'])#gnosim.trace.refraction_library.getAcceptedSolutions()[0:3]
 
     ###-----------------###
     ### Performing Cuts ###
@@ -106,13 +106,18 @@ if __name__ == "__main__":
 
     #Standard application
     cut_A = info['has_solution']
-    cut_B = info['triggered']
+    cut_B = info['triggered']#numpy.ones_like(cut_A)#info['triggered']
 
     cut = numpy.logical_and(cut_A,cut_B)
     eventids = numpy.unique(info[cut]['eventid'])
+    #eventids = numpy.array([32])
 
-    if numpy.size(eventids) == 1:
-        eventids = numpy.array([eventids])
+
+    if type(eventids) != numpy.ndarray:
+        if numpy.size(eventids) == 1:
+            eventids = numpy.array([eventids])
+        else:
+            eventids = numpy.array(eventids)
 
     ###----------------###
     ### Picking Events ###
@@ -169,7 +174,6 @@ if __name__ == "__main__":
     ###----------------###
     ### Running Events ###
     ###----------------###
-
     for eventid in do_events:
         print('Attempting event ',eventid)
         event_info = info[info['eventid'] == eventid]

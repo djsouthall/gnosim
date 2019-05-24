@@ -703,11 +703,11 @@ def plotGeometry(stations, neutrino_loc, info, ice, plot3d=False, neutrino_trave
     '''
     if emission_polarization_vecs is not None:
         vector_length = numpy.sqrt(neutrino_loc[0]**2 + neutrino_loc[1]**2)/20.0
-        if numpy.logical_or(sum([len(station.antennas)*len(station.solutions) for station in stations]) != numpy.shape(emission_polarization_vecs)[0],  numpy.shape(emission_polarization_vecs)[1] != 3):
-            print('Dimesions of emission_polarization_vecs did not match requirements.  Skipping.')
+        if numpy.logical_or(len(info) != numpy.shape(emission_polarization_vecs)[0], numpy.logical_or(sum([len(station.antennas)*len(station.solutions) for station in stations]) != numpy.shape(emission_polarization_vecs)[0],  numpy.shape(emission_polarization_vecs)[1] != 3)):
+            print('Dimensions of emission_polarization_vecs did not match requirements.  Skipping.')
             emission_polarization_vecs = None
-        if numpy.logical_or(sum([len(station.antennas)*len(station.solutions) for station in stations]) != numpy.shape(final_polarization_vecs)[0],  numpy.shape(final_polarization_vecs)[1] != 3):
-            print('Dimesions of final_polarization_vecs did not match requirements.  Skipping.')
+        if numpy.logical_or(len(info) != numpy.shape(final_polarization_vecs)[0], numpy.logical_or(sum([len(station.antennas)*len(station.solutions) for station in stations]) != numpy.shape(final_polarization_vecs)[0],  numpy.shape(final_polarization_vecs)[1] != 3)):
+            print('Dimensions of final_polarization_vecs did not match requirements.  Skipping.')
             final_polarization_vecs = None
 
     max_xy = 0.0
@@ -743,57 +743,56 @@ def plotGeometry(stations, neutrino_loc, info, ice, plot3d=False, neutrino_trave
                         ax.view_init(elev = 30.0, azim = phi_throw-90.0)
                 for index_solution, solution in enumerate(ssub_info['solution']):
                     array_wide_solution_index += 1
-                    x, y, z, t, d, phi, theta, a_p, a_s, index_reflect_air, index_reflect_water = rayTrace(antenna_loc, phi_throw, ssub_info['theta_ant'][ssub_info['solution'] == solution],ice, r_limit = 1.001*neutrino_loc_r)
-                    
-                    #The below incidence angles are for the ray going towards the antenna as would be put into snells law.
-                    if index_reflect_air != 0:
-                        incidence_angle_air = 180.0 - theta[index_reflect_air]
-                    else: 
-                        incidence_angle_air = -999.0
-                    if index_reflect_water != 0:
-                        incidence_angle_water = theta[index_reflect_water]
-                    else: 
-                        incidence_angle_water = -999.0
-                    #import pdb
-                    #pdb.set_trace()
-                    
-                    if x[-1] > max_xy:
-                        max_xy = x[-1]
-                    elif x[-1] < min_xy:
-                        min_xy = x[-1]
+                    if ssub_info['has_solution'][ssub_info['solution'] == solution] == True:
+                        x, y, z, t, d, phi, theta, a_p, a_s, index_reflect_air, index_reflect_water = rayTrace(antenna_loc, phi_throw, ssub_info['theta_ant'][ssub_info['solution'] == solution],ice, r_limit = 1.001*neutrino_loc_r)
+                        
+                        #The below incidence angles are for the ray going towards the antenna as would be put into snells law.
+                        if index_reflect_air != 0:
+                            incidence_angle_air = 180.0 - theta[index_reflect_air]
+                        else: 
+                            incidence_angle_air = -999.0
+                        if index_reflect_water != 0:
+                            incidence_angle_water = theta[index_reflect_water]
+                        else: 
+                            incidence_angle_water = -999.0
+                        
+                        if x[-1] > max_xy:
+                            max_xy = x[-1]
+                        elif x[-1] < min_xy:
+                            min_xy = x[-1]
 
-                    if y[-1] > max_xy:
-                        max_xy = y[-1]
-                    elif y[-1] < min_xy:
-                        min_xy = y[-1]
+                        if y[-1] > max_xy:
+                            max_xy = y[-1]
+                        elif y[-1] < min_xy:
+                            min_xy = y[-1]
 
-                    sorted_z = numpy.sort(z)
-                    if sorted_z[-1] > max_z:
-                        max_z = sorted_z[-1]
-                    if sorted_z[0] < min_z:
-                        min_z = sorted_z[0]
+                        sorted_z = numpy.sort(z)
+                        if sorted_z[-1] > max_z:
+                            max_z = sorted_z[-1]
+                        if sorted_z[0] < min_z:
+                            min_z = sorted_z[0]
 
-                    label = ant_label + ' ' + solution.decode() 
-                    if incidence_angle_air != -999.0:
-                        label += '\n$\\theta_\mathrm{air}$ = %0.3f'%incidence_angle_air
-                    if incidence_angle_water != -999.0:
-                        label += '\n$\\theta_\mathrm{water}$ = %0.3f'%incidence_angle_water
+                        label = ant_label + ' ' + solution.decode() 
+                        if incidence_angle_air != -999.0:
+                            label += '\n$\\theta_\mathrm{air}$ = %0.3f'%incidence_angle_air
+                        if incidence_angle_water != -999.0:
+                            label += '\n$\\theta_\mathrm{water}$ = %0.3f'%incidence_angle_water
 
-                    if numpy.isin(solution.decode(),list(linestyle_dict.keys())):
-                        style = linestyle_dict[solution.decode()]
-                    else:
-                        style = '-'
-                    if plot3d == False:
-                        r = numpy.sqrt(x**2 + y**2)
-                        ax.plot(r,z,label=label,color=antenna_colors[index_antenna],linestyle = style,alpha = line_alpha)
-                    else:
-                        ax.plot(x,y,z,label=label,color=antenna_colors[index_antenna],linestyle = style,alpha = line_alpha)
-                        if emission_polarization_vecs is not None:
-                            emission_polarization_vec = vector_length*gnosim.utils.linalg.normalize(emission_polarization_vecs[array_wide_solution_index])
-                            ax.quiver(neutrino_loc[0],neutrino_loc[1],neutrino_loc[2],emission_polarization_vec[0],emission_polarization_vec[1],emission_polarization_vec[2],color=antenna_colors[index_antenna],linestyle = style)
-                        if final_polarization_vecs is not None:
-                            final_polarization_vec = vector_length*gnosim.utils.linalg.normalize(final_polarization_vecs[array_wide_solution_index])
-                            ax.quiver(antenna_loc[0],antenna_loc[1],antenna_loc[2],final_polarization_vec[0],final_polarization_vec[1],final_polarization_vec[2],color=antenna_colors[index_antenna], linestyle = style)
+                        if numpy.isin(solution.decode(),list(linestyle_dict.keys())):
+                            style = linestyle_dict[solution.decode()]
+                        else:
+                            style = '-'
+                        if plot3d == False:
+                            r = numpy.sqrt(x**2 + y**2)
+                            ax.plot(r,z,label=label,color=antenna_colors[index_antenna],linestyle = style,alpha = line_alpha)
+                        else:
+                            ax.plot(x,y,z,label=label,color=antenna_colors[index_antenna],linestyle = style,alpha = line_alpha)
+                            if emission_polarization_vecs is not None:
+                                emission_polarization_vec = vector_length*gnosim.utils.linalg.normalize(emission_polarization_vecs[array_wide_solution_index])
+                                ax.quiver(neutrino_loc[0],neutrino_loc[1],neutrino_loc[2],emission_polarization_vec[0],emission_polarization_vec[1],emission_polarization_vec[2],color=antenna_colors[index_antenna],linestyle = style)
+                            if final_polarization_vecs is not None:
+                                final_polarization_vec = vector_length*gnosim.utils.linalg.normalize(final_polarization_vecs[array_wide_solution_index])
+                                ax.quiver(antenna_loc[0],antenna_loc[1],antenna_loc[2],final_polarization_vec[0],final_polarization_vec[1],final_polarization_vec[2],color=antenna_colors[index_antenna], linestyle = style)
 
                 if plot3d == False:
                     ax.scatter(origin_r,antenna_loc[2],label=ant_label,color=antenna_colors[index_antenna],marker = 'd',s = 100)

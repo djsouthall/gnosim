@@ -1154,6 +1154,7 @@ class Antenna:
             beam_pattern_factor = numpy.sqrt(1.0 - detection_wave_vector_antenna_frame[2]**2.0) #where r is assumed to be 1 because working with unit vectors, #Note for many beam patterns likely want vector point TO observation, i.e. negative of this. But for this calculation is doesn't matter.
             #This is sqrt because it is being applied to the E field NOT the power (power beam pattern is sin2(theta))
             signal_reduction_factor = polarization_dot_factor*beam_pattern_factor*attenuation_factor #ONLY USE THIS FOR CALCULATIONS, AS THE OTHER NUMBERS MIGHT BE PLACEHOLDERS (IN GENERAL).  I.E. TRY NOT TO USE BEAM_PATTERN_FACTOR (E.G.) FOR ANYTHING OTHER THAN STORING IT AFTER OUTPUT BECAUSE DEPENDING ON TYPE OF ANTENNA IT MIGHT BE -999.0
+
             if return_polarizations == True:
                 return signal_reduction_factor, polarization_dot_factor, beam_pattern_factor, attenuation_factor, dot_angle, polarization_unit_vector_1_ice_frame, polarization_unit_vector_0_ice_frame
             else:

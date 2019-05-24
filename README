@@ -63,7 +63,9 @@ The below section discusses the usage of the simulation code.  The general topic
             3.3.1 ..... Info Content Descriptions
             3.3.2 ..... Working with the Info Dataset
         3.4.0 ......... Analysis Scripts
-        3.5.0 ......... Converting Signals to Data-Like Format
+        3.5.0 ......... Utils Scripts
+            3.5.1 ..... Generate Event Orientations
+        3.6.0 ......... Converting Signals to Data-Like Format
 
     4.0.0 ............. Information For Contributors
         
@@ -551,6 +553,12 @@ The below section discusses the usage of the simulation code.  The general topic
                     'detection_wave_vector'
                     'emission_polarization_vector'
                     'detection_polarization_vector'
+        coords : str or None
+            This is the location of a csv file containing the coordinates of neutrinos to be thrown.  If this is given then the number of
+            events thrown will be overidden to match the number of specified coordinates in this file.  To see an example of how such a
+            csv file can be created see gnosim/utils/generate_event_orientations.py.  
+            The columns are expected to be: x_0, y_0, z_0, phi_0, theta_0
+            Definitions of these can be found in the documentation for gnosim.sim.antarcticsim.sim.throw().
 
 
 2.0.0    Running the Simulation
@@ -1036,7 +1044,22 @@ The below section discusses the usage of the simulation code.  The general topic
             hull was being improved but has not been touched since.  The code is still there in case it will some day be 
             adapted for the recent code build.
 
-    3.5.0    Converting Signals to Data-Like Format
+    3.5.0    Utils Scripts
+    -------------------------
+
+        Sometimes a script will be made and added to the utils section rather than analysis, as it is just for general use or is
+        useful before the simulation is run and not necessarily as part of the analysis.  Here are descriptions of some of those
+        scripts.
+
+        3.5.1    Generate Event Orientations
+        ------------------------------------
+
+            Script: gnosim/utils/generate_event_orientations.py 
+            This is a small script which can be used to create a csv file containing coordinates of on-cone neutrino events surrounding
+            chosen antenna locations at a defined radius (either spherical or cylindrical radius).  These location of the csv containing 
+            these coordinates can thn be used as the input parameter 'coords' in sim configuration files.
+
+    3.6.0    Converting Signals to Data-Like Format
     -----------------------------------------------
 
         #TODO: Create a script that can do this.

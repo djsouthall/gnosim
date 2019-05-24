@@ -24,6 +24,7 @@ import pandas
 import time
 import multiprocessing
 import concurrent.futures
+import csv
 
 from multiprocessing import cpu_count
 import threading
@@ -662,7 +663,6 @@ class Sim:
                                             self.in_dic_array[station.label][antenna.label][solution]['a_s'][eventid] , \
                                             self.in_dic_array[station.label][antenna.label][solution]['a_p'][eventid], \
                                             return_polarizations = True)
-                                    
                                     if self.electric_field_domain == 'time':                                                                        
 
                                         if include_noise == True:
@@ -1989,10 +1989,69 @@ if __name__ == '__main__':
 
     sim_config = yaml.load(open(config_file))
 
-    station_config_file = sim_config['station_config_file'] #The dir/filename
+    #Optionally load x_0, y_0, z_0, theta_0, phi_0 from a csv file.
+
+    sys.stdout.flush()
+    if numpy.isin('coords',list(sim_config.keys())):
+        try:
+            print('Attempting to load neutrino coordinates from csv file.')
+            if numpy.char.lower(str(sim_config['coords'])) != 'none':
+                x_0 = []
+                y_0 = []
+                z_0 = []
+                phi_0 = [] #Neutrino source dir
+                theta_0 = [] #Neutrino source dir
+
+                with open(os.path.expandvars(sim_config['coords'])) as csv_file:
+                    csv_reader = csv.reader(csv_file, delimiter=',')
+                    line_count = 0
+                    for row in csv_reader:
+                        if line_count == 0:
+                            print('Reading in coordinates from csv for column names %s'%str(row))
+                            print('Expecting column names: x_0,y_0,z_0,phi_0,theta_0')
+                            line_count += 1
+                        else:
+                            x_0.append(row[0])
+                            y_0.append(row[1])
+                            z_0.append(row[2])
+                            phi_0.append(row[3])
+                            theta_0.append(row[4])
+                            line_count += 1
+                n_events = len(x_0)
+                print('Set n_events to %i'%n_events)
+        except:
+            print('Could not load data.  Defaulting to None and generating random locations.')
+            x_0 = None
+            y_0 = None
+            z_0 = None
+            phi_0 = None
+            theta_0 = None
+    else:
+        print('Using randomly generated neutrino locations.')
+        x_0 = None
+        y_0 = None
+        z_0 = None
+        phi_0 = None
+        theta_0 = None
+
+    '''
+    #Hard coded coordinates.  
+    theta_0                 = numpy.array([35.0,145.0]), #Put as None to not pass values.  Otherwise len must match n_events.
+    phi_0                   = numpy.array([0.0,0.0]), #Put as None to not pass values. Otherwise len must match n_events.
+    x_0                     = numpy.array([10.0,0.0]), #Put as None to not pass values. Otherwise len must match n_events.
+    y_0                     = numpy.array([0.0,0.0]), #Put as None to not pass values. Otherwise len must match n_events.
+    z_0                     = numpy.array([-175.0,-200.0]) 
+    n_events = len(x_0)
+    '''
+
+    #Loading station config file
+
+    station_config_file = os.path.expandvars(sim_config['station_config_file']) #The dir/filename
     station_config = yaml.load(open(station_config_file)) #The dictionary
 
     station_config_file_fix = station_config_file.split('/')[-1].replace('.py','') #The filename (no extension)
+
+    #Naming outfile 
     if sim_config['outfile_dir'][-1] != '/':
         sim_config['outfile_dir'] = sim_config['outfile_dir'] + '/'
 
@@ -2003,6 +2062,7 @@ if __name__ == '__main__':
                                                                                             n_events,
                                                                                             seed,
                                                                                             index)
+        outfile = os.path.expandvars(outfile)
         print('\n\n!!!Using Seed!!! \n\n Seed: ', seed, '\nOutfile Name: \n', outfile)
     else:
         outfile = sim_config['outfile_dir'] + '%s_%s_%.2e_GeV_%i_events_%i.h5'%(    sim_config['outfile_name_root'],
@@ -2010,8 +2070,9 @@ if __name__ == '__main__':
                                                                                     energy_neutrino,
                                                                                     n_events,
                                                                                     index)
+        outfile = os.path.expandvars(outfile)
         print('Outfile Name: \n', outfile)
-    outfile = os.path.expandvars(outfile)
+    
     if os.path.isfile(outfile):
         #print('Outfile Name %s is taken, saving in current directory and appending \'_new\' if necessary'%(outfile))
         #outfile = './' + outfile.split('/')[-1]
@@ -2034,7 +2095,7 @@ if __name__ == '__main__':
     #Creating Sim and throwing events
     my_sim = Sim(station_config, solutions=numpy.array(sim_config['solutions']),electric_field_domain = sim_config['electric_field_domain'],do_beamforming = sim_config['do_beamforming'],sim_config = sim_config, pre_split = sim_config['pre_split'], load_lib = True)
 
-    sys.stdout.flush()
+
     my_sim.throw(   energy_neutrino,
                     n_events                = n_events,
                     detector_volume_radius  = my_sim.station_config['detector_volume']['radius'],
@@ -2054,15 +2115,13 @@ if __name__ == '__main__':
                     output_all_solutions    = sim_config['output_all_solutions'],
                     save_signals            = sim_config['save_signals'],
                     pre_trigger_angle       = sim_config['pre_trigger_angle'] ,
-                    output_fields           = sim_config['output_fields']) #Put as None to not pass values. Otherwise len must match n_events.
+                    output_fields           = sim_config['output_fields'], #Put as None to not pass values. Otherwise len must match n_events.
+                    theta_0 = theta_0,
+                    phi_0 = phi_0,
+                    x_0 = x_0,
+                    y_0 = y_0,
+                    z_0 = z_0)
     
-    '''
-    theta_0                 = numpy.array([35.0,145.0]), #Put as None to not pass values.  Otherwise len must match n_events.
-    phi_0                   = numpy.array([0.0,0.0]), #Put as None to not pass values. Otherwise len must match n_events.
-    x_0                     = numpy.array([10.0,0.0]), #Put as None to not pass values. Otherwise len must match n_events.
-    y_0                     = numpy.array([0.0,0.0]), #Put as None to not pass values. Otherwise len must match n_events.
-    z_0                     = numpy.array([-175.0,-200.0]) 
-    '''
 
     sys.stdout.flush()
     
