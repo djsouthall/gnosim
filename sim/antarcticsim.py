@@ -367,17 +367,32 @@ class Sim:
             Enables beamforming.  (Default is True).
         output_all_solutions : bool, optional
             Enables all solution types to be output, otherwise only the solution type with the maximum signal per antenna is output.  (Default is True).
-        pre_trigger_angle : float, optional
+        pre_trigger_angle : float or list of floats or None, optional
             If given, then a pre trigger will be applied to the event such that calculations of Askaryan radiation/electric field will only be conducted 
             if ANY of the possible solution types (for all antennas and stations) have an observation angle within pre_trigger_angle number of degrees to
             the Cherenkov angle.  Essentially the Cherenkov cone must be observable within the pre trigger angular window from at least one antenna in the
             array in order for the calculations to proceed.
 
+            pre_trigger_angle can be given as a single float (i.e. 10.0), or as a list no more than 2 floats i.e.([5.0,10.0]).  If a single number is given
+            then it will be used for both the upper an lower (relative) bounds of acceptable angles.  If two values are given the the first value will act
+            as the lower (relative) bound, and the second will be used as the upper (relative) bound.  In this case relative mean that the given angle(s)
+            are relative to the cherenkov angle, and will be added or subtracted from it depending on the bound.
+
             i.e. if pre_trigger_angle is 10.0 degrees then signals will only be calculated if one of the solutions was emitted (observed on cone) at an
             angle: theta_c - 10.0 deg < theta_obs < theta_c + 10.0 deg.
 
+            If [5.0,10.0] is given then signals will only be calculated if one of the solutions was emitted (observed on cone) at an
+            angle: theta_c - 5.0 deg < theta_obs < theta_c + 10.0 deg.
+
             If ANY of the solution types of ANY of the antennas in the entire array satisfies the pre trigger, then all calculations for that event proceed, 
-            not just the solution types that independently satisfied the pre trigger threshold.  (Default is None).
+            not just the solution types that independently satisfied the pre trigger threshold.  
+
+            NOTE:  Setting a pre trigger can speed up the code significantly, but it must be done with care or else information may be lost.
+            It is highly recommended that you first run a simulation with you desired settings and pre_trigger_angle set to None.  Then with this
+            preliminary simulation analyse the losses you expect by not computing these angles (using gnosim/analysis/pre_trigger_set_tool.py for example).
+            Then with this knowledge set the pre trigger for future simulations as you see fit.
+
+            (Default is None).
         event_seed : int, optional
             This sets the state of the random object to be used internally for the event, allowing it to be reproducable regardless of the number of times random
             calls were made externally.  In general this should be calculated using numpy.random.randint(numpy.iinfo(numpy.uint32).max,size=self.n_events).
@@ -486,13 +501,23 @@ class Sim:
         observation_angles = gnosim.utils.linalg.angTwoVec(temporary_info['neutrino_travel_dir_vector'], temporary_info['emission_wave_vector']) # deg
         observation_angles[~has_solution_array.astype(bool)] = -999.0
 
-        if pre_trigger_angle is None:
+        if type(pre_trigger_angle) is type(None):
             #Pre trigger passes for everything with solution
             pre_triggers = has_solution_array 
-        else:
+        elif numpy.size(pre_trigger_angle) == 1:
             #Pre trigger passes within angular window
             pre_triggers = numpy.abs(observation_angles - cherenkov_angle_deg) < pre_trigger_angle #True for each solution which has observation within tolerance
             pre_triggers[~has_solution_array.astype(bool)] = 0
+        elif numpy.size(pre_trigger_angle) == 2:
+            #Pre trigger passes within angular window
+            lb =  max(cherenkov_angle_deg - pre_trigger_angle[0],0.0) #If was a negative, will be 0.
+            ub = min(cherenkov_angle_deg + pre_trigger_angle[1], 180.0) #If was greater than 180, replaced with 180.0.
+            pre_triggers = numpy.logical_and( lb <= observation_angles, observation_angles <= ub )  #True for each solution which has observation within tolerance
+            pre_triggers[~has_solution_array.astype(bool)] = 0
+        else:
+            #Defaulting to no pre_trigger
+            print('None of the expected cases given from pre_trigger_angle in event.  Not using pre_trigger.')
+            pre_triggers = has_solution_array 
         
         temporary_info['pre_triggered'] = pre_triggers
         temporary_info['observation_angle'] = observation_angles
@@ -1466,7 +1491,7 @@ class Sim:
             matplotlib currently not being thread safe.  Plots can be generated after the fact. (See gnosim.analysis.testing_single_event.py).
         output_all_solutions : bool, optional
             Enables all solution types to be output, otherwise only the solution type with the maximum signal per antenna is output.  (Default is True).
-        output_fields : list of str, optional
+        output_fields : list of str, or just None, optional
             This should contain a list of the field names you want output.  This is helpful for debugging.  The field names must match those
             found in self.info_dtype.  There are several fields that are required for output as they are necessary to reproduce the others in the case 
             of testing_single_event.py being ran.  The rest are kept internally through the calculation, but are not saved unless specified.  (Default is None,
@@ -1479,14 +1504,22 @@ class Sim:
             this ndarray is the times corresponding to the signals in every other row.  Signals are given in units of adu and times
             in units of ns.
             # TODO: Add a script that converts these to be in the same format as real data taken from an ARA station.
-        pre_trigger_angle : float, optional
+        pre_trigger_angle : float or list of floats or None, optional
             If given, then a pre trigger will be applied to the event such that calculations of Askaryan radiation/electric field will only be conducted 
             if ANY of the possible solution types (for all antennas and stations) have an observation angle within pre_trigger_angle number of degrees to
             the Cherenkov angle.  Essentially the Cherenkov cone must be observable within the pre trigger angular window from at least one antenna in the
             array in order for the calculations to proceed.
 
+            pre_trigger_angle can be given as a single float (i.e. 10.0), or as a list no more than 2 floats i.e.([5.0,10.0]).  If a single number is given
+            then it will be used for both the upper an lower (relative) bounds of acceptable angles.  If two values are given the the first value will act
+            as the lower (relative) bound, and the second will be used as the upper (relative) bound.  In this case relative mean that the given angle(s)
+            are relative to the cherenkov angle, and will be added or subtracted from it depending on the bound.
+
             i.e. if pre_trigger_angle is 10.0 degrees then signals will only be calculated if one of the solutions was emitted (observed on cone) at an
             angle: theta_c - 10.0 deg < theta_obs < theta_c + 10.0 deg.
+
+            If [5.0,10.0] is given then signals will only be calculated if one of the solutions was emitted (observed on cone) at an
+            angle: theta_c - 5.0 deg < theta_obs < theta_c + 10.0 deg.
 
             If ANY of the solution types of ANY of the antennas in the entire array satisfies the pre trigger, then all calculations for that event proceed, 
             not just the solution types that independently satisfied the pre trigger threshold.  
@@ -1521,8 +1554,20 @@ class Sim:
             print('Selection of trigger units did not match predefined values.  Breaking.')
             return
 
-        if type(pre_trigger_angle) is str:
+        if type(pre_trigger_angle) is type(None):
             #Catches pre_trigger_angle = 'None'
+            print('Not using a pre trigger.')
+            pre_trigger_angle = None
+        elif numpy.logical_or(numpy.logical_or(type(pre_trigger_angle) is tuple,type(pre_trigger_angle) is list),type(pre_trigger_angle) is numpy.ndarray):
+            if numpy.size(pre_trigger_angle) > 2:
+                print('pre_trigger_angle must be either a single number or 2 numbers.  Given pre_trigger_angle has size: ', numpy.size(pre_trigger_angle))
+                print('Setting pre_trigger_angle to None')
+                pre_trigger_angle = None
+            else:
+                print('pre_trigger_angle given as:', pre_trigger_angle)
+        else:
+            print('pre_trigger_angle not given in acceptable format.')
+            print('Setting pre_trigger_angle to None')
             pre_trigger_angle = None
         
         self.outfile = outfile
@@ -1656,16 +1701,23 @@ class Sim:
             'a_s',
             'a_p']
 
-        if numpy.size( output_fields ) == 1:
-            if numpy.any(numpy.char.lower(str(output_fields)) == 'none'):
-                info_out_fields = numpy.array(required_fields)
-            elif numpy.any(numpy.char.lower(output_fields) == 'all'):
-                info_out_fields = numpy.array(list(self.info_dtype.names))
-        else:
-            if type(output_fields) is list:
-                output_fields = numpy.array(output_fields)
+
+        if type(output_fields) is list:
+            output_fields = numpy.array(output_fields)
             info_out_fields = numpy.array(list(self.info_dtype.names))[numpy.isin(numpy.array(list(self.info_dtype.names)),numpy.append(required_fields,output_fields))] #This should keep the ordering of the fields the same as defined in info_dtype.
-        
+        elif type(output_fields) is numpy.ndarray:
+            info_out_fields = numpy.array(list(self.info_dtype.names))[numpy.isin(numpy.array(list(self.info_dtype.names)),numpy.append(required_fields,output_fields))] #This should keep the ordering of the fields the same as defined in info_dtype.
+        elif type(output_fields) is str:
+            if str(numpy.char.lower(output_fields)) == 'all':
+                info_out_fields = numpy.array(list(self.info_dtype.names))
+            else:
+                print('output_fields str given and not recognized in config file.  Using only required output fields.')
+                info_out_fields = numpy.array(required_fields)
+        elif type(output_fields) is type(None):
+            info_out_fields = numpy.array(required_fields)
+        else:
+            info_out_fields = numpy.array(required_fields)
+
         ordered_unique_indices = numpy.sort(numpy.unique(info_out_fields, return_index=True)[1])
         info_out_fields = info_out_fields[ordered_unique_indices]
         self.out_info_dtype = numpy.zeros(0,dtype = self.info_dtype)[info_out_fields].dtype
@@ -1706,13 +1758,14 @@ class Sim:
             self.file.attrs['full_info_dtype'] = str(self.info_dtype) #stored as string.  Can be retrieved as dict later using ast.literal_eval 
             self.file.attrs['output_info_dtype'] = str(self.out_info_dtype) #stored as string.  Can be retrieved as dict later using ast.literal_eval 
             
-            if numpy.size( pre_trigger_angle ) == 1:
-                if numpy.any(numpy.char.lower(str(pre_trigger_angle)) == 'none'):
-                    pre_trigger_angle = None
-            if pre_trigger_angle is None:
+
+            if type(pre_trigger_angle) is type(None):
                 self.file.attrs['pre_trigger_angle'] = numpy.string_('None')
             else:
-                self.file.attrs['pre_trigger_angle'] = pre_trigger_angle
+                if numpy.size(pre_trigger_angle) == 1:
+                    self.file.attrs['pre_trigger_angle'] = pre_trigger_angle
+                else:
+                    self.file.attrs['pre_trigger_angle'] = list(pre_trigger_angle)
 
             self.file.create_dataset('event_seeds', (self.n_events,), dtype=numpy.uint32, compression='gzip', compression_opts=9, shuffle=True)
             self.file.create_dataset('energy_neutrino', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True) #This probably doesn't need to be an output value for each event.
@@ -1993,9 +2046,16 @@ if __name__ == '__main__':
 
     sys.stdout.flush()
     if numpy.isin('coords',list(sim_config.keys())):
-        try:
-            print('Attempting to load neutrino coordinates from csv file.')
-            if numpy.any(numpy.char.lower(str(sim_config['coords'])) != 'none'):
+        if sim_config['coords'] is None:
+            print('None given as coordinate option.')
+            x_0 = None
+            y_0 = None
+            z_0 = None
+            phi_0 = None
+            theta_0 = None
+        elif type(sim_config['coords']) is str:
+            try:
+                print('Attempting to load neutrino coordinates from csv file.')
                 x_0 = []
                 y_0 = []
                 z_0 = []
@@ -2019,20 +2079,15 @@ if __name__ == '__main__':
                             line_count += 1
                 n_events = len(x_0)
                 print('Set n_events to %i'%n_events)
-            else:
+
+            except Exception as e:
+                print(e)
                 print('Could not load data.  Defaulting to None and generating random locations.')
                 x_0 = None
                 y_0 = None
                 z_0 = None
                 phi_0 = None
                 theta_0 = None
-        except:
-            print('Could not load data.  Defaulting to None and generating random locations.')
-            x_0 = None
-            y_0 = None
-            z_0 = None
-            phi_0 = None
-            theta_0 = None
     else:
         print('Using randomly generated neutrino locations.')
         x_0 = None
@@ -2040,15 +2095,6 @@ if __name__ == '__main__':
         z_0 = None
         phi_0 = None
         theta_0 = None
-    '''
-    #Hard coded coordinates.  
-    theta_0                 = numpy.array([35.0,145.0]), #Put as None to not pass values.  Otherwise len must match n_events.
-    phi_0                   = numpy.array([0.0,0.0]), #Put as None to not pass values. Otherwise len must match n_events.
-    x_0                     = numpy.array([10.0,0.0]), #Put as None to not pass values. Otherwise len must match n_events.
-    y_0                     = numpy.array([0.0,0.0]), #Put as None to not pass values. Otherwise len must match n_events.
-    z_0                     = numpy.array([-175.0,-200.0]) 
-    n_events = len(x_0)
-    '''
 
     #Loading station config file
 

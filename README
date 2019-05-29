@@ -486,22 +486,34 @@ The below section discusses the usage of the simulation code.  The general topic
             this ndarray is the times corresponding to the signals in every other row.  Signals are given in units of adu and times
             in units of ns.
             # TODO: Add a script that converts these to be in the same format as real data taken from an ARA station.
-        pre_trigger_angle : float or None
+        pre_trigger_angle : float or list of floats or None, optional
             If given, then a pre trigger will be applied to the event such that calculations of Askaryan radiation/electric field will only be conducted 
             if ANY of the possible solution types (for all antennas and stations) have an observation angle within pre_trigger_angle number of degrees to
             the Cherenkov angle.  Essentially the Cherenkov cone must be observable within the pre trigger angular window from at least one antenna in the
             array in order for the calculations to proceed.
 
+            pre_trigger_angle can be given as a single float (i.e. 10.0), or as a list no more than 2 floats i.e.([5.0,10.0]).  In order for 2 values to be 
+            interpretted correctly by yaml they must be given as a list, NOT a tuple or array in the config file.  If a single number is given
+            then it will be used for both the upper an lower (relative) bounds of acceptable angles.  If two values are given the the first value will act
+            as the lower (relative) bound, and the second will be used as the upper (relative) bound.  In this case relative mean that the given angle(s)
+            are relative to the cherenkov angle, and will be added or subtracted from it depending on the bound.
+
             i.e. if pre_trigger_angle is 10.0 degrees then signals will only be calculated if one of the solutions was emitted (observed on cone) at an
             angle: theta_c - 10.0 deg < theta_obs < theta_c + 10.0 deg.
 
+            If [5.0,10.0] is given then signals will only be calculated if one of the solutions was emitted (observed on cone) at an
+            angle: theta_c - 5.0 deg < theta_obs < theta_c + 10.0 deg.
+
             If ANY of the solution types of ANY of the antennas in the entire array satisfies the pre trigger, then all calculations for that event proceed, 
-            not just the solution types that independently satisfied the pre trigger threshold.
+            not just the solution types that independently satisfied the pre trigger threshold.  
 
             NOTE:  Setting a pre trigger can speed up the code significantly, but it must be done with care or else information may be lost.
             It is highly recommended that you first run a simulation with you desired settings and pre_trigger_angle set to None.  Then with this
-            preliminary simulation analyze the losses you expect by not computing these angles (using gnosim/analysis/pre_trigger_set_tool.py for example).
-            Then with this knowledge set the pre trigger for future simulations as you see fit.
+            preliminary simulation analyse the losses you expect by not computing these angles (using gnosim/analysis/pre_trigger_set_tool.py for example).
+            Then with this knowledge set the pre trigger for future simulations as you see fit.  This script currently only supports single values pre
+            trigger angles.
+
+            (Default is None).
         output_fields : list of str
             Much of the meta-data for each event is contained within a single structured array.  Internally (while the simulation is running) this array will
             have the dtype info_dtype, which is specified withinin antarcticsim.  This data type is reduced for ouput, with some fields being required and staying, 
@@ -811,8 +823,8 @@ The below section discusses the usage of the simulation code.  The general topic
             The units/mode of trigger used.  Corresponds to trigger_threshold_units from the simulation configuration file.
         trigger_threshold : float
             The threshold set for triggering.  The bool signifying if a particular event triggered or not is stored in the 'info' dataset.
-        pre_trigger_angle : float or str
-            This is the pre trigger angle that was used.  If none was used then this will be 'None'.
+        pre_trigger_angle : float or list of floats or None, optional
+            This is the pre trigger angle(s) used.  If None was used then this will be 'None'.
 
         Datasets
         --------

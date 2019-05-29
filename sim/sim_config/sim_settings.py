@@ -17,7 +17,7 @@
 'use_event_threading'   :   True,   #Enables multithreading during event by event calculations (each event is run in a seperate thread).
 'output_all_solutions'  :   True,   #Enables the output of metadata about each solution type for each antenna for each event, rather than just the solution type with the max field strength per antenna.
 'save_signals'          :   True,  #Enables the saving of the waveforms to the output file.
-'pre_trigger_angle'     :   10.0,    #Sets a pre-trigger angle.  Observations within +- this will result in pre trigger.  See docstrings in antarcticsim for more information.
+'pre_trigger_angle'     :   [10.0,10.0],    #Sets a pre-trigger angle.  See docstrings in antarcticsim for more information.  Note if giving two values wrap them in [] NOT ()/.  I.e. [10.0,10.0].
 'output_fields'         :   [   'pre_triggered',  #Should be a list of which optional output fields you want to output.  The more put the larger the output file.  Putting less doesn't necessarily speed up the code, these are being calculated and internally used regardless, this just decides if you want tem stored to disc after.  These are only the fields that can be calculated after the fact using testing_single_event.py
                                 'observation_angle', #Thee undesired fields should just be commented out.
                                 #'electric_field',
