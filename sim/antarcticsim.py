@@ -1657,9 +1657,9 @@ class Sim:
             'a_p']
 
         if numpy.size( output_fields ) == 1:
-            if numpy.char.lower(str(output_fields)) == 'none':
+            if numpy.any(numpy.char.lower(str(output_fields)) == 'none'):
                 info_out_fields = numpy.array(required_fields)
-            elif numpy.char.lower(output_fields) == 'all':
+            elif numpy.any(numpy.char.lower(output_fields) == 'all'):
                 info_out_fields = numpy.array(list(self.info_dtype.names))
         else:
             if type(output_fields) is list:
@@ -1707,7 +1707,7 @@ class Sim:
             self.file.attrs['output_info_dtype'] = str(self.out_info_dtype) #stored as string.  Can be retrieved as dict later using ast.literal_eval 
             
             if numpy.size( pre_trigger_angle ) == 1:
-                if numpy.char.lower(str(pre_trigger_angle)) == 'none':
+                if numpy.any(numpy.char.lower(str(pre_trigger_angle)) == 'none'):
                     pre_trigger_angle = None
             if pre_trigger_angle is None:
                 self.file.attrs['pre_trigger_angle'] = numpy.string_('None')
@@ -1995,7 +1995,7 @@ if __name__ == '__main__':
     if numpy.isin('coords',list(sim_config.keys())):
         try:
             print('Attempting to load neutrino coordinates from csv file.')
-            if numpy.char.lower(str(sim_config['coords'])) != 'none':
+            if numpy.any(numpy.char.lower(str(sim_config['coords'])) != 'none'):
                 x_0 = []
                 y_0 = []
                 z_0 = []
@@ -2019,6 +2019,13 @@ if __name__ == '__main__':
                             line_count += 1
                 n_events = len(x_0)
                 print('Set n_events to %i'%n_events)
+            else:
+                print('Could not load data.  Defaulting to None and generating random locations.')
+                x_0 = None
+                y_0 = None
+                z_0 = None
+                phi_0 = None
+                theta_0 = None
         except:
             print('Could not load data.  Defaulting to None and generating random locations.')
             x_0 = None
@@ -2033,7 +2040,6 @@ if __name__ == '__main__':
         z_0 = None
         phi_0 = None
         theta_0 = None
-
     '''
     #Hard coded coordinates.  
     theta_0                 = numpy.array([35.0,145.0]), #Put as None to not pass values.  Otherwise len must match n_events.
