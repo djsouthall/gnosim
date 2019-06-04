@@ -35,7 +35,8 @@
                                 #'detection_wave_vector',
                                 'emission_polarization_vector',
                                 'detection_polarization_vector'],
-'coords'                : None#'${GNOSIM_DIR}/gnosim/utils/10m_circle_oncone_theta180xphi0.csv' #This should be None unless you wish to override n_events and run with predefined locations.
+'coords'                : "", #'${GNOSIM_DIR}/gnosim/utils/10m_circle_oncone_theta180xphi0.csv' #This should be None unless you wish to override n_events and run with predefined locations.
+'output_type' : 'h5py' 
 }
 
 

@@ -25,6 +25,7 @@ import time
 import multiprocessing
 import concurrent.futures
 import csv
+import ROOT as root
 
 from multiprocessing import cpu_count
 import threading
@@ -158,6 +159,10 @@ class Sim:
     '''
 
     def __init__(self, station_config,solutions = numpy.array([]),electric_field_domain = 'time',do_beamforming = True, sim_config = None, pre_split = True, load_lib = True):
+        self.output_type = sim_config['output_type'] # can be root or h5py
+        if not(self.output_type in ['root', 'h5py']):
+            print("Invalid output type. Defaulting to root.")
+            self.output_type = 'root'
 
         #pre_split False unless using a library already sorted into different
         #directories by solution type.
@@ -1724,7 +1729,7 @@ class Sim:
 
         info = numpy.empty(self.n_events * self.len_info_per_event , dtype = self.out_info_dtype)
         
-        if self.outfile:
+        if self.outfile and self.output_type == 'h5py':
             self.file = h5py.File(self.outfile, 'w')
             # ORIGINAL 28 MAY 2014
             #self.file.attrs['geometric_factor'] = (4. * numpy.pi) * (numpy.pi * detector_volume_radius**2 * detector_volume_depth) # m^3 sr
@@ -1781,8 +1786,85 @@ class Sim:
             self.file.create_dataset('random_time_offsets', (self.n_events,), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
             self.file.create_dataset('info', ( self.n_events * self.len_info_per_event , ) , dtype=self.out_info_dtype, compression='gzip', compression_opts=9, shuffle=True)
             self.file.create_group('signals')
-        
-        
+
+        elif(self.outfile and self.output_type == 'root'):
+            # Root output
+            self.file = root.TFile(self.outfile, 'recreate' ) 
+            self.tree = root.TTree('rnosim', 'rnosim')
+            
+            n_signal = 550 #?? 
+            max_n_antennas = self.n_antenna
+            max_n_solutions = self.n_solutions
+            
+            leaf_event_id = numpy.array([-999], dtype=numpy.int32)
+            self.tree.Branch('event_id', leaf_event_id, 'event_id/I' )
+            leaf_energy_neutrino = numpy.array([-999.], dtype=numpy.double)
+            self.tree.Branch('energy_neutrino', leaf_energy_neutrino, 'energy_neutrino/D' )
+            leaf_event_seeds = numpy.array([-999.], dtype=numpy.double)
+            self.tree.Branch('event_seeds', leaf_event_seeds, 'event_seeds/D' )
+            leaf_inelasticity = numpy.array([-999.], dtype=numpy.double)
+            self.tree.Branch('inelasticity', leaf_inelasticity, 'inelasticity/D' )
+            leaf_p_detect = numpy.array([-999.], dtype=numpy.double)
+            self.tree.Branch('p_detect', leaf_p_detect, 'p_detect/D' )
+            leaf_p_earth = numpy.array([-999.], dtype=numpy.double)
+            self.tree.Branch('p_earth', leaf_p_earth, 'p_earth/D' )
+            leaf_p_interact = numpy.array([-999.], dtype=numpy.double)
+            self.tree.Branch('p_interact', leaf_p_interact, 'p_interact/D' )
+            leaf_phi_0 = numpy.array([-999.], dtype=numpy.double)
+            self.tree.Branch('phi_0', leaf_phi_0, 'phi_0/D' )
+            leaf_random_time_offsets = numpy.array([-999.], dtype=numpy.double)
+            self.tree.Branch('random_time_offsets', leaf_random_time_offsets, 'random_time_offsets/D' )
+            leaf_n_antennas = numpy.array([max_n_antennas], dtype=numpy.int32)
+            self.tree.Branch('n_antennas', leaf_n_antennas, 'n_antennas/I' )
+            leaf_signals = numpy.array(numpy.zeros((max_n_antennas, 8192)), dtype=numpy.double)
+            self.tree.Branch('signals', leaf_signals, 'signals[n_antennas][8192]/D' )
+            leaf_theta_0 = numpy.array([-999.], dtype=numpy.double)
+            self.tree.Branch('theta_0', leaf_theta_0, 'theta_0/D' )
+            leaf_x_0 = numpy.array([-999.], dtype=numpy.double)
+            self.tree.Branch('x_0', leaf_x_0, 'x_0/D' )
+            leaf_y_0 = numpy.array([-999.], dtype=numpy.double)
+            self.tree.Branch('y_0', leaf_y_0, 'y_0/D' )
+            leaf_z_0 = numpy.array([-999.], dtype=numpy.double)
+            self.tree.Branch('z_0', leaf_z_0, 'z_0/D' )
+            leaf_n_solutions = numpy.array([max_n_solutions], dtype=numpy.int32)
+            self.tree.Branch('n_solutions', leaf_n_solutions, 'n_solutions/I' )
+            leaf_has_solution = numpy.array(numpy.zeros(max_n_solutions), dtype=numpy.bool)
+            self.tree.Branch('has_solution', leaf_has_solution, 'has_solution[n_solutions]/O' )
+            leaf_pre_triggered = numpy.array(numpy.zeros(max_n_solutions), dtype=numpy.bool)
+            self.tree.Branch('pre_triggered', leaf_pre_triggered, 'pre_triggered[n_solutions]/O' )
+            leaf_triggered = numpy.array(numpy.zeros(max_n_solutions), dtype=numpy.bool)
+            self.tree.Branch('triggered', leaf_triggered, 'triggered[n_solutions]/O' )
+            leaf_time = numpy.array(numpy.zeros((max_n_solutions, max_n_antennas))-999., dtype=numpy.double)
+            self.tree.Branch('time', leaf_time, 'time[n_solutions][7]/D' )
+            leaf_distance = numpy.array(numpy.zeros((max_n_solutions, max_n_antennas))-999., dtype=numpy.double)
+            self.tree.Branch('distance', leaf_distance, 'distance[n_solutions][7]/D' )
+            leaf_theta_ant = numpy.array(numpy.zeros((max_n_solutions, max_n_antennas))-999., dtype=numpy.double)
+            self.tree.Branch('theta_ant', leaf_theta_ant, 'theta_ant[n_solutions][7]/D' )
+            leaf_theta_ray = numpy.array(numpy.zeros((max_n_solutions, max_n_antennas))-999., dtype=numpy.double)
+            self.tree.Branch('theta_ray', leaf_theta_ray, 'theta_ray[n_solutions][7]/D' )
+            leaf_observation_angle = numpy.array(numpy.zeros((max_n_solutions, max_n_antennas))-999., dtype=numpy.double)
+            self.tree.Branch('observation_angle', leaf_observation_angle, 'observation_angle[n_solutions][7]/D' )
+            leaf_electric_field_digitzed = numpy.array(numpy.zeros((max_n_solutions, max_n_antennas))-999., dtype=numpy.int32)
+            self.tree.Branch('electric_field_digitzed', leaf_electric_field_digitzed, 'electric_field_digitzed[n_solutions][7]/I' )
+            leaf_a_s = numpy.array(numpy.zeros((max_n_solutions, max_n_antennas))-999., dtype=numpy.double)
+            self.tree.Branch('a_s', leaf_a_s, 'a_s[n_solutions][7]/D' )
+            leaf_a_p = numpy.array(numpy.zeros((max_n_solutions, max_n_antennas))-999., dtype=numpy.double)
+            self.tree.Branch('a_p', leaf_a_p, 'a_p[n_solutions][7]/D' )
+            leaf_signal_reduction_factor = numpy.array(numpy.zeros((max_n_solutions, max_n_antennas))-999., dtype=numpy.double)
+            self.tree.Branch('signal_reduction_factor', leaf_signal_reduction_factor, 'signal_reduction_factor[n_solutions][7]/D' )
+            leaf_beam_pattern_factor = numpy.array(numpy.zeros((max_n_solutions, max_n_antennas))-999., dtype=numpy.double)
+            self.tree.Branch('beam_pattern_factor', leaf_beam_pattern_factor, 'beam_pattern_factor[n_solutions][7]/D' )
+            leaf_attenuation_factor = numpy.array(numpy.zeros((max_n_solutions, max_n_antennas))-999., dtype=numpy.double)
+            self.tree.Branch('attenuation_factor', leaf_attenuation_factor, 'attenuation_factor[n_solutions][7]/D' )
+            leaf_polarization_dot_factor = numpy.array(numpy.zeros((max_n_solutions, max_n_antennas))-999., dtype=numpy.double)
+            self.tree.Branch('polarization_dot_factor', leaf_polarization_dot_factor, 'polarization_dot_factor[n_solutions][7]/D' )
+            leaf_pol_dot_angle = numpy.array(numpy.zeros((max_n_solutions, max_n_antennas))-999., dtype=numpy.double)
+            self.tree.Branch('pol_dot_angle', leaf_pol_dot_angle, 'pol_dot_angle[n_solutions][7]/D' )
+            leaf_emission_polarization_vector = numpy.array(numpy.zeros((max_n_solutions, max_n_antennas, 3))-999., dtype=numpy.double)
+            self.tree.Branch('emission_polarization_vector', leaf_emission_polarization_vector, 'emission_polarization_vector[n_solutions][7][3]/D' )
+            leaf_detection_polarization_vector = numpy.array(numpy.zeros((max_n_solutions, max_n_antennas, 3))-999., dtype=numpy.double)
+            self.tree.Branch('detection_polarization_vector', leaf_detection_polarization_vector, 'detection_polarization_vector[n_solutions][7][3]/D' )
+
         general_prep_time = time.time() - self.throw_start_time
         #Loading Hulls (or creating if hulls have not been previously determined in the necessary folder)
         
@@ -1828,11 +1910,63 @@ class Sim:
 
             for future in concurrent.futures.as_completed(futures):
                 #Note eventid must be first output for other outputs to use it properly
+                if(self.outfile and self.output_type == 'root'):
 
-                eventid, p_interact[eventid], p_earth[eventid], p_detect[eventid], info[(eventid * self.len_info_per_event ):((eventid+1) * self.len_info_per_event )], triggered, signals_out = future.result()
-                event_label = 'event%i'%eventid
-                
-                if self.outfile: 
+                    eventid, p_interact, p_earth, p_detect, info_, triggered, signals_out = future.result()                    
+                    del future # To save memory. 
+                    
+                    leaf_event_id[0] = eventid
+                    leaf_energy_neutrino[0] = energy_neutrinos[eventid]
+                    leaf_event_seeds[0] = event_seeds[eventid]
+                    leaf_inelasticity[0] = inelasticity[eventid]
+                    leaf_p_detect[0] = p_detect
+                    leaf_p_earth[0] = p_earth
+                    leaf_p_interact[0] = p_interact
+                    leaf_phi_0[0] = phi_0[eventid]
+                    leaf_theta_0[0] = theta_0[eventid]
+                    leaf_x_0[0] = x_0[eventid]
+                    leaf_y_0[0] = y_0[eventid]
+                    leaf_z_0[0] = z_0[eventid]                
+
+                    awk_map = numpy.array(['direct', 'cross', 'reflect'])                                            
+                    for j in range(len(info_)):
+
+                        # These gets filled a bunch but Oh well
+                        sol_index = numpy.where(awk_map == str(info_['solution'][j])[2:-1])[0][0] # Got to be better way to do this
+                        leaf_has_solution[sol_index] = info_['has_solution'][j]
+                        leaf_pre_triggered[sol_index] = info_['pre_triggered'][j]
+                        leaf_triggered[sol_index] = info_['triggered'][j]                
+
+                        leaf_time[sol_index][info_['antenna'][j]] = info_['time'][j]
+                        leaf_distance[sol_index][info_['antenna'][j]] = info_['distance'][j]
+                        leaf_theta_ant[sol_index][info_['antenna'][j]] = info_['theta_ant'][j]
+                        leaf_theta_ray[sol_index][info_['antenna'][j]] = info_['theta_ray'][j]
+                        leaf_observation_angle[sol_index][info_['antenna'][j]] = info_['observation_angle'][j]
+                        leaf_electric_field_digitzed[sol_index][info_['antenna'][j]] = info_['time'][j]
+                        leaf_a_s[sol_index][info_['antenna'][j]] = info_['a_s'][j]
+                        leaf_a_p[sol_index][info_['antenna'][j]] = info_['a_p'][j]
+                        leaf_signal_reduction_factor[sol_index][info_['antenna'][j]] = info_['signal_reduction_factor'][j]
+                        leaf_beam_pattern_factor[sol_index][info_['antenna'][j]] = info_['beam_pattern_factor'][j]
+                        leaf_attenuation_factor[sol_index][info_['antenna'][j]] = info_['attenuation_factor'][j]
+                        leaf_polarization_dot_factor[sol_index][info_['antenna'][j]] = info_['polarization_dot_factor'][j]
+                        leaf_pol_dot_angle[sol_index][info_['antenna'][j]] = info_['pol_dot_angle'][j]
+                        leaf_emission_polarization_vector[sol_index][info_['antenna'][j]] = info_['emission_polarization_vector'][j]
+                        leaf_detection_polarization_vector[sol_index][info_['antenna'][j]] = info_['detection_polarization_vector'][j]
+
+                        # This is Dan Smiths code
+
+                    if numpy.logical_and(self.save_signals == True,triggered == True):                
+                        for index_station, station in enumerate(self.stations):
+                            for index_antenna, antenna in enumerate(station.antennas):
+                                leaf_signals[index_antenna] = numpy.append(signals_out[station.label][index_antenna], numpy.zeros(len(leaf_signals[index_antenna]) - len(signals_out[station.label][index_antenna]))) 
+                    self.tree.Fill()
+
+                else:
+
+                    eventid, p_interact[eventid], p_earth[eventid], p_detect[eventid], info[(eventid * self.len_info_per_event ):((eventid+1) * self.len_info_per_event )], triggered, signals_out = future.result()
+                    event_label = 'event%i'%eventid
+
+                if(self.outfile and self.output_type == 'h5py'):
                     if numpy.logical_and(self.save_signals == True,triggered == True):
                         #This region I will need to be careful adjustig when/if I add multithreading per event. 
                         #Note to future self, there is a section in 'Python and HDF5' about multithreading with HDF5
@@ -1884,7 +2018,7 @@ class Sim:
 
         sys.stdout.flush()
                 
-        if self.outfile:
+        if self.outfile and self.output_type == 'h5py':
             print('Writing data after %0.3f s'%(time.time() - self.throw_start_time))
             sys.stdout.flush()
             
@@ -1940,7 +2074,10 @@ class Sim:
             sys.stdout.flush()
             self.file['info'][...] = info
             self.file.close()
-    
+
+        elif(self.outfile and self.output_type == 'root'):
+            print('Writing root after %0.3f s'%(time.time() - self.throw_start_time))
+            self.file.Write()        
             
         current_time  = time.time() - self.throw_start_time
         print('Throw finished after %0.3f s'%current_time)
