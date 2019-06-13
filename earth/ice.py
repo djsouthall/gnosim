@@ -563,22 +563,23 @@ class Ice:
     ############################################################
 
 if __name__ == "__main__":
+    pylab.close('all')
     z = numpy.linspace(-3000., 100., 10000) # Array of elevations (m)
-    ice_antarctica = Ice('antarctica')
-    index_of_refraction_at_neutrino = ice_antarctica.indexOfRefraction(-173.0)
+    '''
+    #ice_antarctica = Ice('antarctica')
+    #ice_ross = Ice('ross')
+    index_of_refraction_at_neutrino = ice_greenland.indexOfRefraction(-173.0)
     cherenkov_angle_deg = numpy.rad2deg(numpy.arccos(1./index_of_refraction_at_neutrino))
-    print(cherenkov_angle_deg)
-    ice_ross = Ice('ross')
+    '''
     ice_greenland = Ice('greenland')
     ice_parametric = Ice('parametric_greenland')
     ice_empirical = Ice('empirical_greenland')
-
     pylab.figure()
     pylab.plot(z, ice_parametric.density(z) * gnosim.utils.constants.mass_proton, label='Parametric') # Convert from nucleons m^-3 to kg m^-3
     pylab.plot(z, ice_empirical.density(z) * gnosim.utils.constants.mass_proton, label='Empirical') # Convert from nucleons m^-3 to kg m^-3
-    pylab.plot(z, ice_ross.density(z) * gnosim.utils.constants.mass_proton, label='Ross') # Convert from nucleons m^-3 to kg m^-3
+    #pylab.plot(z, ice_ross.density(z) * gnosim.utils.constants.mass_proton, label='Ross') # Convert from nucleons m^-3 to kg m^-3
     pylab.plot(z, ice_greenland.density(z) * gnosim.utils.constants.mass_proton, label='greenland') # Convert from nucleons m^-3 to kg m^-3
-    pylab.plot(z, ice_antarctica.density(z) * gnosim.utils.constants.mass_proton, label='antarctica') # Convert from nucleons m^-3 to kg m^-3
+    #pylab.plot(z, ice_antarctica.density(z) * gnosim.utils.constants.mass_proton, label='antarctica') # Convert from nucleons m^-3 to kg m^-3
     pylab.xlabel('Elevation (m)')
     pylab.ylabel(r'Density (kg m$^{-3}$)')
     pylab.legend(loc='lower center')
@@ -590,25 +591,30 @@ if __name__ == "__main__":
     z = numpy.linspace(-3100., 100., 2000) # Array of elevations (m)
 
     pylab.figure()
-    #pylab.plot(z, ice_parametric.indexOfRefraction(z), label='Parametric')
+    pylab.plot(z, ice_greenland.indexOfRefraction(z), label='Greenland')
+    pylab.plot(z, ice_parametric.indexOfRefraction(z), label='Parametric')
     pylab.plot(z, ice_empirical.indexOfRefraction(z), label='Empirical')
     #pylab.plot(z, ice_ross.indexOfRefraction(z), label='Ross')
-    pylab.plot(z, ice_antarctica.indexOfRefraction(z), label='antarctica')
+    #pylab.plot(z, ice_antarctica.indexOfRefraction(z), label='antarctica')
 
     pylab.xlabel('Elevation (m)')
     pylab.ylabel('Index of Refraction')
     pylab.legend(loc='lower center')
     #k = 0.86 * 1.e-3 # kg^-1 m^3
-    #pylab.plot(z, 1. + (k * ice_antarctica.f_density(z) * gnosim.utils.constants.mass_proton), c='green')
+    ##pylab.plot(z, 1. + (k * ice_antarctica.f_density(z) * gnosim.utils.constants.mass_proton), c='green')
     pylab.xlim([-3100., 100.])
     
     z = numpy.linspace(-3000., 0., 2000) # Array of elevations (m)
     pylab.figure()
     frequency = 0.3 # GHz
-    pylab.plot(z, ice_antarctica.attenuationLength(z, frequency=frequency))
+    #pylab.plot(z, ice_antarctica.attenuationLength(z, frequency=frequency))
+    pylab.plot(z, ice_greenland.attenuationLength(z,frequency=frequency), label='Greenland')
+    pylab.plot(z, ice_parametric.attenuationLength(z,frequency=frequency), label='Parametric')
+    pylab.plot(z, ice_empirical.attenuationLength(z,frequency=frequency), label='Empirical')
     pylab.title('Frequency = %i MHz'%(frequency / gnosim.utils.constants.MHz_to_GHz))
     pylab.xlabel('Elevation (m)')
     pylab.ylabel('Electric Field Attenuation Length (m)')
+    pylab.legend()
     pylab.xlim([-3000., 0.])
     
     #input("press any key to exit")

@@ -40,6 +40,7 @@ The below section discusses the usage of the simulation code.  The general topic
             1.2.1 ..... What is a Ray Tracing Library?
             1.2.2 ..... Creating a Ray Tracing Library
             1.2.3 ..... Concerning the Envelope and Concave Hull
+            1.2.4 ..... Making Many Libraries with Farm Script
         1.3.0 ......... Preparing a Station Configuration File
         1.4.0 ......... Preparing a Simulation Configuration File
 
@@ -273,6 +274,14 @@ The below section discusses the usage of the simulation code.  The general topic
 
         If significant changes are made to the number of rays thrown, or the dimensions of the ice, then please consult this line of code and adjust it as
         required.  The hulls/envelopes can be plotted and referenced to guide your adjustment of the number of bins.
+
+        1.2.4    Making Many Libraries with Farm Script
+        -----------------------------------------------
+
+        There is a farm_lib.py script that can be used for submitting multiple refraction library generation scripts to midway.  The majority of settings
+        are still contained within the refraction library script (which is called by the farm script).  The farm can currently only vary the depths and 
+        submit a different depth per batch job, so to vary things like ice model you will need to change the model as defined in refraction_library.py 
+        and run the farm again.  
 
     1.3.0    Preparing a Station Configuration File
     -----------------------------------------------

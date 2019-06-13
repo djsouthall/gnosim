@@ -155,6 +155,7 @@ def fresnelAmplitude(n_1, n_2, incidence_angle, mode, return_power=False):
             return R_s, R_p, T_s, T_p
         else:
             print ('WARNING: mode %s not recognized'%(mode))
+            sys.stdout.flush()
     else:
         if mode == 'reflection':
             return r_s, r_p
@@ -164,6 +165,7 @@ def fresnelAmplitude(n_1, n_2, incidence_angle, mode, return_power=False):
             return r_s, r_p, t_s, t_p
         else:
             print ('WARNING: mode %s not recognized'%(mode))
+            sys.stdout.flush()
 
 def testFresnelSign(n_1=1.5, n_2=1.0):
     '''
@@ -304,6 +306,7 @@ def fresnelPower(n_1, n_2, incidence_angle, mode):
         return t_s, t_p
     else:
         print ('WARNING: mode %s not recognized'%(mode))
+        sys.stdout.flush()
 
 ############################################################
 
@@ -474,13 +477,16 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit=Non
 
     for ii in range(0, n_steps):
         #print('On Event',ii)
+        #sys.stdout.flush()
         # Dynamic time step depending on how fast the index of refraction is changing
         if ice.deltaIndexOfRefraction(z_array[ii]) > 1.e-4 or z_array[ii] >= 0.:
             t_step = 1.*t_step_in
             #print(t_step)
+            #sys.stdout.flush()
         else:
             t_step = 5.*t_step_in
             #print(t_step)
+            #sys.stdout.flush()
         
         
         
@@ -493,6 +499,7 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit=Non
                 #print('Within 5m of a boundary at z_array[%i] = %0.2f'%(ii,z_array[ii]))
                 t_step = t_array[ii] - t_array[ii-1]
                 #print('Initial t_step is:', t_step)
+                #sys.stdout.flush()
             else:
                 print_new = False
             while (numpy.logical_or( (z_array[ii] + potential_z_step) > z_upward_surface , (z_array[ii] + potential_z_step) < z_downward_surface)):
@@ -501,6 +508,7 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit=Non
                                    / ice.indexOfRefraction(z_array[ii]))
             #if print_new:
             #    print('t_step changed to' , t_step)
+            #    sys.stdout.flush()
             
         
         t_array[ii + 1] = t_array[ii] + t_step
@@ -567,6 +575,7 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit=Non
         
         if ii == index_reflect and ii > 0:
             #print ('SKIP', ii)
+            #sys.stdout.flush()
             theta_array[ii + 1] = theta_array[ii]
             index_reflect = 0
         elif delta_index_of_refraction < -0.1 and theta_array[ii] < 90.:
@@ -586,6 +595,7 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit=Non
                 a_p_array[ii + 1] *= r_p
                 a_s_array[ii + 1] *= r_s
             #print ('ICE -> AIR', ii, r_p, r_s)
+            #sys.stdout.flush()
             theta_array[ii + 1] = 180. - theta_array[ii]
             index_reflect = ii + 1
             if index_reflect_air == 0 and index_reflect_water == 0:
@@ -611,6 +621,7 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit=Non
                 a_s_array[ii + 1] *= t_s
             
             #print ('AIR -> ICE', ii, t_p, t_s)
+            #sys.stdout.flush()
         elif delta_index_of_refraction < -0.1 and theta_array[ii] > 90.:
             # Ray going from ice to water
             # Compute reflection coefficients (power which is reflected)
@@ -623,6 +634,7 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit=Non
             a_s_array[ii + 1] *= numpy.sqrt(r_s)
             reflection_water = True
             #print ('ICE -> WATER', ii, r_p, r_s)
+            #sys.stdout.flush()
             theta_array[ii + 1] = 180. - theta_array[ii]
             index_reflect = ii + 1
             index_reflect_water = ii + 1
@@ -637,12 +649,14 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit=Non
         
         #if numpy.fabs(theta_array[ii + 1] - theta_array[ii]) > 5.:
         #    #print (theta_array[ii], theta_array[ii + 1])
+        #    #sys.stdout.flush()
         #    #raw_input('WAIT')
 
         # Define a stop condition
         if index_reflect_water > 0 and theta_array[ii + 1] > 90.:
             n_steps = ii + 1
             #print ('STOP', n_steps)
+            #sys.stdout.flush()
             break
 
     # Convert to total distance
@@ -709,6 +723,7 @@ def plotGeometry(stations, neutrino_loc, info, ice, plot3d=False, neutrino_trave
         if numpy.logical_or(len(info) != numpy.shape(final_polarization_vecs)[0], numpy.logical_or(sum([len(station.antennas)*len(station.solutions) for station in stations]) != numpy.shape(final_polarization_vecs)[0],  numpy.shape(final_polarization_vecs)[1] != 3)):
             print('Dimensions of final_polarization_vecs did not match requirements.  Skipping.')
             final_polarization_vecs = None
+        sys.stdout.flush()
 
     max_xy = 0.0
     min_xy = 0.0
@@ -814,6 +829,7 @@ def plotGeometry(stations, neutrino_loc, info, ice, plot3d=False, neutrino_trave
                     ax.quiver(neutrino_loc[0],neutrino_loc[1],neutrino_loc[2],neutrino_travel_dir[0],neutrino_travel_dir[1],neutrino_travel_dir[2], color = 'k',label='Neutrino Travel Direction')
                 except:
                     print('Error in plotting neutrino vector.')
+                    sys.stdout.flush()
             ax.legend(fontsize = 14)
             ax.set_xlabel('x(m)',fontsize=20)
             ax.set_ylabel('y(m)',fontsize=20)
@@ -839,6 +855,7 @@ def plotGeometry(stations, neutrino_loc, info, ice, plot3d=False, neutrino_trave
         return fig
     else:
         print('Info should be input with only one event, otherwise this breaks')
+        sys.stdout.flush()
         return
 ############################################################
 
@@ -873,6 +890,7 @@ def makeLibrary(z_0, theta_ray_array, ice_model, library_dir='library', r_limit=
 
     for ii in range(0, len(theta_ray_array)):
         print ('(%i/%i) theta_ant = %.4f'%(ii, len(theta_ray_array), theta_ray_array[ii]))
+        sys.stdout.flush()
         x, y, z, t, d, phi, theta, a_p, a_s, index_reflect_air, index_reflect_water = rayTrace([x_0, y_0, z_0], phi_0, theta_ray_array[ii],ice)
 
         n_points = len(t)
@@ -976,6 +994,7 @@ class RefractionLibrary:
 
         # Dictionary to store data
         self.data = {}
+        sys.stdout.flush()
         for solution in self.solutions:
             self.data[solution] = {}
             for key in self.keys:
@@ -1112,12 +1131,14 @@ class RefractionLibrary:
                 print (solution, len(self.data[solution]['t']))
 
             print ('Intersections...')
+            sys.stdout.flush()
             # Find intersections
             self.data['direct'], self.data['cross'] = self.intersect(self.data['direct'])
             #self.data['direct'] = dic_direct
             #self.data['cross'] = dic_cross
 
             print ('Sort solutions...')
+            sys.stdout.flush()
 
             if numpy.isin('direct_2', list(self.data.keys())):
                 if len(self.data['direct_2']['t']) > 0:
@@ -1132,6 +1153,7 @@ class RefractionLibrary:
         else:
             #Below is what happens if the solution types are already sorted into subfolders
             print('Loading data from pre split directories')
+            sys.stdout.flush()
             for infile in self.infiles:
                 #print (infile)
                 for solution in self.solutions:
@@ -1186,8 +1208,10 @@ class RefractionLibrary:
             for solution in self.solutions:
                 if verbose:
                     print('\tSolution Type: %10s \tNumber of points: %i'%( solution , len(self.data[solution]['z'])))
+                    sys.stdout.flush()
                 if (len(self.data[solution]['z']) == 0):
                     print('\tNot enough points, returning 0 value hull')
+                    sys.stdout.flush()
                     z_out = [0]
                     r_out = [0]
                     z_in = [0]
@@ -1451,18 +1475,24 @@ class RefractionLibrary:
 ############################################################
 
 if __name__ == '__main__':
-
+    # Depth
+    # -----
+    if len(sys.argv) > 1:
+        z = sys.argv[1]
+        z_array = numpy.array([float(z)])
+    else:
+        z_array = numpy.array([-13.0,-14.0,-15.0,-16.0,-17.0,-18.0,-19.0,-20.0,-13.0 - 20.0,-14.0 - 20.0,-15.0 - 20.0,-16.0 - 20.0,-17.0 - 20.0,-18.0 - 20.0,-19.0 - 20.0,-20.0 - 20.0,-13.0 - 40.0,-14.0 - 40.0,-15.0 - 40.0,-16.0 - 40.0,-17.0 - 40.0,-18.0 - 40.0,-19.0 - 40.0,-20.0 - 40.0,-13.0 - 60.0,-14.0 - 60.0,-15.0 - 60.0,-16.0 - 60.0,-17.0 - 60.0,-18.0 - 60.0,-19.0 - 60.0,-20.0 - 60.0,-13.0 - 80.0,-14.0 - 80.0,-15.0 - 80.0,-16.0 - 80.0,-17.0 - 80.0,-18.0 - 80.0,-19.0 - 80.0,-20.0 - 80.0]) #The list of depths for which to throw rays (or load libraries if make_library == False).
+    
     # Parameters
     # ----------
+    make_library = True     #If True, will compute the libraries and save them.  Otherwise just loads from previously saved libraries if available. (False is useful for plotting previously generated libraries).
+    split_library = True    #If True, will split the libraries by solution type and save them.
+    plot_library = False    #If True, will plot the ray tracing libraries as they are created (or loaded if make_library == False).
+    save_envelope = True    #If True, will calculate the envelope for the ray tracing library and save it.  Advisable to do in advance when ray tracing library is created.
+    plot_envelope = False   #If True, will plot the envelope.
+    plot_theta_ant = False  #If True, plots the library colormapped with theta_ant
 
-    make_library = False     #If True, will compute the libraries and save them.  Otherwise just loads from previously saved libraries if available. (False is useful for plotting previously generated libraries).
-    split_library = False    #If True, will split the libraries by solution type and save them.
-    plot_library = True    #If True, will plot the ray tracing libraries as they are created (or loaded if make_library == False).
-    save_envelope = False    #If True, will calculate the envelope for the ray tracing library and save it.  Advisable to do in advance when ray tracing library is created.
-    plot_envelope = True   #If True, will plot the envelope.
-    plot_theta_ant = True  #If True, plots the library colormapped with theta_ant
-    z_array = numpy.array([-173.0])#numpy.array([-173.0,-174.0,-175.0,-176.0,-177.0,-179.0,-181.0]) #The list of depths for which to throw rays (or load libraries if make_library == False).
-    n_rays = 180            #The number of rays to be thrown per depth.
+    n_rays = 120            #The number of rays to be thrown per depth.
     r_limit = None          #Note if this is NOT None, then all thrown rays will quit once they read this particular radius.  Use with care.  
                             #If you want a simulation with r = 6300m, it might be advisable to make r_limit = 7000 so the boundaries of hulls are still well defined
     ice_model = 'antarctica' #The ice model to use when throwing rays.  To see available options see gnosim.earth.ice.getAcceptedIceModels().
@@ -1477,10 +1507,8 @@ if __name__ == '__main__':
     #TODO: Some of the below function should be added to the lib class.
     ice_model = gnosim.earth.ice.checkIceModel(ice_model) #Checks if ice model exists and replaces as necessary.
     for z_0 in z_array:
-
         #Library Name Formatting
         library_dir = os.environ['GNOSIM_DIR'] + '/gnosim/trace/library_%i_%s_%i_rays_signed_fresnel'%(int(z_0),ice_model,n_rays)
-       
         theta_array = numpy.linspace(0., 180., n_rays) 
 
         if make_library == True:
@@ -1490,11 +1518,13 @@ if __name__ == '__main__':
                     library_dir = library_dir + '_new'
             print ('library dir = %s'%(library_dir))
             print ('z_0 = %.2f'%(z_0))
+            sys.stdout.flush()
             os.mkdir(library_dir)
             makeLibrary(z_0, theta_array,ice_model, library_dir=library_dir,r_limit = r_limit)
             
         if numpy.any([plot_library == True,split_library == True,save_envelope == True]):
             print('\n'+library_dir+'/*.h5\n')
+            sys.stdout.flush()
             pre_split = (split_library == False)
             test_lib = RefractionLibrary(library_dir+'/*.h5',pre_split = pre_split)
             
@@ -1516,11 +1546,13 @@ if __name__ == '__main__':
                 sub_dir = in_dir + '/' + solution
                 while os.path.isdir(in_path.replace(in_dir,sub_dir)):
                     print('Outfile path:' , in_path.replace(in_dir,sub_dir),'exists, appending _new to path')
+                    sys.stdout.flush()
                     sub_dir = sub_dir + '_new'
                 os.mkdir(in_path.replace(in_dir,sub_dir) + '/')
                 
                 for ang_index, infile in enumerate(infiles):
                     print('Saving Split:\t' , infile)
+                    sys.stdout.flush()
                     reader = h5py.File(infile, 'r')
                     file = h5py.File(in_path.replace(in_dir,sub_dir) + '/' + infile.split('/')[-1], 'w')
                     theta_ant_cut = numpy.where(numpy.isclose(test_lib.data[solution]['theta_ant'],infile_angles[ang_index], atol = 0.99*min(numpy.diff(infile_angles))))[0]
@@ -1528,6 +1560,7 @@ if __name__ == '__main__':
                     for attr in list(reader.attrs):
                         file.attrs[attr] = reader.attrs[attr]
                     print('Saving',len(theta_ant_cut),'values for solution type:',solution,'\ttheta_ant = ',infile_angles[ang_index])
+                    sys.stdout.flush()
                     for key in list(test_lib.data[solution].keys()):
                         file.create_dataset(key, (len(theta_ant_cut),), dtype='f', compression='gzip', compression_opts=9, shuffle=True)
                         if len(theta_ant_cut != 0):
@@ -1576,6 +1609,7 @@ if __name__ == '__main__':
             infiles = glob.glob('./'+library_dir+'/concave_hull/*.h5')
             if len(infiles) == 0:
                 print('Error loading concave hull files.  Ensure they are saved and in dir\n./'+library_dir+'/concave_hull/')
+                sys.stdout.flush()
                 continue
             infile_list = []
             fig,ax = pylab.subplots()
