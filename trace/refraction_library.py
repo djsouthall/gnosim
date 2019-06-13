@@ -17,6 +17,7 @@ import gnosim.utils.plane
 import gnosim.earth.earth
 import gnosim.earth.ice
 import gnosim.utils.misc
+import time
 
 pylab.ion()
 
@@ -1201,7 +1202,18 @@ class RefractionLibrary:
         else:
             out_dir = os.path.expandvars(out_dir) + '/concave_hull'
         try:
-            os.mkdir(out_dir)
+            if os.path.isdir(out_dir):
+                print('Output directory Name %s already exists.  Moving files to new directory within.')
+                old_files = glob.glob(out_dir + '/*.*') #not folders
+                mv_dir = out_dir + '/old'
+                while os.path.isdir(mv_dir):
+                    mv_dir = mv_dir + str(time.time()).replace('.','p')
+                print('Attempting to mkdir: ', mv_dir)
+                os.mkdir(mv_dir)
+                for file in old_files:
+                    os.rename(file,mv_dir + '/' + file.split('/')[-1])
+            else:
+                os.mkdir(out_dir)
             legend_locs = {'direct':'upper right','cross':'upper right','reflect':'upper right','direct_2':'lower right','cross_2':'lower right','reflect_2':'lower right'}        
             concave_hull = getConcaveHullStarter()
                 
@@ -1601,7 +1613,7 @@ if __name__ == '__main__':
                 pylab.xlim(-10,6310)
 
         if save_envelope == True:
-            test_lib.saveEnvelope(library_dir,solution_list = None,verbose = True, plot_hulls = False)
+            test_lib.saveEnvelope(library_dir,verbose = True, plot_hulls = False)
             
         if plot_envelope == True:
             color_key = {'direct':'r', 'cross':'darkgreen', 'reflect':'blue', 'direct_2':'gold', 'cross_2':'lawngreen', 'reflect_2':'purple'}

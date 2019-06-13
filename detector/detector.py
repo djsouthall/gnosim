@@ -841,13 +841,18 @@ class Antenna:
         print('Loading Hull For:',self.lib_dir)
         self.concave_hull = {}
         indir = self.lib_dir.replace('*.h5','')
-        if os.path.expandvars(indir)[-1] == '/':
-            indir = os.path.expandvars(indir) + 'concave_hull'
-        else:
-            indir = os.path.expandvars(indir) + '/concave_hull'
-        if os.path.isdir(indir) == False:
-            print('Hull not previously generated, calculating now.')
-            self.lib.saveEnvelope( self.lib_dir.replace('/*.h5','') )
+        
+        generate = False
+        for solution in self.solutions:
+            if os.path.exists(indir + '/concave_hull_data_%s.h5'%solution):
+                pass
+            else:
+                generate = True
+
+        if generate == True:
+            print('All of hull not previously generated, calculating now.')
+            self.lib.saveEnvelope( indir.replace('/concave_hull','') )
+
         chull = self.lib.loadEnvelope( indir ,store_fit_data = False)
         for dkey in self.lib.data.keys():
             self.concave_hull[dkey] = {}
