@@ -735,7 +735,7 @@ def plotGeometry(stations, neutrino_loc, info, ice, plot3d=False, neutrino_trave
     neutrino_loc_r = numpy.sqrt(neutrino_loc[0]**2 + neutrino_loc[1]**2)
     if len(numpy.unique(info['eventid'])) == 1:
         eventid = numpy.unique(info['eventid'])[0]
-        fig = pylab.figure(figsize=(16.,11.2)) #my screensize
+        fig = pylab.figure()
         if plot3d == True:
             ax = fig.gca(projection='3d')
         else:
@@ -1521,7 +1521,7 @@ if __name__ == '__main__':
     for z_0 in z_array:
         #Library Name Formatting
         libraries_dir = os.environ['GNOSIM_DIR'] + '/gnosim/trace/libraries'
-        if not os.path.isdir(library_dir):
+        if not os.path.isdir(libraries_dir):
             try:
                 print('Making libraries directory:')
                 print(libraries_dir)
@@ -1650,6 +1650,9 @@ if __name__ == '__main__':
                         print('Failed trying to plot hull for solution: %s'%solution)
                         print(e)
             pylab.legend(loc='upper right')
+            pylab.xlabel('r(m)',fontsize=16)
+            pylab.ylabel('z(m)',fontsize=16)
+
             pylab.ylim(-3010,10)
             pylab.xlim(-10,6310)
             

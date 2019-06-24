@@ -250,7 +250,7 @@ if __name__ == "__main__":
             sorted_cut_compare = numpy.argsort(energy_neutrino_compare)[numpy.isin(numpy.argsort(energy_neutrino_compare),numpy.where(cut_compare)[0])]
 
     if plot_data:
-        fig = pylab.figure(figsize=(16.,11.2))
+        fig = pylab.figure()
         
         if plot_ratios == True:
             ax = pylab.subplot(2,1,1)
@@ -286,7 +286,7 @@ if __name__ == "__main__":
         if plot_data:
             ax = pylab.subplot(2,1,2, sharex = ax)
         else:
-            fig = pylab.figure(figsize=(16.,11.2))
+            fig = pylab.figure()
             ax = fig.gca()
 
         

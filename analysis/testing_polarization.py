@@ -29,7 +29,6 @@ if __name__ == "__main__":
     show_Diff_Em_v_Det_Pol_Angles = False
     #####################################################################
 
-    figsize = (20.,12.5)#(16.,11.2)
     #TODO:  Make this have seperate plots per antenna incase they are oriented different and have different expected shapes.
     #Parameters
     infile = os.environ['GNOSIM_DATA'] + '/May3/results_2019_testing_May3_real_config_antarctica_180_rays_signed_fresnel_3.16e+09_GeV_1000000_events_0_seed_1.h5'
@@ -52,7 +51,7 @@ if __name__ == "__main__":
     #####################################################################
 
     if show_Red_Fact_v_Pol_Dot == True:
-        fig = pylab.figure(figsize=figsize)
+        fig = pylab.figure()
         fig.canvas.set_window_title('Red Fact v Pol Theta (Color)')
         ax = fig.gca()
         pylab.hist2d(info['pol_dot_angle'],info['signal_reduction_factor'],norm=matplotlib.colors.LogNorm(),bins=(100,100))
@@ -62,7 +61,7 @@ if __name__ == "__main__":
     #####################################################################
 
     if show_Ang_Range == True:
-        fig = pylab.figure(figsize=figsize)
+        fig = pylab.figure()
         fig.canvas.set_window_title('Ang Range')
         ax = fig.gca()
         ax.minorticks_on()
@@ -81,7 +80,7 @@ if __name__ == "__main__":
     #####################################################################
 
     if show_Pol_Dot_v_Theta_Ant == True:
-        fig = pylab.figure(figsize=figsize)
+        fig = pylab.figure()
         fig.canvas.set_window_title('Pol Theta v Theta Ant')
         gs = gridspec.GridSpec(2, 1, height_ratios=[1, 4]) 
         ax1 = pylab.subplot(gs[0])
@@ -122,7 +121,7 @@ if __name__ == "__main__":
     #####################################################################
 
     if show_Emission_Pol_Dot_v_Theta_Ant == True:
-        fig = pylab.figure(figsize=figsize)
+        fig = pylab.figure()
         fig.canvas.set_window_title('Emission Pol Theta v Theta Ant')
         gs = gridspec.GridSpec(2, 1, height_ratios=[1, 4]) 
         ax1 = pylab.subplot(gs[0])
@@ -166,7 +165,7 @@ if __name__ == "__main__":
     #####################################################################
 
     if show_Emission_Pol_Dot_v_Theta_Emit == True:
-        fig = pylab.figure(figsize=figsize)
+        fig = pylab.figure()
         fig.canvas.set_window_title('Emission Pol Theta v Theta WaveEmit')
         gs = gridspec.GridSpec(2, 1, height_ratios=[1, 4]) 
         ax1 = pylab.subplot(gs[0])
@@ -225,7 +224,7 @@ if __name__ == "__main__":
     #####################################################################
 
     if show_Attenuation_v_D == True:
-        fig = pylab.figure(figsize=figsize)
+        fig = pylab.figure()
         fig.canvas.set_window_title('Attenuation v D')
         ax = pylab.subplot(3,1,1)
         ax.minorticks_on()
@@ -266,7 +265,7 @@ if __name__ == "__main__":
     #####################################################################
 
     if show_Em_v_Det_Pol_Angles == True:
-        fig = pylab.figure(figsize=figsize)
+        fig = pylab.figure()
         fig.canvas.set_window_title('Em v Det Pol Angles')
         ax1 = pylab.subplot(3,1,1)
         cut = info['solution'] == b'direct'
@@ -319,7 +318,7 @@ if __name__ == "__main__":
     #####################################################################
 
     if show_Diff_Em_v_Det_Pol_Angles == True:
-        fig = pylab.figure(figsize=figsize)
+        fig = pylab.figure()
         fig.canvas.set_window_title('Diff Em v Det Pol Angles')
         dz = numpy.cos(numpy.deg2rad(info['theta_ant'])) - numpy.cos(numpy.deg2rad(info['theta_ray']))
         dzp = info['detection_polarization_vector'][:,2] - info['emission_polarization_vector'][:,2]

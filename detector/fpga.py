@@ -199,7 +199,7 @@ def fpgaBeamForming(u_in , V_in, beam_dict , plot1 = False, plot2 = False, save_
     for beam_index, beam_label in enumerate(beam_dict['beams'].keys()):
         formed_beam_powers[beam_label] = {}
         if plot1 == True:
-            fig = pylab.figure(figsize=(16.,11.2))
+            fig = pylab.figure()
         first_in_loop  = True
         for subbeam_index, subbeam_label in enumerate(beam_dict['beams'][beam_label].keys()):
             first_in_sub_loop = True
@@ -237,7 +237,7 @@ def fpgaBeamForming(u_in , V_in, beam_dict , plot1 = False, plot2 = False, save_
     #####
     beam_powersums = {}
     if plot2 == True:
-        fig = pylab.figure(figsize=(16.,11.2))
+        fig = pylab.figure()
         
     test_interval = 8
     test_length = 16

@@ -661,7 +661,7 @@ def addSignals(u_in,V_in,plot=False,V_noise_in = [], remove_noise_overlap = Fals
         else:
             V_out = numpy.zeros_like(u_out)
         if plot == True:
-            pylab.figure(figsize=(16.,11.2))   
+            pylab.figure()   
             ax = pylab.subplot(numpy.shape(V_in)[0]+1,1,numpy.shape(V_in)[0]+1)
             
             pylab.xlim((u_out_min,u_out_max))
@@ -912,7 +912,7 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
             A = numpy.fft.irfft(A_fft,n=len(u))
             A = numpy.fft.fftshift(A)
         if plot_potential == True:
-            pylab.figure(figsize=(16.,11.2))
+            pylab.figure()
             ax = pylab.subplot(311)
             pylab.title('alpha = %0.3f, $\\theta$ = %0.2f deg'%(alpha,numpy.rad2deg(theta_obs_rad)),fontsize=20)
             pylab.plot(u,fp,label='fp')
@@ -994,7 +994,7 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
         
         if include_noise == True:
             if plot_potential == True:
-                pylab.figure(figsize=(16.,11.2))
+                pylab.figure()
                 ax = pylab.subplot(211)
                 pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f\tt_step = %g ns'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n,t_step),fontsize=20)
                 pylab.ylabel('R*|A| (V s)')
@@ -1008,7 +1008,7 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
                 #pylab.scatter(u,R*E_raw,s=1)
                 pylab.plot(u,R*E_raw)
             
-            pylab.figure(figsize=(16.,11.2))
+            pylab.figure()
             ax = pylab.subplot(211)
             pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f\tt_step = %g ns'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n,t_step),fontsize=20)
             pylab.ylabel('Noiseless Signal Voltage (V)',fontsize=16)
@@ -1023,7 +1023,7 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
             pylab.plot(u,V_noise)
         else:
             if plot_potential == True:
-                pylab.figure(figsize=(16.,11.2))
+                pylab.figure()
                 ax = pylab.subplot(211)
                 pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f\tt_step = %g ns'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n,t_step),fontsize=20)
                 pylab.ylabel('R*|A| (V s)')
@@ -1038,7 +1038,7 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
                 pylab.plot(u,R*E_raw)
             
             '''
-            fig = pylab.figure(figsize=(16.,11.2))
+            fig = pylab.figure()
             pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f\tt_step = %g ns'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n,t_step),fontsize=20)
             #pylab.subplot(313,sharex = ax)
             pylab.ylabel('Noiseless Signal Voltage (V)',fontsize=20)
@@ -1054,7 +1054,7 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
             '''
             
     if plot_spectrum == True:
-        fig_spec = pylab.figure(figsize=(16.,11.2))
+        fig_spec = pylab.figure()
         pylab.title('MAGNITUDE E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n))
         scatter = False
         
@@ -1069,7 +1069,7 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
         h_gain *= 4.0 * numpy.pi
 
 
-        pylab.figure(figsize=(16.,11.2))
+        pylab.figure()
         pylab.plot(freqs, 10.0 * numpy.log10(h_gain), label="Antenna", color = 'limegreen')
         pylab.plot(freqs, 10.0 * numpy.log10(sys_gain), label="Elect.", color = 'darkorange')
         pylab.xlabel("Freq. [Hz]")
@@ -1130,7 +1130,7 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
         #fig_spec.patch.set_alpha(0.)
         #ax.patch.set_alpha(0.)
     if plot_angles == True:
-        pylab.figure(figsize=(16.,11.2))
+        pylab.figure()
         ax = pylab.subplot(2,1,1)
         pylab.title('PHASE E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n))
         pylab.plot(freqs/1e6,numpy.rad2deg(numpy.angle(E_raw_fft)),label='Raw Signal (fft)', color = 'blue')

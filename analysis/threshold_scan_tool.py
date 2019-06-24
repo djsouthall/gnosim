@@ -137,7 +137,7 @@ if __name__ == "__main__":
         signal_ticks_x = numpy.array(signal_ticks_x)
         signal_ticks_y = numpy.array(signal_ticks_y)
         if plot_analog_signals == True:
-            pylab.figure(figsize=(16.,11.2))
+            pylab.figure()
             first_in_loop = True
             for index_antenna,antenna in enumerate(station.antennas):
                 if first_in_loop == True:
@@ -152,7 +152,7 @@ if __name__ == "__main__":
             pylab.legend()
         
         if plot_digital_signals == True:
-            fig = pylab.figure(figsize=(16.,11.2))  
+            fig = pylab.figure()  
             fig.suptitle('Generated Noise Signals')
             first_in_loop = True
             for index_antenna, antenna in enumerate(station.antennas):
@@ -192,7 +192,7 @@ if __name__ == "__main__":
         beam_colors = gnosim.utils.misc.getColorMap(len(station.beam_dict['beams'].keys()))
 
         if plot_summed_beams == True:
-            fig = pylab.figure(figsize=(16.,11.2)) #my screensize
+            fig = pylab.figure() 
             fig.suptitle('Generated Noise Signals')
             ax = pylab.gca()
 
@@ -206,7 +206,7 @@ if __name__ == "__main__":
             #ax.legend(loc='center left', bbox_to_anchor=(0.95, 0.5))
         
         if plot_rate_per_beam == True:
-            fig = pylab.figure(figsize=(16.,11.2)) #my screensize
+            fig = pylab.figure() 
             fig.suptitle('Generated Noise Signals, Per Beam')
             for beam_index, beam_label in enumerate(station.beam_dict['beams'].keys()):
                 only_plot_cut = numpy.array(hits[beam_index]) > 0
@@ -244,7 +244,7 @@ if __name__ == "__main__":
 
         print(coeff)
         if plot_fit == True:
-            fig = pylab.figure(figsize=(16.,11.2)) #my screensize
+            fig = pylab.figure() 
             fig.suptitle('Generated Noise Signals, All Beams')
             pylab.plot(threshold_array[indx], yfit(threshold_array[indx]), '--', color='red', lw=1,label = 'Initial Fit')
             #pylab.plot(threshold_array, yfit_extended(threshold_array), '--', color='red', lw=1)

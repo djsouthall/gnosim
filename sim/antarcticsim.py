@@ -919,7 +919,7 @@ class Sim:
                             try:
                                 print('Plotting Signals Acquired a lock')
 
-                                fig = pylab.figure(figsize=(16.,11.2)) #my screensize
+                                fig = pylab.figure()
                                 
                                 n_rows = sum(station.phased_cut)
                                 ntables = 4 #With below lines is 5 for beamforming == True

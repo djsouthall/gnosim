@@ -64,7 +64,7 @@ if __name__ == "__main__":
         
         
         if plot_1 == True:
-            hist_fig = pylab.figure(figsize=(16.,11.2))
+            hist_fig = pylab.figure()
             x = energies
             if weight_by_p_earth == True:
                 hist_fig.suptitle('Trigger = %0.1f (Weighted by $p_\mathrm{earth}$'%trigger_level)
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     
         #########
         if plot_2 == True:
-            hist_fig2 = pylab.figure(figsize=(16.,11.2))
+            hist_fig2 = pylab.figure()
             bins = [1000,1000]
             x = energies
             y = 1/info['distance']

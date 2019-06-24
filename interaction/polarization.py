@@ -237,7 +237,6 @@ def testPolarization():
 
     #prepare plotting
     fig = pylab.figure()
-    #fig = pylab.figure(figsize=(16,11.2))
     ax = fig.gca(projection='3d')
     #Plot antenna
     ax.scatter(antenna_loc[0],antenna_loc[1],antenna_loc[2],'Antenna')
@@ -279,7 +278,6 @@ def testPolarization():
 
     #prepare plotting
     fig = pylab.figure()
-    #fig = pylab.figure(figsize=(16,11.2))
     ax = fig.gca(projection='3d')
     #Plot antenna
     ax.scatter(antenna_loc[0],antenna_loc[1],antenna_loc[2],'Antenna')

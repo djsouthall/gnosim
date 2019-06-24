@@ -71,7 +71,6 @@ if __name__ == "__main__":
     from mpl_toolkits.mplot3d import Axes3D
 
     fig = pylab.figure()
-    #fig = pylab.figure(figsize=(16,11.2))
     ax = fig.gca(projection='3d')
     #Plot antenna
     for origin in origin_antenna:
