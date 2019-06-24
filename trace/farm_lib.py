@@ -12,8 +12,8 @@ import numpy
 
 
 if __name__ == '__main__':
-    z_array = numpy.array([-13.0,-14.0,-15.0,-16.0,-17.0,-18.0,-19.0,-20.0,-13.0 - 20.0,-14.0 - 20.0,-15.0 - 20.0,-16.0 - 20.0,-17.0 - 20.0,-18.0 - 20.0,-19.0 - 20.0,-20.0 - 20.0,-13.0 - 40.0,-14.0 - 40.0,-15.0 - 40.0,-16.0 - 40.0,-17.0 - 40.0,-18.0 - 40.0,-19.0 - 40.0,-20.0 - 40.0,-13.0 - 60.0,-14.0 - 60.0,-15.0 - 60.0,-16.0 - 60.0,-17.0 - 60.0,-18.0 - 60.0,-19.0 - 60.0,-20.0 - 60.0,-13.0 - 80.0,-14.0 - 80.0,-15.0 - 80.0,-16.0 - 80.0,-17.0 - 80.0,-18.0 - 80.0,-19.0 - 80.0,-20.0 - 80.0]) #The list of depths for which to throw rays (or load libraries if make_library == False).
-
+    #z_array = numpy.array([-13.0,-14.0,-15.0,-16.0,-17.0,-18.0,-19.0,-20.0,-13.0 - 20.0,-14.0 - 20.0,-15.0 - 20.0,-16.0 - 20.0,-17.0 - 20.0,-18.0 - 20.0,-19.0 - 20.0,-20.0 - 20.0,-13.0 - 40.0,-14.0 - 40.0,-15.0 - 40.0,-16.0 - 40.0,-17.0 - 40.0,-18.0 - 40.0,-19.0 - 40.0,-20.0 - 40.0,-13.0 - 60.0,-14.0 - 60.0,-15.0 - 60.0,-16.0 - 60.0,-17.0 - 60.0,-18.0 - 60.0,-19.0 - 60.0,-20.0 - 60.0,-13.0 - 80.0,-14.0 - 80.0,-15.0 - 80.0,-16.0 - 80.0,-17.0 - 80.0,-18.0 - 80.0,-19.0 - 80.0,-20.0 - 80.0]) #The list of depths for which to throw rays (or load libraries if make_library == False).
+    z_array = numpy.unique(numpy.array([-173.0-0.0, -173.0-1.0, -173.0-2.0, -173.0-3.0, -173.0-4.0, -173.0-6.0, -173.0-8.0, -173.0-7.0, -173.0-27.0, -173.0-7.0, -173.0-27.0, -173.0-7.0, -173.0-27.0, -173.0-7.0, -173.0-27.0])) #The list of depths for which to throw rays (or load libraries if make_library == False).
     username = 'dsouthall'
     partition = 'broadwl'
     jobname = 'gnolib'
@@ -27,8 +27,6 @@ if __name__ == '__main__':
         command = os.environ['GNOSIM_DIR'] + '/gnosim/trace/refraction_library.py %f'%(z)
         command_queue = batch + command
         print(command)
-        os.system(command_queue) # Submit to queue
-
         # Avoid overwhelming the queue with jobs
         while False:
 

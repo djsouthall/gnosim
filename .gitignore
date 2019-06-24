@@ -3,3 +3,8 @@
 **/*~
 **/trace/libraries/*
 ../utils/misc_private.py
+**/detector/station_config/config_dipole_octo_-200_antarctica_180_rays.py
+**/detector/station_config/real_config_antarctica_180_rays_signed_fresnel.py
+**/detector/station_config/real_config_antarctica_180_rays_signed_fresnel_old_dipole.py
+**/detector/station_config/real_config_full_station.py
+

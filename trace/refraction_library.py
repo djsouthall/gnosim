@@ -1499,15 +1499,15 @@ if __name__ == '__main__':
     # ----------
     make_library = True     #If True, will compute the libraries and save them.  Otherwise just loads from previously saved libraries if available. (False is useful for plotting previously generated libraries).
     split_library = True    #If True, will split the libraries by solution type and save them.
-    plot_library = False    #If True, will plot the ray tracing libraries as they are created (or loaded if make_library == False).
     save_envelope = True    #If True, will calculate the envelope for the ray tracing library and save it.  Advisable to do in advance when ray tracing library is created.
+    plot_library = False    #If True, will plot the ray tracing libraries as they are created (or loaded if make_library == False).
     plot_envelope = False   #If True, will plot the envelope.
     plot_theta_ant = False  #If True, plots the library colormapped with theta_ant
 
-    n_rays = 120            #The number of rays to be thrown per depth.
+    n_rays = 180            #The number of rays to be thrown per depth.
     r_limit = None          #Note if this is NOT None, then all thrown rays will quit once they read this particular radius.  Use with care.  
                             #If you want a simulation with r = 6300m, it might be advisable to make r_limit = 7000 so the boundaries of hulls are still well defined
-    ice_model = 'antarctica' #The ice model to use when throwing rays.  To see available options see gnosim.earth.ice.getAcceptedIceModels().
+    ice_model = 'antarctica_allison'#'greenland_avva'#'antarctica_allison' #The ice model to use when throwing rays.  To see available options see gnosim.earth.ice.getAcceptedIceModels().
     plot_solution_list = numpy.array(['direct','cross','reflect']) #numpy.array(['direct','cross','reflect','direct_2','cross_2','reflect_2']) #The list of solutions types to plot.  To see options see gnosim.trace.refraction_library.getAcceptedSolutions(). 
     
     #Note, it is recommended that you look below the for Library Name Formatting to ensure it is what you want.
@@ -1520,7 +1520,16 @@ if __name__ == '__main__':
     ice_model = gnosim.earth.ice.checkIceModel(ice_model) #Checks if ice model exists and replaces as necessary.
     for z_0 in z_array:
         #Library Name Formatting
-        library_dir = os.environ['GNOSIM_DIR'] + '/gnosim/trace/library_%i_%s_%i_rays_signed_fresnel'%(int(z_0),ice_model,n_rays)
+        libraries_dir = os.environ['GNOSIM_DIR'] + '/gnosim/trace/libraries'
+        if not os.path.isdir(library_dir):
+            try:
+                print('Making libraries directory:')
+                print(libraries_dir)
+                os.mkdir(libraries_dir)
+            except Exception as e:
+                print('Error while attempting to make libraries dir.  Setting libraries_dir to ./')
+                libraries_dir = '.'
+        library_dir = libraries_dir + '/library_%i_%s_%i_rays'%(int(z_0),ice_model,n_rays)
         theta_array = numpy.linspace(0., 180., n_rays) 
 
         if make_library == True:
@@ -1618,9 +1627,9 @@ if __name__ == '__main__':
         if plot_envelope == True:
             color_key = {'direct':'r', 'cross':'darkgreen', 'reflect':'blue', 'direct_2':'gold', 'cross_2':'lawngreen', 'reflect_2':'purple'}
             concave_hull = {}
-            infiles = glob.glob('./'+library_dir+'/concave_hull/*.h5')
+            infiles = glob.glob(library_dir+'/concave_hull/*.h5')
             if len(infiles) == 0:
-                print('Error loading concave hull files.  Ensure they are saved and in dir\n./'+library_dir+'/concave_hull/')
+                print('Error loading concave hull files.  Ensure they are saved and in dir\n '+library_dir+'/concave_hull/')
                 sys.stdout.flush()
                 continue
             infile_list = []
@@ -1628,14 +1637,18 @@ if __name__ == '__main__':
             for infile in infiles:
                 solution = (infile.split('concave_hull_data_')[-1]).replace('.h5','')
                 if numpy.isin(solution,plot_solution_list):
-                    concave_hull[solution] ={}
-                    reader = h5py.File(infile, 'r')
-                    z = numpy.linspace(reader.attrs['z_min'],reader.attrs['z_max'],3000)
-                    f_in = scipy.interpolate.interp1d(reader['z_inner_r_bound'][...],reader['r_inner_r_bound'][...],bounds_error=False,fill_value = ((reader['r_inner_r_bound'][...])[0],(reader['r_inner_r_bound'][...])[-1]),kind='cubic') 
-                    f_out = scipy.interpolate.interp1d(reader['z_outer_r_bound'][...],reader['r_outer_r_bound'][...],bounds_error=False,fill_value = ((reader['r_outer_r_bound'][...])[0],(reader['r_outer_r_bound'][...])[-1]),kind='cubic')
-                    pylab.scatter(f_in(z),z,label = solution+' inner',color=color_key[solution],marker = '<')
-                    pylab.scatter(f_out(z),z,label = solution+' outer',color=color_key[solution],marker = '>')
-                    ax.fill_betweenx(z,f_in(z),f_out(z),color=color_key[solution],alpha=0.2)
+                    try:
+                        concave_hull[solution] ={}
+                        reader = h5py.File(infile, 'r')
+                        z = numpy.linspace(reader.attrs['z_min'],reader.attrs['z_max'],3000)
+                        f_in = scipy.interpolate.interp1d(reader['z_inner_r_bound'][...],reader['r_inner_r_bound'][...],bounds_error=False,fill_value = ((reader['r_inner_r_bound'][...])[0],(reader['r_inner_r_bound'][...])[-1]),kind='cubic') 
+                        f_out = scipy.interpolate.interp1d(reader['z_outer_r_bound'][...],reader['r_outer_r_bound'][...],bounds_error=False,fill_value = ((reader['r_outer_r_bound'][...])[0],(reader['r_outer_r_bound'][...])[-1]),kind='cubic')
+                        pylab.scatter(f_in(z),z,label = solution+' inner',color=color_key[solution],marker = '<')
+                        pylab.scatter(f_out(z),z,label = solution+' outer',color=color_key[solution],marker = '>')
+                        ax.fill_betweenx(z,f_in(z),f_out(z),color=color_key[solution],alpha=0.2)
+                    except Exception as e:
+                        print('Failed trying to plot hull for solution: %s'%solution)
+                        print(e)
             pylab.legend(loc='upper right')
             pylab.ylim(-3010,10)
             pylab.xlim(-10,6310)

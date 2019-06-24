@@ -840,8 +840,14 @@ class Antenna:
         '''
         print('Loading Hull For:',self.lib_dir)
         self.concave_hull = {}
+
         indir = self.lib_dir.replace('*.h5','')
-        
+
+        if os.path.expandvars(indir)[-1] == '/':
+            indir = os.path.expandvars(indir) + 'concave_hull'
+        else:
+            indir = os.path.expandvars(indir) + '/concave_hull'
+
         generate = False
         for solution in self.solutions:
             if os.path.exists(indir + '/concave_hull_data_%s.h5'%solution):
