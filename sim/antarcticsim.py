@@ -280,8 +280,9 @@ class Sim:
         #O'Reilly, Python and HDF5: Chapter 7. More About Types - Compound Types
         station_type = minDType(len(self.stations),mode='uint')
         antenna_type = minDType(self.n_antenna,mode='uint')
-        E_digital_type = minDType(2**(max_bits-1),mode='int')
-        fpga_type = minDType(2**(max_cap_bits-1),mode='int')
+        #I tried this for the two below only to later realize that I want them to have a filler value of -999 (which would instead show as 25 incorrectly if dtype varies. )
+        E_digital_type = 'i'#minDType(2**(max_bits-1),mode='int') 
+        fpga_type = 'i'#minDType(2**(max_cap_bits-1),mode='int')
 
         self.info_dtype = numpy.dtype([ ('eventid','i'),
                                         ('station',station_type),

@@ -1110,6 +1110,17 @@ class Antenna:
         gnosim.interaction.askaryan
         gnosim.interaction.polarization
         '''
+
+        '''
+        # TODO
+        elif(self.antenna_type == 'lpda'):
+            print('This is something we should do!')
+            #Possible source for key information:
+            #https://arxiv.org/ftp/arxiv/papers/1406/1406.0820.pdf
+            #https://arianna.ps.uci.edu/sites/default/files/Allan_Hallgren_VLVvT2015.pdf
+        '''
+
+
         if self.antenna_type == 'simple':
 
             #This is attenuation from attenuation length, and for a p polarized light.  Most like what was done with simple before.  No beam pattern.
