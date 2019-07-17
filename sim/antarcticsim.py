@@ -158,11 +158,12 @@ class Sim:
     For more info about how to work with info_dtype check out HDF5's discussion of custome dtypes in O'Reilly, Python and HDF5: Chapter 7. More About Types - Compound Types
     '''
 
-    def __init__(self, station_config,solutions = numpy.array([]),electric_field_domain = 'time',do_beamforming = True, sim_config = None, pre_split = True, load_lib = True):
-        self.output_type = sim_config['output_type'] # can be root or h5py
-        if not(self.output_type in ['root', 'h5py']):
-            print("Invalid output type. Defaulting to root.")
-            self.output_type = 'root'
+    def __init__(self, station_config, solutions=numpy.array([]), electric_field_domain='time', output_type='h5py', do_beamforming=True, sim_config=None, pre_split=True, load_lib=True):
+        if not(output_type in ['root', 'h5py']):
+            print('Invalid output type. Defaulting to h5py.')
+            self.output_type = 'h5py'
+        else:
+            self.output_type = output_type
 
         #pre_split False unless using a library already sorted into different
         #directories by solution type.
@@ -920,17 +921,26 @@ class Sim:
                             try:
                                 print('Plotting Signals Acquired a lock')
 
+                                include_tables = False
+
                                 fig = pylab.figure()
                                 
                                 n_rows = sum(station.phased_cut)
-                                ntables = 4 #With below lines is 5 for beamforming == True
-                                height_ratios = [2,2,n_rows+1,n_rows+1]
-                                if do_beamforming == True:
-                                    ntables += 1
-                                    height_ratios.append(0.5*sum(height_ratios))
                                     
-                                gs_left = gridspec.GridSpec(n_rows, 2, width_ratios=[3, 2]) #should only call left plots.  pylab.subplot(gs_left[0]),pylab.subplot(gs_left[2]),...
-                                gs_right = gridspec.GridSpec(ntables, 2, width_ratios=[3, 2], height_ratios=height_ratios) #should only call odd tables pylab.subplot(gs_right[1])
+                                if include_tables == True:
+                                    gs_left = gridspec.GridSpec(n_rows, 2, width_ratios=[3, 2]) #should only call left plots.  pylab.subplot(gs_left[0]),pylab.subplot(gs_left[2]),...
+                                    ntables = 4 #With below lines is 5 for beamforming == True
+                                    height_ratios = [2,2,n_rows+1,n_rows+1]
+                                    if do_beamforming == True:
+                                        ntables += 1
+                                        height_ratios.append(0.5*sum(height_ratios))
+                                    gs_right = gridspec.GridSpec(ntables, 2, width_ratios=[3, 2], height_ratios=height_ratios) #should only call odd tables pylab.subplot(gs_right[1])
+                                else:
+                                    if do_beamforming == True:
+                                        gs_left = gridspec.GridSpec(n_rows, 2, width_ratios=[3, 2]) #should only call left plots.  pylab.subplot(gs_left[0]),pylab.subplot(gs_left[2]),...
+                                        gs_right = gridspec.GridSpec(3, 2, width_ratios=[3, 2], height_ratios=[1, 4, 1]) #should only call odd tables pylab.subplot(gs_right[1])
+                                    else:
+                                        gs_left = gridspec.GridSpec(n_rows, 1) #should only call left plots.  pylab.subplot(gs_left[0]),pylab.subplot(gs_left[2]),...
                                 #if do_beamforming == True:
                                 #    gs_beam_forming = gridspec.GridSpec(ntables, 3, width_ratios=[3, 1,5], height_ratios=height_ratios)
                                     
@@ -978,95 +988,113 @@ class Sim:
                                     
                                 pylab.xlabel('t-t_emit (ns)',fontsize=12)
                                 
-                                #Making Tables
-                                #TABLE 1: Making position table
-                                table_fig = pylab.subplot(gs_right[1])
-                                
-                                table_ax = pylab.gca()
-                                table_fig.patch.set_visible(False)
-                                table_ax.axis('off')
-                                table_ax.axis('tight')
-                                x_neutrino = x_0
-                                y_neutrino = y_0
-                                z_neutrino = z_0
-                                r_neutrino = numpy.sqrt(x_neutrino**2 + y_neutrino**2)
-                                phi_neutrino = phi_0
-                                df = pandas.DataFrame({'x(m)':[ x_neutrino ] , 'y(m)':[ y_neutrino ] , 'z(m)':[ z_neutrino ] , 'r(m)':[ r_neutrino ] , '$\phi_0$(deg)':[ phi_neutrino ] })
-                                table = pylab.table(cellText = df.values.round(2), colLabels = df.columns, loc = 'center')
-                                table.auto_set_font_size(False)
-                                table.set_fontsize(10)
-                                pylab.title('Event Info')
-                                
-                                #TABLE 2: Making Neutrino Energetics table 
-                                table_fig = pylab.subplot(gs_right[3])
-                                
-                                table_ax = pylab.gca()
-                                table_fig.patch.set_visible(False)
-                                table_ax.axis('off')
-                                table_ax.axis('tight')
-                                
-                                df = pandas.DataFrame({'E$_\\nu$ (GeV)':'%0.4g'%(effective_energy_neutrino) , 'Inelasticity':'%0.4g'%inelasticity , 'p_interact':'%0.4g'%p_interact, 'p_earth':'%0.4g'%p_earth},index=[0])
-                                #decimals = pandas.Series([3,3,3,3],index = df.columns)
-                                table = pylab.table(cellText = df.values , colLabels = df.columns, loc = 'center')
-                                table.auto_set_font_size(False)
-                                table.set_fontsize(10)
-                                
-                                
-                                #TABLE 3: Making observed angles and attenuations table
-                                table_fig = pylab.subplot(gs_right[5])
-                                
-                                table_ax = pylab.gca()
-                                table_fig.patch.set_visible(False)
-                                table_ax.axis('off')
-                                table_ax.axis('tight')
-                                #only want info from phased antennas
-                                info_phased_cut = numpy.logical_and(info['station'] == index_station , numpy.isin(info['antenna'],numpy.where(station.phased_cut)[0])) 
-                                antenna =           ['%i'%i for i in info[info_phased_cut]['antenna'].astype(int)]
-                                observation_angle = ['%0.4g'%i for i in info[info_phased_cut]['observation_angle'].astype(float)]
-                                theta_ant =         ['%0.4g'%i for i in info[info_phased_cut]['theta_ant'].astype(float)]
-                                distance =          ['%0.3g'%i for i in info[info_phased_cut]['distance'].astype(float)]
-                                reduction_factor =       ['%0.3g'%i for i in info[info_phased_cut]['signal_reduction_factor']]
-                                df = pandas.DataFrame({'antenna':antenna , '$\\theta_\mathrm{ant}$ (deg)':theta_ant , '$\\theta_\mathrm{emit}$ (deg)':observation_angle,'d$_\mathrm{path}$ (m)':distance, 'Reduction Factor':reduction_factor})
-                                table = pylab.table(cellText = df.values, colLabels = df.columns, loc = 'center')
-                                table.auto_set_font_size(False)
-                                table.set_fontsize(10)
-                                
-                                
-                                #TABLE 4: Max Voltage and SNR per Antenna
-                                table_fig = pylab.subplot(gs_right[7])
-                                
-                                table_ax = pylab.gca()
-                                table_fig.patch.set_visible(False)
-                                table_ax.axis('off')
-                                table_ax.axis('tight')
-                                antenna =           ['%i'%i for i in info[info_phased_cut]['antenna'].astype(int)]
-                                electric_field =    ['%0.3g'%i for i in info[info_phased_cut]['electric_field'].astype(float)]
-                                dom_freqs =         ['%0.3g'%i for i in (info[info_phased_cut]['dominant_freq']/1e6).astype(float)]
-                                SNRs =              ['%0.3g'%i for i in info[info_phased_cut]['SNR'].astype(float)]
-                                df = pandas.DataFrame({'antenna':antenna , '$V_\mathrm{max}$ (V)':electric_field , 'SNR':SNRs, '$f_\mathrm{max}$ (MHz)':dom_freqs})
-                                table = pylab.table(cellText = df.values , colLabels = df.columns, loc = 'center')
-                                table.auto_set_font_size(False)
-                                table.set_fontsize(10)
-                                
-                                #TABLE 5: THE TABLE THAT'S ACTUALLY A PLOT AND ONLY SOMETIMES SHOWS UP DEPENDING ON SETTINGS :D
-                                
-                                if do_beamforming == True:
-                                    
-                                    gs_beam_forming = gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=gs_right[9], wspace=0.2, hspace=0.1, width_ratios=[1,12,6])
-                                    #table_fig = pylab.subplot(gs_beam_forming[13])
-                                    table_fig = pylab.subplot(gs_beam_forming[1])
-                                    #table_fig = pylab.subplot(gs_right[9])
-                                    table_ax = pylab.gca()
-                                    table_fig.patch.set_visible(True)
-                                    
-                                    for beam_index, beam_label in enumerate(station.beam_dict['beams'].keys()):
-                                        table_ax.plot(beam_powersums[beam_label],label = '%s, $\\theta_{ant} = $ %0.2f'%(beam_label,station.beam_dict['theta_ant'][beam_label]),color = station.beam_colors[beam_index])
+                                if include_tables == True:
 
-                                    pylab.yticks(rotation=45)
-                                    table_ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-                                    #pylab.legend(loc='upper right', bbox_to_anchor=(1.05, 0.5))
-                                    #table_ax.axis('tight')
-                                pylab.subplots_adjust(left = 0.03, bottom = 0.05, right = 0.97, top = 0.97, wspace = 0.15, hspace = 0.28)
+                                    #Making Tables
+                                    #TABLE 1: Making position table
+                                    table_fig = pylab.subplot(gs_right[1])
+                                    
+                                    table_ax = pylab.gca()
+                                    table_fig.patch.set_visible(False)
+                                    table_ax.axis('off')
+                                    table_ax.axis('tight')
+                                    x_neutrino = x_0
+                                    y_neutrino = y_0
+                                    z_neutrino = z_0
+                                    r_neutrino = numpy.sqrt(x_neutrino**2 + y_neutrino**2)
+                                    phi_neutrino = phi_0
+                                    df = pandas.DataFrame({'x(m)':[ x_neutrino ] , 'y(m)':[ y_neutrino ] , 'z(m)':[ z_neutrino ] , 'r(m)':[ r_neutrino ] , '$\phi_0$(deg)':[ phi_neutrino ] })
+                                    table = pylab.table(cellText = df.values.round(2), colLabels = df.columns, loc = 'center')
+                                    table.auto_set_font_size(True)
+                                    #table.set_fontsize(10)
+                                    pylab.title('Event Info')
+                                    
+                                    #TABLE 2: Making Neutrino Energetics table 
+                                    table_fig = pylab.subplot(gs_right[3])
+                                    
+                                    table_ax = pylab.gca()
+                                    table_fig.patch.set_visible(False)
+                                    table_ax.axis('off')
+                                    table_ax.axis('tight')
+                                    
+                                    df = pandas.DataFrame({'E$_\\nu$ (GeV)':'%0.4g'%(effective_energy_neutrino) , 'Inelasticity':'%0.4g'%inelasticity , 'p_interact':'%0.4g'%p_interact, 'p_earth':'%0.4g'%p_earth},index=[0])
+                                    #decimals = pandas.Series([3,3,3,3],index = df.columns)
+                                    table = pylab.table(cellText = df.values , colLabels = df.columns, loc = 'center')
+                                    table.auto_set_font_size(True)
+                                    #table.set_fontsize(10)
+                                    
+                                    
+                                    #TABLE 3: Making observed angles and attenuations table
+                                    table_fig = pylab.subplot(gs_right[5])
+                                    
+                                    table_ax = pylab.gca()
+                                    table_fig.patch.set_visible(False)
+                                    table_ax.axis('off')
+                                    table_ax.axis('tight')
+                                    #only want info from phased antennas
+                                    info_phased_cut = numpy.logical_and(info['station'] == index_station , numpy.isin(info['antenna'],numpy.where(station.phased_cut)[0])) 
+                                    antenna =           ['%i'%i for i in info[info_phased_cut]['antenna'].astype(int)]
+                                    observation_angle = ['%0.4g'%i for i in info[info_phased_cut]['observation_angle'].astype(float)]
+                                    theta_ant =         ['%0.4g'%i for i in info[info_phased_cut]['theta_ant'].astype(float)]
+                                    distance =          ['%0.3g'%i for i in info[info_phased_cut]['distance'].astype(float)]
+                                    reduction_factor =       ['%0.3g'%i for i in info[info_phased_cut]['signal_reduction_factor']]
+                                    df = pandas.DataFrame({'antenna':antenna , '$\\theta_\mathrm{ant}$ (deg)':theta_ant , '$\\theta_\mathrm{emit}$ (deg)':observation_angle,'d$_\mathrm{path}$ (m)':distance, 'Reduction Factor':reduction_factor})
+                                    table = pylab.table(cellText = df.values, colLabels = df.columns, loc = 'center')
+                                    table.auto_set_font_size(True)
+                                    #table.set_fontsize(10)
+                                    
+                                    
+                                    #TABLE 4: Max Voltage and SNR per Antenna
+                                    table_fig = pylab.subplot(gs_right[7])
+                                    
+                                    table_ax = pylab.gca()
+                                    table_fig.patch.set_visible(False)
+                                    table_ax.axis('off')
+                                    table_ax.axis('tight')
+                                    antenna =           ['%i'%i for i in info[info_phased_cut]['antenna'].astype(int)]
+                                    electric_field =    ['%0.3g'%i for i in info[info_phased_cut]['electric_field'].astype(float)]
+                                    dom_freqs =         ['%0.3g'%i for i in (info[info_phased_cut]['dominant_freq']/1e6).astype(float)]
+                                    SNRs =              ['%0.3g'%i for i in info[info_phased_cut]['SNR'].astype(float)]
+                                    df = pandas.DataFrame({'antenna':antenna , '$V_\mathrm{max}$ (V)':electric_field , 'SNR':SNRs, '$f_\mathrm{max}$ (MHz)':dom_freqs})
+                                    table = pylab.table(cellText = df.values , colLabels = df.columns, loc = 'center')
+                                    table.auto_set_font_size(True)
+                                    #table.set_fontsize(10)
+                                    
+                                    #TABLE 5: THE TABLE THAT'S ACTUALLY A PLOT AND ONLY SOMETIMES SHOWS UP DEPENDING ON SETTINGS :D
+                                
+                                    if do_beamforming == True:
+                                        
+                                        gs_beam_forming = gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=gs_right[9], wspace=0.2, hspace=0.1, width_ratios=[1,12,6])
+                                        table_fig = pylab.subplot(gs_beam_forming[1])
+                                        table_ax = pylab.gca()
+                                        table_fig.patch.set_visible(True)
+                                        
+                                        for beam_index, beam_label in enumerate(station.beam_dict['beams'].keys()):
+                                            table_ax.plot(beam_powersums[beam_label],label = '%s, $\\theta_{ant} = $ %0.2f'%(beam_label,station.beam_dict['theta_ant'][beam_label]),color = station.beam_colors[beam_index])
+
+                                        pylab.yticks(rotation=45)
+                                        table_ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+                                        #pylab.legend(loc='upper right', bbox_to_anchor=(1.05, 0.5))
+                                        #table_ax.axis('tight')
+                                    #pylab.subplots_adjust(left = 0.03, bottom = 0.05, right = 0.97, top = 0.97, wspace = 0.15, hspace = 0.28)
+                                    pylab.subplots_adjust(top=0.965, bottom=0.07, left=0.045, right=0.98, hspace=0.365, wspace=0.08)
+
+
+                                else:
+                                    if do_beamforming == True:
+                                        gs_beam_forming = gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=gs_right[3], wspace=0.2, hspace=0.1, width_ratios=[1,12,6])
+                                        table_fig = pylab.subplot(gs_beam_forming[1])
+                                        table_ax = pylab.gca()
+                                        table_fig.patch.set_visible(True)
+                                        
+                                        for beam_index, beam_label in enumerate(station.beam_dict['beams'].keys()):
+                                            table_ax.plot(beam_powersums[beam_label],label = '%s, $\\theta_{ant} = $ %0.2f'%(beam_label,station.beam_dict['theta_ant'][beam_label]),color = station.beam_colors[beam_index])
+
+                                        pylab.yticks(rotation=45)
+                                        table_ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+                                    #pylab.subplots_adjust(left = 0.03, bottom = 0.05, right = 0.97, top = 0.97, wspace = 0.15, hspace = 0.28)
+                                    pylab.subplots_adjust(top=0.965, bottom=0.07, left=0.045, right=0.98, hspace=0.365, wspace=0.08)
                                 if return_fig_array == True:
                                     fig_array.append(fig)
 
@@ -1615,7 +1643,7 @@ class Sim:
         #Location of neutrino interaction (characterized by [x_0, y_0, z_0] or [phi_vertex, theta_vertex, z_0] )
         #TODO: Make sure detector volume is big enough if multiple stations are present.  
         if z_0 is None:
-            z_0 = numpy.random.uniform(-1. * detector_volume_depth, 0., size=self.n_events) # m #maybe something to double check later, make sure doesn't give solutions outside of earth
+            z_0 = numpy.random.uniform(-1. * detector_volume_depth, 0., size=self.n_events) #maybe something to double check later, make sure doesn't give solutions outside of earth
         else:
             print('Using input z_0')
             if numpy.logical_or(isinstance(z_0,list) == True,isinstance(z_0,tuple) == True):
@@ -1661,7 +1689,7 @@ class Sim:
             phi_vertex = numpy.random.uniform(0., 360., size=self.n_events) # deg
             alpha_max_radians = detector_volume_radius / gnosim.utils.constants.radius_earth # radians
             alpha = numpy.arccos(numpy.random.uniform(1., numpy.cos(alpha_max_radians), size=self.n_events)) # radians
-            r_vertex = gnosim.utils.constants.radius_earth * alpha
+            r_vertex = gnosim.utils.constants.radius_earth * alpha #TODO: This should be (r_earth - z_antenna) * alpha
             x_0 = r_vertex * numpy.cos(numpy.radians(phi_vertex))
             y_0 = r_vertex * numpy.sin(numpy.radians(phi_vertex))
         
@@ -2283,6 +2311,11 @@ if __name__ == '__main__':
     print('Images will be saved to ', image_path)
 
     #Creating Sim and throwing events
+    if numpy.isin('output_type',sim_config.keys()):
+        output_type = sim_config['output_type'] # can be root or h5py
+    else:
+        output_type = None #Sim should handle this and default to default output
+
     my_sim = Sim(station_config, solutions=numpy.array(sim_config['solutions']),electric_field_domain = sim_config['electric_field_domain'],do_beamforming = sim_config['do_beamforming'],sim_config = sim_config, pre_split = sim_config['pre_split'], load_lib = True)
 
 

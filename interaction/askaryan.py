@@ -30,6 +30,9 @@ def electricFieldFrequencyDomainRaw(frequency, d, angle, Energy_GeV, inelasticit
     The old method of calculating the electric field.  This is a frequency domain model:
     Askaryan Emission
     Source: Lehtinen et al. 2003, arXiv:0309656
+
+    Note that this is in no way maintained and is a remnant of before the time domain signals (and the significant structural
+    changes that came with them) were added.  It is HIGHLY recommended that you use time domain calculation. 
     
     Parameters
     ----------
@@ -67,54 +70,6 @@ def electricFieldFrequencyDomainRaw(frequency, d, angle, Energy_GeV, inelasticit
     return electric_field
     
 ############################################################
-
-############################################################
-
-
-def loadSignalResponse(mode='vpol'):
-    '''
-    This loads the system response, antenna response, and corresponding frequencies.  This is no longer being used
-    as loading has become part of the antenna type definition in gnosim.detector.detector.Antenna.addTimingInfo().
-    The responses are returned in the frequency domain.
-    
-    Parameters
-    ----------
-    mode : str, optional
-        The label for a particular response function loading operation.  (Default is 'vpol').
-
-    Returns
-    -------
-    h_fft : numpy.ndarray of cfloat
-        The values for the antenna response. (Should have units of m, i.e. effective height).
-    sys_fft : numpy.ndarray of cfloat
-        The values for the syste response. (Should be unitless).
-    freqs : numpy.ndarray of float
-        The values for the frequencies corresponding to the above responses.
-
-    See Also
-    --------
-    gnosim.detector.detector.Antenna.addTimingInfo
-    '''
-    if mode == 'vpol':
-        print('Loading Signal Response vpol')
-        antenna_response = numpy.load(os.environ['GNOSIM_DIR'] + '/gnosim/sim/response/ara_antenna_response_vpol.npy')
-        electronic_response = numpy.load(os.environ['GNOSIM_DIR'] + '/gnosim/sim/response/ara_system_response_vpol.npy')
-        freqs, h_fft = numpy.hsplit(antenna_response, 2)
-        freqs, sys_fft = numpy.hsplit(electronic_response, 2)
-        h_fft = numpy.ravel(h_fft)
-        sys_fft = numpy.ravel(sys_fft)
-        freqs =  numpy.ravel(freqs).astype(float)
-    else:
-        print('Error: No other responses available yet other than vpol, defaulting to loading Signal Response vpol')
-        antenna_response = numpy.load(os.environ['GNOSIM_DIR'] + '/gnosim/sim/response/ara_antenna_response_vpol.npy')
-        electronic_response = numpy.load(os.environ['GNOSIM_DIR'] + '/gnosim/sim/response/ara_system_response_vpol.npy')
-        freqs, h_fft = numpy.hsplit(antenna_response, 2)
-        freqs, sys_fft = numpy.hsplit(electronic_response, 2)
-        h_fft = numpy.ravel(h_fft)
-        sys_fft = numpy.ravel(sys_fft)
-        freqs =  numpy.ravel(freqs).astype(float)
-    
-    return h_fft,sys_fft,freqs
 
 def RA(Energy_GeV,t_ns):
     '''
@@ -279,318 +234,6 @@ def F_p(Energy_GeV,t_ns,n,LQ):
     fp = (4. * numpy.pi /(LQ * gnosim.utils.constants.mu_0 * math.sqrt(1-1/n**2))) * ra #note that math.sqrt(1-1/1.78**2) is a faster form of numpy.sin(cherenkov_angle) = numpy.sin(numpy.arccos(1/n))
     fp = numpy.multiply(scipy.signal.tukey(len(fp),alpha=0.05),fp)
     return fp
-    
-def vectorPotentialTimeDomain(theta_obs_rad,R,Energy_GeV,n,u,plot = False):
-    '''
-    This calculates the vector potential in the time domain following the source listed below.
-    
-    ***
-    This function is NOT maintained or used.  It's contents have been moved to quickSignalSingle which
-    contains the full calculation but streamlined for calculation duration.
-    ***
-    
-    Source:
-    Practical and Accurate Calculations of Askaryan Radiation - Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283
-
-    Parameters
-    ----------
-    theta_obs_rad : float
-        The observation angle relative to the shower axis.  Given in radians.
-    R : float
-        The observation distance.  Given in m.
-    Energy_GeV : float
-        The energy for which to calculate the vector potential of the Askaryan radiation.  Should already be reduced
-        by the inelasticity factor if applicable.  Given in GeV.
-    n : float
-        The index of refraction where the interaction occurs. 
-    u : numpy.ndarray of floats
-        The times for which to calculate the vector potential.  Given in ns.
-    plot : bool, optional
-        Enables plotting.
-
-    Returns
-    -------
-    u : numpy.ndarray of float
-        The times corresponding to the vector potential.  Given in ns.
-    A : numpy.ndarray of float
-        The vector potential.  Given in V s/m.
-    '''
-    cherenkov_angle = numpy.arccos(1./n)
-    LQ = excessProjectedTrackLength(Q)
-    alpha = (1. - n*numpy.cos(theta_obs_rad))/gnosim.utils.constants.speed_light #scaling factor of u substitution units of ns/m
-
-    fp = F_p(Energy_GeV,u,n,LQ)
-    fp = numpy.multiply(scipy.signal.tukey(len(fp),alpha=0.05),fp)
-
-    if abs(alpha) < 0.001:
-        A = ( gnosim.utils.constants.mu_0 * numpy.sin(theta_obs_rad) * LQ * fp / (4. * numpy.pi * R) ) 
-        #u = u_step * numpy.linspace(-(len(fp)-1)/2,(len(fp)-1)/2,len(fp))
-        A_fft = numpy.fft.rfft(A)
-        #A = numpy.fft.fftshift(A)
-        #time_step = (u[1]-u[0]) #ns
-        #freq_step = 1/(len(u)*(time_step*1e-9))
-        #max_freq = 1/(2*(time_step*1e-9))
-        #freqs = numpy.arange(len(A_fft))*freq_step #might be off by 1 step somewhere
-        #E_fft = -1j*2*numpy.pi*numpy.multiply(A_fft , freqs)
-        #E = numpy.fft.irfft(E_fft,n=len(u)) #/ (len(E_fft) / (max(u) - min(u)))
-        #E = numpy.fft.fftshift(E)
-        
-        if plot == True:
-            pylab.figure()
-            pylab.subplot(211)
-            pylab.title('alpha = %0.3f, $\\theta$ = %0.2f deg'%(alpha,numpy.rad2deg(theta_obs_rad)),fontsize=20)
-            pylab.plot(u,fp,label='fp')
-            pylab.ylabel('$F_p$ ($Amps$)',fontsize=16)
-            pylab.xlim(-10,50)
-            pylab.subplot(212)
-            pylab.plot(u,R*A,label='q')
-            #pylab.ylabel('$R|A|$ ',fontsize=16)
-            pylab.semilogy(u,numpy.fabs(R*A),label='RA')
-            pylab.xlabel('$\Delta t$',fontsize=16)
-            pylab.xlim(-10,50)
-    else:
-        #For calculation Q(u/alpha) below here is my explaination:
-        #The scale factor is added to modify this function by scaling the z' input
-        #such that the convolution described in Eq17 of arXiv:1106.6283.
-        #Essentially in trying to understand how to implement the convolution described
-        #by that equation I decided a u substitution had to be done where 
-        #u = z' * alpha where alpha = (1-n*cos(theta))/c.  
-        #The convolution is then 1/alpha INT du Q(u/alpha)*Fp(dt - u).  The scale
-        #factor is meant to account for the scaling in Q to make it appear more
-        #like a convolution: 1/alpha INT du Q'(u)*Fp(dt - u), where Q' scales u. 
-        #The scaling factor not being one implies the input x is some value of ns
-        #that was converted from meters using the scale factor.
-        
-        q = Q(u/alpha)
-        q = numpy.multiply(scipy.signal.tukey(len(q),alpha=0.05),q)
-        #q = numpy.pad(q,pad_width=int(len(q)/2),mode='constant')
-        fourier_fp = numpy.fft.rfft(fp)
-        fourier_q = numpy.fft.rfft(q)
-
-        convo = numpy.multiply(fourier_fp,fourier_q)
-        
-        #time_step = (u[1]-u[0]) #ns
-        #freq_step = 1/(len(u)*(time_step*1e-9))
-        #max_freq = 1/(2*(time_step*1e-9))
-        #freqs = numpy.arange(len(convo))*freq_step #might be off by 1 step somewhere
-        #freqs = numpy.arange(0,max_freq+freq_step,freq_step)
-        #deriv_convo = 1j*2*numpy.pi*numpy.multiply(convo , freqs)
-        #print('max_freq =',max_freq)
-        #print('max(freqs) =',max(freqs))
-        #print('len(freqs)=',len(freqs))
-        #print('len(convo)=',len(convo)) 
-        
-        inverse_convo_A = numpy.fft.irfft(convo,n=len(u))
-        inverse_convo_A = numpy.fft.fftshift(inverse_convo_A) #might not need to do this, but it moves padding after signal to before signal
-        
-        #inverse_convo_E = numpy.fft.irfft(deriv_convo,n=len(u))
-        #inverse_convo_E = numpy.fft.fftshift(inverse_convo_E)
-        
-        #inverse_convo = scipy.fftpack.fftshift(scipy.fftpack.ifft(convo)) #maybe could divide my 2*pi*f here to get directly 
-        A = ( gnosim.utils.constants.mu_0 * numpy.sin(theta_obs_rad) / (4. * numpy.pi * R ) ) * (inverse_convo_A / ( abs(alpha) * len(inverse_convo_A) / (max(u) - min(u)))) #abs alpha because in the u sub the bounds swap when alpha < 0, but then alpha <0 so the two negatives cancel.
-        #E = -( gnosim.utils.constants.mu_0 * numpy.sin(theta_obs_rad) / (4. * numpy.pi * R ) ) * (inverse_convo_E / ( abs(alpha) * len(inverse_convo_E) / (max(u) - min(u))))# the extra negative comes from the E being -dA/dt
-        if plot == True:
-            pylab.figure()
-            pylab.subplot(311)
-            pylab.title('alpha = %0.3f, $\\theta$ = %0.2f deg'%(alpha,numpy.rad2deg(theta_obs_rad)),fontsize=20)
-            pylab.plot(u,fp,label='fp')
-            pylab.ylabel('$F_p$ ($Amps$)',fontsize=16)
-            pylab.xlim(-10,50)
-            pylab.subplot(312)
-            pylab.plot(u,q,label='q')
-            pylab.ylabel('$Q (arb)$ ',fontsize=16)
-            pylab.xlim(-10,50)
-            pylab.subplot(313)
-            #pylab.semilogy(u,R*A,label='RA')
-            pylab.semilogy(u,numpy.fabs(R*numpy.absolute(A)),label='RA')
-            pylab.ylabel('$R|A|$ ',fontsize=16)
-            pylab.xlabel('$\Delta t$',fontsize=16)
-            pylab.xlim(-10,50)
-            pylab.subplots_adjust(left=0.08, bottom=0.05, right=0.98, top=0.97, wspace=None, hspace=None)
-    return u , A
-
-def electricFieldTimeDomainRaw(theta_obs_rad,R,Energy_GeV,n,u,plot = False,deriv_mode = 'freq'):
-    '''
-    This calculates the electric field in the time domain following the source listed below.  
-    Does not include antenna or system responses.
-    
-    ***
-    This function is NOT maintained or used.  It's contents have been moved to quickSignalSingle which
-    contains the full calculation but streamlined for calculation duration.
-    ***
-    
-    Source:
-    Practical and Accurate Calculations of Askaryan Radiation - Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283
-
-    Parameters
-    ----------
-    theta_obs_rad : float
-        The observation angle relative to the shower axis.  Given in radians.
-    R : float
-        The observation distance.  Given in m.
-    Energy_GeV : float
-        The energy for which to calculate the vector potential of the Askaryan radiation.  Should already be reduced
-        by the inelasticity factor if applicable.  Given in GeV.
-    n : float
-        The index of refraction where the interaction occurs. 
-    u : numpy.ndarray of floats
-        The times for which to calculate the vector potential.  Given in ns.
-    plot : bool, optional
-        Enables plotting.
-    deriv_mode : str, optional
-        Determines how the derivate is performed (time v.s. frequency domain derivative).
-        The options are 'time' and 'freq'. (Default is 'freq').
-
-    Returns
-    -------
-    u : numpy.ndarray of float
-        The times corresponding to the electric field.  Given in ns.
-    E : numpy.ndarray of float
-        The electric field.  Given in V.
-    '''
-    u , A = vectorPotentialTimeDomain(theta_obs_rad,R,Energy_GeV,n,u)
-    if deriv_mode == 'freq':
-        A_fft = numpy.fft.rfft(A)
-        time_step = (u[1]-u[0]) #ns
-        freq_step = 1/(len(u)*(time_step*1e-9))
-        max_freq = 1/(2*(time_step*1e-9))
-        freqs = numpy.arange(len(A_fft))*freq_step #might be off by 1 step somewhere
-        E_fft = -1j*2*numpy.pi*numpy.multiply(A_fft , freqs)
-        E = numpy.fft.irfft(E_fft)
-    else:
-        E = - numpy.divide(numpy.gradient(A),numpy.gradient(u)) * 1e9
-    if plot == True:
-            pylab.figure()
-            pylab.title('E = %g \t$\\theta$=%0.3f \tn = %0.2f'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n))
-            pylab.ylabel('$R|\\vec{E}|$ (V)',fontsize=16)
-            pylab.xlabel('t (ns)',fontsize=16)
-            pylab.plot(u,R*E,label = '$R|\\vec{E}_{raw}|$ ')
-    return  u , E
-
-def electricFieldTimeDomainSignal(theta_obs_rad,R,Energy_GeV,n,h_fft=None,sys_fft=None,freqs=None,plot=False,out_dom_freq = False,return_pos = False,mode='vpol',up_sample_factor=10,deriv_mode = 'freq'):  
-    '''
-    This calculates the electric field in the time domain following the source listed below.  
-    Includes the antenna and system responses.
-    
-    ***
-    This function is NOT maintained or used.  It's contents have been moved to quickSignalSingle which
-    contains the full calculation but streamlined for calculation duration.
-    ***
-    
-    Source:
-    Practical and Accurate Calculations of Askaryan Radiation - Phys. Rev. D 84, 103003 (2011), arXiv:1106.6283
-
-    Parameters
-    ----------
-    theta_obs_rad : float
-        The observation angle relative to the shower axis.  Given in radians.
-    R : float
-        The observation distance.  Given in m.
-    Energy_GeV : float
-        The energy for which to calculate the vector potential of the Askaryan radiation.  Should already be reduced
-        by the inelasticity factor if applicable.  Given in GeV.
-    n : float
-        The index of refraction where the interaction occurs. 
-    u : numpy.ndarray of floats
-        The times for which to calculate the vector potential.  Given in ns.
-    h_fft : numpy.ndarray of cfloat
-        The values for the antenna response. (Should have units of m, i.e. effective height).
-    sys_fft : numpy.ndarray of cfloat
-        The values for the syste response. (Should be unitless).
-    freqs : numpy.ndarray of float
-        The values for the frequencies corresponding to the above responses.
-    plot : bool, optional
-        Enables plotting.
-    out_dom_freq  : bool, optional
-        Enables returning of the frequency corresponding to the max power bin in the signal spectrum.
-    return_pos  : bool, optional
-        Enables returning of only the signal and times that correspond to positive u.
-    mode : str, optional
-        The label for a particular response function loading operation.  (Default is 'vpol').
-    up_sample_factor : int, optional
-        Characterizes how much calculateTimes should up sample the responses.  This is no longer used, as it
-        is expected that signal responses are up sampled in advance. up_sample_factor is not exact, as the
-        number of points is rounded to a factor of 2 to ensure future ifft's are as fast as possible.
-    deriv_mode : str, optional
-        Determines how the derivate is performed (time v.s. frequency domain derivative).
-        The options are 'time' and 'freq'. (Default is 'freq').
-
-    Returns
-    -------
-    u : numpy.ndarray of float
-        The times corresponding to the electric field.  Given in ns.
-    V : numpy.ndarray of float
-        The electric field.  Given in V.
-    dominant_freq : float, optional
-        The frequency corresponding to the max power bin in the signal spectrum.
-
-    See Also
-    --------
-    gnosim.sim.response.upsample_response
-    '''
-    if any([numpy.size(h_fft) ==1,numpy.size(sys_fft)==1,numpy.size(freqs)==1]):
-        h_fft,sys_fft,freqs = loadSignalResponse(mode=mode)
-    freqs = numpy.absolute(freqs)
-    t_step_old = 1/(2*max(freqs))*1e9 #ns
-    n_old = len(freqs)
-    
-    h_fft = numpy.append(h_fft,numpy.zeros(up_sample_factor*len(h_fft)))
-    sys_fft = numpy.append(sys_fft,numpy.zeros(up_sample_factor*len(sys_fft)))
-    freqs = numpy.arange(len(sys_fft))*(freqs[1]-freqs[0])
-    t_step = 1/(2*max(freqs))*1e9 #ns
-    n_new = len(freqs)
-    
-    tmin = 500 #the time window will not go under this number
-    #n_points = int(max(tmin//t_step,2*(len(sys_fft)-1)))#n_points in time
-    n_points = int(2*(len(sys_fft)-1))#n_points in time
-    freq_step = 1/(n_points*t_step*1e-9) #Hz
-    '''
-    if n_points != 2*(len(sys_fft)-1):
-        #need to pad in time domain to make final signal reach further temporally
-        h = numpy.fft.irfft(h_fft)
-        sys = numpy.fft.irfft(sys_fft) 
-        h = numpy.append(h,numpy.zeros(n_points - len(h)))
-        sys = numpy.append(sys,numpy.zeros(n_points - len(sys)))
-        h_fft = numpy.fft.rfft(h)
-        sys_fft = numpy.fft.rfft(sys) 
-    '''    
-    f = numpy.arange(len(h_fft))*freq_step
-    response_fft = numpy.multiply(h_fft,sys_fft)
-        
-    u = numpy.arange(-n_points/2,n_points/2)*t_step
-    
-    u , E_sig = electricFieldTimeDomainRaw(theta_obs_rad,R,Energy_GeV,n,u,plot=plot,deriv_mode = deriv_mode)
-    E_fft = numpy.fft.rfft(E_sig)
-    V_fft = numpy.multiply(E_fft,response_fft)
-    V = numpy.fft.irfft(V_fft,n=len(u))
-    
-    if plot == True:
-        pylab.figure()
-        pylab.title('E = %g \t$\\theta$=%0.3f \tn = %0.2f'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n))
-        pylab.plot(u,V)
-        pylab.ylabel('Signal (V)',fontsize=16)
-        pylab.xlabel('t (ns)',fontsize=16)
-        
-        pylab.figure()
-        pylab.title('E = %g \t$\\theta$=%0.3f \tn = %0.2f'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n))
-        pylab.plot(f/1e6,20.0 * numpy.log10(numpy.absolute(E_fft)),label='Raw Signal (fft)')
-        pylab.plot(f/1e6,20.0 * numpy.log10(numpy.absolute(h_fft)),label='Antenna Response')
-        pylab.plot(f/1e6,20.0 * numpy.log10(numpy.absolute(sys_fft)),label='System Response')
-        pylab.plot(f/1e6,20.0 * numpy.log10(numpy.absolute(V_fft)),label='Processed Signal (fft)')
-        
-        pylab.xlabel('Freq. [MHz]',fontsize=16)
-        pylab.ylabel('dB',fontsize=16)
-        pylab.ylim(-50,100)
-        pylab.xlim(0,1000)
-        pylab.legend()
-    if return_pos == True:
-        V = V[u>=0]
-        u = u[u>=0]
-    if out_dom_freq == True:
-        dominant_freq = f[numpy.argmax(numpy.absolute(V_fft))]
-        return u , V , dominant_freq
-    else:
-        return u , V
 
 def addSignals(u_in,V_in,plot=False,V_noise_in = [], remove_noise_overlap = False):
     '''
@@ -706,84 +349,8 @@ def addSignals(u_in,V_in,plot=False,V_noise_in = [], remove_noise_overlap = Fals
             
         return u_out,V_out
 
-def calculateTimes(up_sample_factor=20,h_fft=None,sys_fft=None,freqs=None,mode=None):
-    '''
-    This loads (if not given) the system response, antenna response, and corresponding frequencies, 
-    and additionally calculates the times for which the Askaryan calculation will be calculated.  
-    This is no longer being used as loading has become part of the  antenna type definition in 
-    gnosim.detector.detector.Antenna.addTimingInfo(). The responses are returned in the frequency domain.
 
-    ***
-    This function is NOT maintained or used.  It's contents have been moved to quickSignalSingle which
-    contains the full calculation but streamlined for calculation duration.
-    ***
-
-    Parameters
-    ----------
-    up_sample_factor : int, optional
-        Characterizes how much calculateTimes should up sample the responses.  This is no longer used, as it
-        is expected that signal responses are up sampled in advance. up_sample_factor is not exact, as the
-        number of points is rounded to a factor of 2 to ensure future ifft's are as fast as possible.
-    h_fft : numpy.ndarray of cfloat
-        The values for the antenna response. (Should have units of m, i.e. effective height).
-    sys_fft : numpy.ndarray of cfloat
-        The values for the syste response. (Should be unitless).
-    freqs : numpy.ndarray of float
-        The values for the frequencies corresponding to the above responses.
-    mode : str, optional
-        The label for a particular response function loading operation.  (Default is 'vpol').
-
-    Returns
-    -------
-    u : numpy.ndarray of float
-        The times corresponding to the electric field.  Given in ns.
-    h_fft : numpy.ndarray of cfloat
-        The values for the antenna response. (Should have units of m, i.e. effective height).
-    sys_fft : numpy.ndarray of cfloat
-        The values for the syste response. (Should be unitless).
-    freqs : numpy.ndarray of float
-        The values for the frequencies corresponding to the above responses.
-
-    See Also
-    --------
-    gnosim.sim.response.upsample_response
-    gnosim.detector.detector.Antenna.addTimingInfo()
-    '''
-
-    '''
-    Calculates the times used for signal calculations based on the response functions
-    (assumed to have the same frequency step).  
-    
-    This also returns the newly padded responses and freqs.
-    '''
-    #Loading in response function and setting frequency / time steps
-    if any([numpy.size(h_fft) ==1,numpy.size(sys_fft)==1,numpy.size(freqs)==1]):
-        if mode == None:
-            print('No mode given to pass to loadSignalResponse, that functions default mode will be used')
-            h_fft,sys_fft,freqs = loadSignalResponse()
-        else:
-            print('Passing loadSignalResponse(mode=%s)'%mode)
-            h_fft,sys_fft,freqs = loadSignalResponse(mode=mode)
-
-    if up_sample_factor <= 0:
-        up_sample_factor = 1
-    
-    freqs = numpy.absolute(freqs)
-    freq_step = freqs[1]-freqs[0] #1/(n_points*t_step*1e-9) #Hz
-    possible_lengths = 2**numpy.arange(0,25)
-    n_points_freq = possible_lengths[possible_lengths >= up_sample_factor*len(h_fft)][0] + 1 #Want 2^n events in time domain, so 2^n  #upsamples to the closest power of two to upsample*original_length
-    freqs = numpy.arange(n_points_freq)*freq_step
-    
-    h_fft = numpy.append(h_fft,numpy.zeros(n_points_freq - len(h_fft)))
-    sys_fft = numpy.append(sys_fft,numpy.zeros(n_points_freq - len(sys_fft)))
-    #response_fft = numpy.multiply(h_fft,sys_fft)
-    
-    t_step = 1/(2*max(freqs))*1e9 #ns
-    u = numpy.arange(-(n_points_freq-1),(n_points_freq-1))*t_step #To increase time duration of signal I should just need to upsample?
-    return u, h_fft, sys_fft, freqs
-
-
-def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reduction_factor, u, h_fft, sys_fft, freqs, fp_fft = None, plot_signals=False, plot_spectrum=False, plot_angles = False, plot_potential = False, include_noise = False, resistance = 50, noise_temperature = 320, random_local = None):  
+def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reduction_factor, u, h_fft, sys_fft, freqs, fp_fft=None, plot_signals=False, plot_spectrum=False, plot_signals_spectrum=False, plot_angles=False, plot_potential=False, include_noise=False, resistance=50, noise_temperature=320, random_local=None):  
     '''
     This calculates the electric field in the time domain following the source listed below.  
     Includes the antenna and system responses.  This should do the entire calculation, mostly
@@ -824,13 +391,16 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
         The frequency domain version of the form factor.  This is the same for a particular neutrino event, so
         can be calculated in advance and passed to this function to save computation time.  (Default is None).
     plot_signals : bool, optional
-        Enables plotting of signals.
+        Enables plotting of signals.  (Default is False).
     plot_spectrum : bool, optional
-        Enables plotting of the signal spectrum.
+        Enables plotting of the response spectrum.  (Default is False).
+    plot_signals_spectrum : bool, optional
+        Emables plotting signal spectrum on top of response spectra.  plot_spectrum must be enabled for this to work.
+        (Default is False).
     plot_angles : bool, optional
-        Enables plotting of the signal phases.
+        Enables plotting of the signal phases.  (Default is False).
     plot_potential : bool, optional
-        Enables plotting of the vector potential.
+        Enables plotting of the vector potential.  (Default is False).
     include_noise : bool, optional
         Enables the addition of noise (Default is False).
     resistance : float, optional
@@ -903,7 +473,7 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
         #q = Q(u/alpha)
         #q = numpy.multiply(scipy.signal.tukey(len(q),alpha=0.05),q)
         
-        q = 0.60 * scipy.stats.gamma.pdf( 0.60 * u/alpha , a = 4.85 ) #This seems to be rate limiting.  If you think of faster way to calculate you can save some time.
+        q = 0.60 * scipy.stats.gamma.pdf( 0.60 * u/alpha , a = 4.85 ) #This seems to be rate limiting.  If you think of faster way to calculate you can save some time.  Potentially just a precomputed lookup table?
         q = numpy.multiply(scipy.signal.tukey(len(q),alpha=0.05),q)
         q_fft = numpy.fft.rfft(q) #should look into an analytica form of fft(gamma function) to see if there is a way to avoid this fft
         A_fft = numpy.multiply(fp_fft,q_fft) * ( gnosim.utils.constants.mu_0 * numpy.sin(theta_obs_rad) / (4. * numpy.pi * R ) ) * ( t_step/abs(alpha) ) #the t_step already accounts for scaling required with irffting.  Might not want here?  unsure
@@ -917,15 +487,27 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
             pylab.title('alpha = %0.3f, $\\theta$ = %0.2f deg'%(alpha,numpy.rad2deg(theta_obs_rad)),fontsize=20)
             pylab.plot(u,fp,label='fp')
             pylab.ylabel('$F_p$ ($Amps$)',fontsize=16)
+            pylab.minorticks_on()
+            pylab.grid(which="both")
+            pylab.grid(b=True, which='major', color='k', linestyle='-')
+            pylab.grid(b=True, which='minor', color='tab:gray', linestyle='--',alpha=0.5)
             #pylab.xlim(-10,50)
             pylab.subplot(312,sharex = ax)
             pylab.plot(u,q,label='q')
             pylab.ylabel('$Q (arb)$ ',fontsize=16)
+            pylab.minorticks_on()
+            pylab.grid(which="both")
+            pylab.grid(b=True, which='major', color='k', linestyle='-')
+            pylab.grid(b=True, which='minor', color='tab:gray', linestyle='--',alpha=0.5)
             #pylab.xlim(-10,50)
             pylab.subplot(313,sharex = ax)
             pylab.semilogy(u,numpy.fabs(R*numpy.absolute(A)),label='RA')
             pylab.ylabel('$R|A|$ ',fontsize=16)
             pylab.xlabel('$\Delta t$',fontsize=16)
+            pylab.minorticks_on()
+            pylab.grid(which="both")
+            pylab.grid(b=True, which='major', color='k', linestyle='-')
+            pylab.grid(b=True, which='minor', color='tab:gray', linestyle='--',alpha=0.5)
             #pylab.xlim(-10,50)
     #calculating E_raw_fft    
     E_raw_fft = -1.0j*2.0*numpy.pi*numpy.multiply(A_fft , freqs) #negitive sign because E = -dA/dt
@@ -997,14 +579,22 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
                 pylab.figure()
                 ax = pylab.subplot(211)
                 pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f\tt_step = %g ns'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n,t_step),fontsize=20)
-                pylab.ylabel('R*|A| (V s)')
-                pylab.xlabel('t (ns)')
+                pylab.ylabel('R*|A| (V s)',fontsize=16)
+                pylab.xlabel('t (ns)',fontsize=16)
+                pylab.minorticks_on()
+                pylab.grid(which="both")
+                pylab.grid(b=True, which='major', color='k', linestyle='-')
+                pylab.grid(b=True, which='minor', color='tab:gray', linestyle='--',alpha=0.5)
                 #pylab.scatter(u,R*numpy.absolute(A),s=1)
                 pylab.plot(u,R*numpy.absolute(A))
                 
                 pylab.subplot(212,sharex = ax)
-                pylab.ylabel('$R \cdot E_{raw}$ (V)')
-                pylab.xlabel('t (ns)')
+                pylab.ylabel('$R \cdot E_{raw}$ (V)',fontsize=16)
+                pylab.xlabel('t (ns)',fontsize=16)
+                pylab.minorticks_on()
+                pylab.grid(which="both")
+                pylab.grid(b=True, which='major', color='k', linestyle='-')
+                pylab.grid(b=True, which='minor', color='tab:gray', linestyle='--',alpha=0.5)
                 #pylab.scatter(u,R*E_raw,s=1)
                 pylab.plot(u,R*E_raw)
             
@@ -1014,11 +604,19 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
             pylab.ylabel('Noiseless Signal Voltage (V)',fontsize=16)
             pylab.xlabel('t (ns)',fontsize=16)
             #pylab.scatter(u,V,s=1)
-            pylab.plot(u[plot_cut],V_noiseless[plot_cut])
+            pylab.minorticks_on()
+            pylab.grid(which="both")
+            pylab.grid(b=True, which='major', color='k', linestyle='-')
+            pylab.grid(b=True, which='minor', color='tab:gray', linestyle='--',alpha=0.5)
+            pylab.plot(u,V_noiseless)
             
             pylab.subplot(212,sharex = ax)
-            pylab.ylabel('Signal Voltage (V)')
-            pylab.xlabel('t (ns)')
+            pylab.ylabel('Signal Voltage (V)',fontsize=16)
+            pylab.xlabel('t (ns)',fontsize=16)
+            pylab.minorticks_on()
+            pylab.grid(which="both")
+            pylab.grid(b=True, which='major', color='k', linestyle='-')
+            pylab.grid(b=True, which='minor', color='tab:gray', linestyle='--',alpha=0.5)
             #pylab.scatter(u,V,s=1)
             pylab.plot(u,V_noise)
         else:
@@ -1026,14 +624,22 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
                 pylab.figure()
                 ax = pylab.subplot(211)
                 pylab.title('E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f\tt_step = %g ns'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n,t_step),fontsize=20)
-                pylab.ylabel('R*|A| (V s)')
-                pylab.xlabel('t (ns)')
+                pylab.ylabel('R*|A| (V s)',fontsize=16)
+                pylab.xlabel('t (ns)',fontsize=16)
+                pylab.minorticks_on()
+                pylab.grid(which="both")
+                pylab.grid(b=True, which='major', color='k', linestyle='-')
+                pylab.grid(b=True, which='minor', color='tab:gray', linestyle='--',alpha=0.5)
                 #pylab.scatter(u,R*numpy.absolute(A),s=1)
                 pylab.plot(u,R*numpy.absolute(A))
             
                 pylab.subplot(212,sharex = ax)
-                pylab.ylabel('$R \cdot E_{raw}$ (V)')
-                pylab.xlabel('t (ns)')
+                pylab.ylabel('$R \cdot E_{raw}$ (V)',fontsize=16)
+                pylab.xlabel('t (ns)',fontsize=16)
+                pylab.minorticks_on()
+                pylab.grid(which="both")
+                pylab.grid(b=True, which='major', color='k', linestyle='-')
+                pylab.grid(b=True, which='minor', color='tab:gray', linestyle='--',alpha=0.5)
                 #pylab.scatter(u,R*E_raw,s=1)
                 pylab.plot(u,R*E_raw)
             
@@ -1055,7 +661,9 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
             
     if plot_spectrum == True:
         fig_spec = pylab.figure()
-        pylab.title('MAGNITUDE E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n))
+
+        if plot_signals_spectrum:
+            pylab.title('MAGNITUDE E = %g GeV \t$\\theta$=%0.3f deg \tn = %0.2f'%(Energy_GeV,numpy.rad2deg(theta_obs_rad),n))
         scatter = False
         
         '''
@@ -1077,12 +685,12 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
         '''
         
         #These scalings are for v6 onward.  Older scalings were probably incorrect anyways so I am just leaving these for all versions.
-        sys_gain = numpy.absolute(sys_fft)**2
+        sys_gain = numpy.absolute(sys_fft)**2 #Squaring instead of just plottiong as 20log10
         sys_gain *= 2.0 # Because the rfft is missing half the power
         
         h_gain = numpy.absolute(h_fft)
-        h_gain *= (1.74 / 3e8) * numpy.array(freqs)
-        h_gain *= h_gain 
+        h_gain *= (1.74 / 3e8) * numpy.array(freqs) #1/lambda
+        h_gain *= h_gain #squaring
         h_gain *= 2.0 # Because the rfft is missing half the power
         h_gain *= 4.0 * numpy.pi
         
@@ -1103,30 +711,37 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
             signal_gain *= 2.0 # Because the rfft is missing half the power
             signal_gain *= t_step**2
         ##
-        linewidth = 5 
+        linewidth = 3 
         markersize = 4
         if scatter == True:
-            #pylab.scatter(freqs/1e6,10.0 * numpy.log10(raw_signal_gain),label='Raw Signal (fft)', color = 'blue',s = markersize)
             pylab.scatter(freqs/1e6,10.0 * numpy.log10(sys_gain),label='System Response (fft)', color = 'darkorange',s = markersize)
             pylab.scatter(freqs/1e6,10.0 * numpy.log10(h_gain),label='Antenna Response (fft)', color = 'limegreen',s = markersize)
-            #pylab.scatter(freqs/1e6,10.0 * numpy.log10(signal_gain),label='Processed Signal (fft)', color = 'red',s = markersize)
+            if plot_signals_spectrum:
+                pylab.scatter(freqs/1e6,10.0 * numpy.log10(raw_signal_gain),label='Raw Signal (fft)', color = 'blue',s = markersize)
+                pylab.scatter(freqs/1e6,10.0 * numpy.log10(signal_gain),label='Processed Signal (fft)', color = 'red',s = markersize)
         else:
-            #pylab.plot(freqs/1e6,10.0 * numpy.log10(raw_signal_gain),label='Raw Signal (fft)', color = 'blue',linewidth = linewidth)
             pylab.plot(freqs/1e6,10.0 * numpy.log10(sys_gain),label='System Response (fft)', color = 'darkorange',linewidth = linewidth)
             pylab.plot(freqs/1e6,10.0 * numpy.log10(h_gain),label='Antenna Response (fft)', color = 'limegreen',linewidth = linewidth)
-            #pylab.plot(freqs/1e6,10.0 * numpy.log10(signal_gain),label='Processed Signal (fft)', color = 'red',linewidth = linewidth)
+            if plot_signals_spectrum:
+                pylab.plot(freqs/1e6,10.0 * numpy.log10(raw_signal_gain),label='Raw Signal (fft)', color = 'blue',s = markersize)
+                pylab.plot(freqs/1e6,10.0 * numpy.log10(signal_gain),label='Processed Signal (fft)', color = 'red',s = markersize)
         
-        pylab.ylabel("Realized Gain [dBi] (Signals in arb)",fontsize=16)
+        if plot_signals_spectrum:
+            pylab.ylabel("Realized Gain [dBi] (Signals in arb)",fontsize=16)
+        else:
+            pylab.ylabel("Realized Gain [dBi]",fontsize=16)
         pylab.xlabel('Freq. [MHz]',fontsize=16)
         #pylab.ylabel('dB (20.0 log10(numpy.absolute(V_fft)))',fontsize=16)
         pylab.ylim(-75,75)
         pylab.xlim(0,1000)
         pylab.minorticks_on()
-        #pylab.grid(which="both")
+        pylab.grid(which="both")
+        pylab.grid(b=True, which='major', color='k', linestyle='-')
+        pylab.grid(b=True, which='minor', color='tab:gray', linestyle='--',alpha=0.5)
         pylab.legend(fontsize=14)
         ax = pylab.gca()
         ax.tick_params(axis = 'both',labelsize = 16)
-        pylab.subplots_adjust(left = 0.09, bottom = 0.06, right = 0.97, top = 0.97, wspace = 0.20, hspace = 0.20)
+        #pylab.subplots_adjust(left = 0.09, bottom = 0.06, right = 0.97, top = 0.97, wspace = 0.20, hspace = 0.20)
         #fig_spec.patch.set_alpha(0.)
         #ax.patch.set_alpha(0.)
     if plot_angles == True:
@@ -1138,6 +753,10 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
         pylab.plot(freqs/1e6,numpy.rad2deg(numpy.angle(h_fft)),label='Antenna Response (fft)', color = 'limegreen')
         pylab.ylabel('Angle [deg]',fontsize=16)
         pylab.legend(fontsize=14)
+        pylab.minorticks_on()
+        pylab.grid(which="both")
+        pylab.grid(b=True, which='major', color='k', linestyle='-')
+        pylab.grid(b=True, which='minor', color='tab:gray', linestyle='--',alpha=0.5)
         
         
         pylab.subplot(2,1,2,sharex=ax,sharey=ax)
@@ -1153,7 +772,11 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
         #pylab.ylim(-100,100)
         pylab.xlim(0,1500)
         pylab.legend(fontsize=14)
-    
+        pylab.minorticks_on()
+        pylab.grid(which="both")
+        pylab.grid(b=True, which='major', color='k', linestyle='-')
+        pylab.grid(b=True, which='minor', color='tab:gray', linestyle='--',alpha=0.5)
+
     if include_noise == True:
         dominant_freq = freqs[numpy.argmax(numpy.absolute(V_fft_noise))]
         return u + t_offset , V_noiseless, dominant_freq, V_noise,  SNR
@@ -1166,32 +789,34 @@ def quickSignalSingle(theta_obs_rad, R, Energy_GeV, n, t_offset, signal_reductio
 
 
 if __name__ == "__main__":
-    pylab.close('all')
+    #pylab.close('all')
+    #################################################################
+    import yaml
+    import gnosim.detector.detector
+    solutions = numpy.array(['direct'])
+    config_file = os.environ['GNOSIM_DIR'] + '/gnosim/detector/station_config/real_config_full_station.py'
+    config = yaml.load(open(config_file))
+    station = gnosim.detector.detector.Station('ARA5',config,solutions = solutions)
+    station.plotStation()
+
+    ant = station.antennas[0]
+
     energy_neutrino = 3.e9 # GeV
     n = 1.78
     c = gnosim.utils.constants.speed_light #m/ns
-    
     R = 1000. #m
     cherenkov_angle = numpy.arccos(1./n)
     cherenkov_angle_deg = numpy.rad2deg(numpy.arccos(1./n))
-    h_fft,sys_fft,freqs = loadSignalResponse()
-    input_u, h_fft, sys_fft, freqs = calculateTimes(up_sample_factor=20)
-    inelasticity = 0.2
-    noise_rms = numpy.std(quickSignalSingle(0,R,inelasticity*energy_neutrino,n,R,0,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)[3])
-    u, V_noiseless, dominant_freq, V_noise,  SNR = quickSignalSingle(numpy.deg2rad(50),R,inelasticity*energy_neutrino,n,2500,0.7,input_u, h_fft, sys_fft, freqs,plot_signals=False,plot_spectrum=False,plot_potential=False,include_noise = True)
-    sampling_rate = 1.5 #GHz
-    sampling_period = 1.0/sampling_rate
-    bits = 7
-    scale_noise_from = noise_rms
-    scale_noise_to = 3
-    
-    random_time_offset = numpy.random.uniform(-5.0,5.0) #ns
-    dc_offset = 0.0 #V
-    sample_times = numpy.arange(u[0],u[-1],sampling_period) + random_time_offset 
-    sampled_times , V_bit = gnosim.detector.fpga.digitizeSignal(u,V_noise,sample_times,bits,scale_noise_from,scale_noise_to, dc_offset = dc_offset, plot = False)
-    dt = sampled_times[1] - sampled_times[0]
-    #################################################################
 
+    inelasticity = 1.00
+
+    u, V_noiseless, dominant_freq, V_noise,  SNR = gnosim.interaction.askaryan.quickSignalSingle(numpy.deg2rad(50),R,inelasticity*energy_neutrino,n,1,0.7,ant.signal_times, ant.h_fft, ant.sys_fft, ant.freqs_response,plot_signals=True,plot_spectrum=True,plot_potential=True,include_noise = True)
+    minimum_time = numpy.min(u)
+    maximum_time = numpy.max(u)
+    random_time_offset = numpy.random.uniform(-1, 1, size=1)
+    digital_sample_times = numpy.arange(minimum_time,maximum_time,station.digital_sampling_period) + random_time_offset #these + random_time_offset #these
+    sample_times,V_bit = gnosim.detector.fpga.digitizeSignal(u,V_noise,digital_sample_times,7,0.0204,3, dc_offset = 0, plot = True)
     '''
     See gnosim.sim.testing_single_event for how to rerun calculations for an event.
     '''    
+

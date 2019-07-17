@@ -2,7 +2,7 @@
 This file contains the properties of any ice model (Greenland v.s. Antarctic ice)
 As well as functions for using these models.
 
-This combines what were previously rhe antarctic.py and greenland.py files.
+This combines what were previously the antarctic.py and greenland.py files.
 '''
 import os
 import sys
@@ -1172,8 +1172,21 @@ if __name__ == "__main__":
 
     pylab.figure()
     pylab.title('Density')
+    pylab.plot(ice_greenland_avva.density(z) * gnosim.utils.constants.mass_proton,z, label='greenland_avva density from Arthern') # Convert from nucleons m^-3 to kg m^-3
+    #pylab.plot(ice_antarctica_allison.density(z) * gnosim.utils.constants.mass_proton,z, label='antarctica_allison density from Spicecore') # Convert from nucleons m^-3 to kg m^-3
+    pylab.ylabel('Elevation (m)')
+    pylab.xlabel(r'Density (kg m$^{-3}$)')
+    pylab.legend(loc='lower center')
+    pylab.ylim([-3100., 100.])
+    pylab.legend()
+    pylab.minorticks_on()
+    pylab.grid(b=True, which='major', color='k', linestyle='-')
+    pylab.grid(b=True, which='minor', color='tab:gray', linestyle='--',alpha=0.5)
+
+    pylab.figure()
+    pylab.title('Density')
     pylab.plot(z, ice_greenland_avva.density(z) * gnosim.utils.constants.mass_proton, label='greenland_avva density from Arthern') # Convert from nucleons m^-3 to kg m^-3
-    pylab.plot(z, ice_antarctica_allison.density(z) * gnosim.utils.constants.mass_proton, label='antarctica_allison density from Spicecore') # Convert from nucleons m^-3 to kg m^-3
+    #pylab.plot(z, ice_antarctica_allison.density(z) * gnosim.utils.constants.mass_proton, label='antarctica_allison density from Spicecore') # Convert from nucleons m^-3 to kg m^-3
     pylab.xlabel('Elevation (m)')
     pylab.ylabel(r'Density (kg m$^{-3}$)')
     pylab.legend(loc='lower center')
@@ -1186,7 +1199,7 @@ if __name__ == "__main__":
     pylab.figure()
     pylab.title('Density')
     pylab.plot(-z, ice_greenland_avva.density(z) * gnosim.utils.constants.mass_proton / 1.e3, label='greenland_avva density from Arthern') # Convert from nucleons m^-3 to kg m^-3
-    pylab.plot(-z, ice_antarctica_allison.density(z) * gnosim.utils.constants.mass_proton / 1.e3, label='antarctica_allison density from Spicecore') # Convert from nucleons m^-3 to kg m^-3
+    #pylab.plot(-z, ice_antarctica_allison.density(z) * gnosim.utils.constants.mass_proton / 1.e3, label='antarctica_allison density from Spicecore') # Convert from nucleons m^-3 to kg m^-3
     pylab.xlabel('Depth (m)')
     pylab.ylabel(r'Density (Mg m$^{-3}$)')
     pylab.legend(loc='lower center')
@@ -1203,7 +1216,7 @@ if __name__ == "__main__":
     pylab.figure()
     pylab.title('Index of Refraction')
     pylab.plot(z, ice_greenland_avva.indexOfRefraction(z), label='greenland_avva')
-    pylab.plot(z, ice_antarctica_allison.indexOfRefraction(z), label='antarctica_allison')
+    #pylab.plot(z, ice_antarctica_allison.indexOfRefraction(z), label='antarctica_allison')
     pylab.xlim([-300,0.0])
     pylab.xlabel('Elevation (m)')
     pylab.ylabel('Index of Refraction')
@@ -1216,10 +1229,23 @@ if __name__ == "__main__":
     pylab.figure()
     pylab.title('Index of Refraction')
     pylab.plot(z, ice_greenland_avva.indexOfRefraction(z), label='greenland_avva')
-    pylab.plot(z, ice_antarctica_allison.indexOfRefraction(z), label='antarctica_allison')
+    #pylab.plot(z, ice_antarctica_allison.indexOfRefraction(z), label='antarctica_allison')
     pylab.xlim([-3000,0.0])
     pylab.xlabel('Elevation (m)')
     pylab.ylabel('Index of Refraction')
+    pylab.legend(loc='lower center')
+    pylab.legend()
+    pylab.minorticks_on()
+    pylab.grid(b=True, which='major', color='k', linestyle='-')
+    pylab.grid(b=True, which='minor', color='tab:gray', linestyle='--',alpha=0.5)
+    
+    pylab.figure()
+    pylab.title('Index of Refraction')
+    pylab.plot(ice_greenland_avva.indexOfRefraction(z), z, label='greenland_avva')
+    #pylab.plot(ice_antarctica_allison.indexOfRefraction(z), z, label='antarctica_allison')
+    pylab.ylim([-3000,0.0])
+    pylab.ylabel('Elevation (m)')
+    pylab.xlabel('Index of Refraction')
     pylab.legend(loc='lower center')
     pylab.legend()
     pylab.minorticks_on()

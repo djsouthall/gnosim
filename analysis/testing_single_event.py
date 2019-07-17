@@ -10,6 +10,8 @@ of a particular event.  This has been left open and not encapsualted as a functi
 that will change a lot based on the needs of the particular user, and it is nice for them to not have to work around a strict
 structure.  
 
+NOTE: This currently only works for h5py output file type.
+
 Running
 -------
 It is recommended that you run this in a command line interface like ipython with the %run command or using the 
@@ -65,13 +67,13 @@ import ast
 pylab.ion()
 
 if __name__ == "__main__":
-    pylab.close('all')
+    #pylab.close('all')
 
     ###------------###
     ### Parameters ###
     ###------------###
 
-    infile = '/home/dsouthall/scratch-midway2/results_2019_testing_input_event_locations_real_config_antarctica_180_rays_signed_fresnel_1.00e+08_GeV_0_events_1.h5'
+    infile = '/project/avieregg/gno_analysis/june2019/output/antarctica_8ant100m/results_june2019_antarctica_8ant_100m_3.16e+09_GeV_100000_events_0_seed_1.h5'
     plot_geometry = True
     plot_signals = True
     choose_n = 1 #How many of the triggered events to run
@@ -110,7 +112,21 @@ if __name__ == "__main__":
 
     cut = numpy.logical_and(cut_A,cut_B)
     eventids = numpy.unique(info[cut]['eventid'])
-    #eventids = numpy.array([32])
+    eventids = numpy.array([42344])
+
+    '''
+    For event 42344
+    In [8]: info_out[info_out['solution'] == b'direct']['theta_ant']                                                                                                                                                   
+    Out[8]: 
+    array([101.338715, 101.55207 , 101.75805 , 101.95732 , 102.15027 ,
+           102.336876, 102.51761 , 102.69245 ], dtype=float32)
+
+    In [9]: info_out[info_out['solution'] == b'cross']['theta_ant']                                                                                                                                                    
+    Out[9]: 
+    array([71.62072, 71.37601, 71.13936, 70.90957, 70.68653, 70.47106,
+           70.25243, 70.05115], dtype=float32)
+
+    '''
 
 
     if type(eventids) != numpy.ndarray:

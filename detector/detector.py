@@ -1253,6 +1253,38 @@ if __name__ == "__main__":
     config = yaml.load(open(config_file))
     station = Station('ARA5',config,solutions = solutions)
     station.plotStation()
+
+    ant = station.antennas[0]
+
+
+
+    energy_neutrino = 3.e9 # GeV
+    n = 1.78
+    c = gnosim.utils.constants.speed_light #m/ns
+    R = 1000. #m
+    cherenkov_angle = numpy.arccos(1./n)
+    cherenkov_angle_deg = numpy.rad2deg(numpy.arccos(1./n))
+
+    inelasticity = 1.0
+
+    u, V_noiseless, dominant_freq, V_noise,  SNR = gnosim.interaction.askaryan.quickSignalSingle(numpy.deg2rad(50),R,inelasticity*energy_neutrino,n,2500,0.7,ant.signal_times, ant.h_fft, ant.sys_fft, ant.freqs_response,plot_signals=True,plot_spectrum=True,plot_potential=True,include_noise = True)
+
+    '''
+    pylab.figure()
+    pylab.title('Response Curves',fontsize=18)
+    pylab.scatter(ant.freqs_response/1e6, 10.0 * numpy.log10(ant.h_fft), label="Antenna")
+    pylab.scatter(ant.freqs_response/1e6, 10.0 * numpy.log10(ant.sys_fft), label="System")
+    pylab.xlabel("Freq. (MHz)",fontsize=16)
+    pylab.ylabel("Realized Gain (dBi)",fontsize=16)
+    pylab.legend(fontsize=14)
+    pylab.xlim(0, 1000)
+    pylab.ylim(-25.0, 40.0)
+    pylab.minorticks_on()
+    pylab.grid(which="both")
+    pylab.grid(b=True, which='major', color='k', linestyle='-')
+    pylab.grid(b=True, which='minor', color='tab:gray', linestyle='--',alpha=0.5)
+    '''
+
     '''
     x = 0.0
     y = 0.0

@@ -70,27 +70,41 @@ def digitizeSignal(u,V,sample_times,digitizer_bits,scale_noise_from,scale_noise_
     #sampling_period = 1.0 / sampling_rate #ns
     #sample_times = numpy.arange(u[1],u[-1],sampling_period) + random_time_offset
     #sample_times = sample_times[numpy.logical_and(sample_times <= u[-1],sample_times >= u[1])] #otherwise interpolation error for out of bounds. 
-    V_sampled = scipy.interpolate.interp1d(u,V,bounds_error = False,fill_value = 0.0)(sample_times) #sampletimes will now extend beyond the interpolated range but here it returns 0 voltage
-    
+    #V_sampled = numpy.around(scipy.interpolate.interp1d(u,V,bounds_error = False,fill_value = 0.0)(sample_times),decimals=3) #sampletimes will now extend beyond the interpolated range but here it returns 0 voltage
+    V_sampled = scipy.interpolate.interp1d(u,V,bounds_error = False,fill_value = 0.0)(sample_times)
     #bit_vals = numpy.linspace(-2**(digitizer_bits-1)+1,2**(digitizer_bits-1),2**digitizer_bits,dtype=int)
     bit_vals = numpy.array([-2**(digitizer_bits-1)+1,2**(digitizer_bits-1)],dtype=int) #only really need endpoints
     slope = scale_noise_to/scale_noise_from
     f = scipy.interpolate.interp1d(bit_vals/slope,bit_vals,bounds_error = False,fill_value = (bit_vals[0],bit_vals[-1]) )
     V_bit = numpy.floor(f(V_sampled)) #not sure if round or floor should be used to best approximate the actual process.
-    
+    #import pdb; pdb.set_trace()
     if plot == True:
+        sampling_rate = 1.0/numpy.diff(sample_times)[0]
         pylab.figure()
         ax = pylab.subplot(2,1,1)
-        pylab.ylabel('V (V)')
-        pylab.xlabel('t (ns)')
-        pylab.scatter(u,V,label='Signal')
-        pylab.stem(sample_times,V_sampled,bottom = dc_offset, linefmt='r-', markerfmt='rs', basefmt='r-',label='Interp Sampled at %0.2f GSPS'%sampling_rate)
+        pylab.ylabel('V (V)',fontsize=16)
+        pylab.xlabel('t (ns)',fontsize=16)
+        pylab.plot(u,V,label='Signal')
+        pylab.stem(sample_times,V_sampled,bottom = dc_offset, linefmt='r-', markerfmt='r.', basefmt='r-',label='Interp Sampled at %0.2f GSPS'%sampling_rate)
         
+        pylab.legend()
+        pylab.minorticks_on()
+        pylab.grid(which="both")
+        pylab.grid(b=True, which='major', color='k', linestyle='-')
+        pylab.grid(b=True, which='minor', color='tab:gray', linestyle='--',alpha=0.5)
+
         ax = pylab.subplot(2,1,2,sharex=ax)
-        pylab.ylabel('Voltage (Scaled so VRMS = 3)')
-        pylab.xlabel('t (ns)')
-        pylab.plot(u,V*slope)
-        pylab.stem(sample_times,V_bit,bottom = dc_offset*slope, linefmt='r-', markerfmt='rs', basefmt='r-',label='Interp Sampled at %0.2f GSPS'%sampling_rate)
+        pylab.ylabel('Voltage (adu)\n%0.3g mV scaled to %i adu'%(1000*scale_noise_from, scale_noise_to),fontsize=16)
+        pylab.xlabel('t (ns)',fontsize=16)
+        pylab.plot(sample_times,V_bit,alpha=0.5)
+        pylab.scatter(sample_times,V_bit,color = 'r',marker = '.',label='Interp Sampled at %0.2f GSPS'%sampling_rate)
+        #pylab.stem(sample_times,V_bit,bottom = dc_offset*slope, linefmt='r-', markerfmt='r.', basefmt='r-',label='Interp Sampled at %0.2f GSPS'%sampling_rate)
+        pylab.legend()
+        pylab.minorticks_on()
+        pylab.grid(which="both")
+        pylab.grid(b=True, which='major', color='k', linestyle='-')
+        pylab.grid(b=True, which='minor', color='tab:gray', linestyle='--',alpha=0.5)
+
     return sample_times,V_bit
 
 def syncSignals(u_in , V_in, min_time, max_time, u_step ):
@@ -217,14 +231,14 @@ def fpgaBeamForming(u_in , V_in, beam_dict , plot1 = False, plot2 = False, save_
                     ax = pylab.subplot(len(beam_dict['beams'][beam_label].keys()),1,subbeam_index+1)
                     pylab.title('%s'%(beam_label))
                     pylab.plot(V_subbeam,label = '$\\theta_\mathrm{ant} = $%0.2f'%(beam_dict['beams'][beam_label][subbeam_label]['theta_ant']))
-                    pylab.xlabel('time steps')
-                    pylab.ylabel('%s (abu)'%subbeam_label)
+                    pylab.xlabel('time steps',fontsize=16)
+                    pylab.ylabel('%s (abu)'%subbeam_label,fontsize=16)
                     pylab.legend(loc='upper right')
                 else:
                     pylab.subplot(len(beam_dict['beams'][beam_label].keys()),1,subbeam_index+1,sharex = ax)
                     pylab.plot(V_subbeam,label = '$\\theta_\mathrm{ant} = $%0.2f'%(beam_dict['beams'][beam_label][subbeam_label]['theta_ant']))
-                    pylab.xlabel('time steps')
-                    pylab.ylabel('%s (abu)'%subbeam_label)
+                    pylab.xlabel('time steps',fontsize=16)
+                    pylab.ylabel('%s (abu)'%subbeam_label,fontsize=16)
                     pylab.legend(loc='upper right')
         if save_figs == True:
             try:

@@ -515,6 +515,7 @@ def rayTrace(origin, phi_0, theta_ant, ice, t_max=50000., t_step=1., r_limit=Non
         t_array[ii + 1] = t_array[ii] + t_step
 
         if ii == 0 and z_array[ii] > 1.:
+            #This section appears to only apply to antennas about the ground (by at least 1m for some reason).
             # Rather than take many steps to the ice, take one large jump
 
             # Curvature corrections

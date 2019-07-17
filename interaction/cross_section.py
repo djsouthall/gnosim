@@ -69,7 +69,7 @@ def crossSection(energy_neutrino, mode):
 
 def totalCrossSection(energy_neutrino, anti=False):
     '''
-    Returns a dictionary for the modes of neutrno intaractions.
+    Returns a dictionary for the modes of neutrino intaractions.
 
     Source:
     Connolly et al. 2011, arXiv:1102.0691
