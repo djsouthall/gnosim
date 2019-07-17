@@ -237,204 +237,13 @@ class Ice:
             self.f_density = scipy.interpolate.interp1d( self.elevation_deep[::-1] , self.density_deep[::-1], kind='cubic', bounds_error = None, fill_value= 'extrapolate' ) #extroplate appears to do a good job here to 0m - DS
         elif numpy.isin(self.ice_model, ['antarctica_allison']):
             '''
-            This uses the spicecore data given by Cosmin (no official source yet).  It fits it with a simple exponential
+            This uses the spicecore data given by Cosmin (no official source yet).  It was fit with a simple exponential
             which fixes the asymptotic behaviour to lead to 917.  These are given in kg/m^3 and then f_density is converted
             to neclei/m^3 using gnosim.utils.constants.mass_proton.
             '''
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
             densityFit = lambda z, a, b : 917.0 - a*numpy.exp(z/b)
-
-            self.popt_spicecore, self.pcov_spicecore = numpy.array([570.05140003,  65.03495904]) , numpy.array([[41.38266317, -4.74136409],[-4.74136409,  0.89063516]]) #Fit of data to above
-
+            self.popt_spicecore = numpy.array([570.05140003,  65.03495904]) #Fit of data to above
+            self.pcov_spicecore = numpy.array([[41.38266317, -4.74136409],[-4.74136409,  0.89063516]])
 
             def f_density(z):
                 '''
@@ -1173,7 +982,7 @@ if __name__ == "__main__":
     pylab.figure()
     pylab.title('Density')
     pylab.plot(ice_greenland_avva.density(z) * gnosim.utils.constants.mass_proton,z, label='greenland_avva density from Arthern') # Convert from nucleons m^-3 to kg m^-3
-    #pylab.plot(ice_antarctica_allison.density(z) * gnosim.utils.constants.mass_proton,z, label='antarctica_allison density from Spicecore') # Convert from nucleons m^-3 to kg m^-3
+    pylab.plot(ice_antarctica_allison.density(z) * gnosim.utils.constants.mass_proton,z, label='antarctica_allison density from Spicecore') # Convert from nucleons m^-3 to kg m^-3
     pylab.ylabel('Elevation (m)')
     pylab.xlabel(r'Density (kg m$^{-3}$)')
     pylab.legend(loc='lower center')
@@ -1186,7 +995,7 @@ if __name__ == "__main__":
     pylab.figure()
     pylab.title('Density')
     pylab.plot(z, ice_greenland_avva.density(z) * gnosim.utils.constants.mass_proton, label='greenland_avva density from Arthern') # Convert from nucleons m^-3 to kg m^-3
-    #pylab.plot(z, ice_antarctica_allison.density(z) * gnosim.utils.constants.mass_proton, label='antarctica_allison density from Spicecore') # Convert from nucleons m^-3 to kg m^-3
+    pylab.plot(z, ice_antarctica_allison.density(z) * gnosim.utils.constants.mass_proton, label='antarctica_allison density from Spicecore') # Convert from nucleons m^-3 to kg m^-3
     pylab.xlabel('Elevation (m)')
     pylab.ylabel(r'Density (kg m$^{-3}$)')
     pylab.legend(loc='lower center')
@@ -1199,7 +1008,7 @@ if __name__ == "__main__":
     pylab.figure()
     pylab.title('Density')
     pylab.plot(-z, ice_greenland_avva.density(z) * gnosim.utils.constants.mass_proton / 1.e3, label='greenland_avva density from Arthern') # Convert from nucleons m^-3 to kg m^-3
-    #pylab.plot(-z, ice_antarctica_allison.density(z) * gnosim.utils.constants.mass_proton / 1.e3, label='antarctica_allison density from Spicecore') # Convert from nucleons m^-3 to kg m^-3
+    pylab.plot(-z, ice_antarctica_allison.density(z) * gnosim.utils.constants.mass_proton / 1.e3, label='antarctica_allison density from Spicecore') # Convert from nucleons m^-3 to kg m^-3
     pylab.xlabel('Depth (m)')
     pylab.ylabel(r'Density (Mg m$^{-3}$)')
     pylab.legend(loc='lower center')
@@ -1216,7 +1025,7 @@ if __name__ == "__main__":
     pylab.figure()
     pylab.title('Index of Refraction')
     pylab.plot(z, ice_greenland_avva.indexOfRefraction(z), label='greenland_avva')
-    #pylab.plot(z, ice_antarctica_allison.indexOfRefraction(z), label='antarctica_allison')
+    pylab.plot(z, ice_antarctica_allison.indexOfRefraction(z), label='antarctica_allison')
     pylab.xlim([-300,0.0])
     pylab.xlabel('Elevation (m)')
     pylab.ylabel('Index of Refraction')
@@ -1229,7 +1038,7 @@ if __name__ == "__main__":
     pylab.figure()
     pylab.title('Index of Refraction')
     pylab.plot(z, ice_greenland_avva.indexOfRefraction(z), label='greenland_avva')
-    #pylab.plot(z, ice_antarctica_allison.indexOfRefraction(z), label='antarctica_allison')
+    pylab.plot(z, ice_antarctica_allison.indexOfRefraction(z), label='antarctica_allison')
     pylab.xlim([-3000,0.0])
     pylab.xlabel('Elevation (m)')
     pylab.ylabel('Index of Refraction')
@@ -1242,7 +1051,7 @@ if __name__ == "__main__":
     pylab.figure()
     pylab.title('Index of Refraction')
     pylab.plot(ice_greenland_avva.indexOfRefraction(z), z, label='greenland_avva')
-    #pylab.plot(ice_antarctica_allison.indexOfRefraction(z), z, label='antarctica_allison')
+    pylab.plot(ice_antarctica_allison.indexOfRefraction(z), z, label='antarctica_allison')
     pylab.ylim([-3000,0.0])
     pylab.ylabel('Elevation (m)')
     pylab.xlabel('Index of Refraction')
