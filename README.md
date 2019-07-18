@@ -146,9 +146,13 @@ The code was developed using compatible builds of Python 3.7.1 and ROOT 6.16.00.
 This will unload the current ROOT and Python modules and load the recommended versions.
 
 Python packages:
+
 numpy - http://www.numpy.org/
+
 scipy - http://www.scipy.org/
+
 h5py - http://www.h5py.org/
+
 matplotlib / pylab - http://matplotlib.org/
 
 Certain portions of the code require large amounts of memory.  If the code is breaking this may be something to check.
@@ -233,7 +237,7 @@ The more rays, the higher to computing time and RAM requirements but the more ac
 
 Once the script is prepare, the script can be run by opening a python command line terminal in the folder containing gnosim and running
 
-  >>> exec(open('./gnosim/refraction_library.py').read())
+    exec(open('./gnosim/refraction_library.py').read())
 
 #### GENERAL
 
@@ -725,7 +729,8 @@ data it is recommended that the user reference the website or the textbook 'Pyth
 (O'Reilly Publishing).  A basic overview is discussed below.
 
 To work with h5py files the package must be loaded in python using the command:
->>> import h5py
+
+    import h5py
 
 ### 3.1.1 Saving and Loading h5py Files
 
