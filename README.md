@@ -368,154 +368,140 @@ A dictionary containing information about the ice to be loaded in the simulation
 
 ## 1.4.0 Preparing a Simulation Configuration File
   
-Simulation configuration files are used to hold the selected settings for running the simulation.  This includes reference to the station configuration files
-to be used, as well general options for running.                       
+Simulation configuration files are used to hold the selected settings for running the simulation.  This includes reference to the station configuration files  to be used, as well general options for running.                       
 
-Below is a description of the keys to include in the simulation configuration file.
-It is recommended that you copy and modify existing configuration files locally, rather than creating your own from scratch.
+Below is a description of the keys to include in the simulation configuration file.  It is recommended that you copy and modify existing configuration files locally, rather than creating your own from scratch.
 
-    outfile_dir : str
-        Where the data files will be saved.
-    outfile_name_root : str
-        This will be the first part of the outfiles name.  It will be followed by information about the simulation such as station_config_file_name and the number 
-        of neutrino events.  Common choices for this are the date, i.e. 'results_2019_Mar', to distinguish sets of simulations.
-    station_config_file : str
-        The address of the station configuration file.
-    solutions : list of str
-        The solutions to work with in the simulation.  To see the list of accepted solution types see gnosim.trace.refraction_library.getAcceptedSolutions().
-        Often either all accepted solution types, or the same list omitting types containing _2, which represent libraries of solution that reflect of the bottom of the ice.
-        These are often omitted because they double compute time and are assumed to have a small effect on the overall measured results.
-    image_extension : str
-        The image extension for any saved images.  Examples: 'svg', 'png', etc.
-    image_path_root : str
-        The location of the directory for which a new sub-folder with the name of the simulation will be created for output images.
-    electric_field_domain : str
-        Selects the Askaryan calculation type.  Either 'time' (highly recommended) or 'freq'.  'freq' is not fully supported and outdated, will use the 
-        frequency domain calculation that was in early builds of GNOSim rather than the new time domain calculation.
-    do_beamforming : bool
-        Enables a the performance of beamforming trigger on digitized signals.  Meta data will be stored in the info section of the outfile pertaining to
-        this.  Beams will only be triggered on if trigger_threshold_units is 'fpga'. 
-    include_noise : bool
-        Enables the inclusion of noise in the signals.  If this is False no noise will be in the signals, but digitized signals will still be scaled as if 
-        noise were present (i.e. a noise signal will be calculated to get the noise_rms voltage, while will be scaled as specified in the station configuration 
-        file).
-    summed_signals : bool
-        If True, then signals resulting from different solution types are combined into a single waveform per antenna.  Otherwise only the waveform of the 
-        solution type with the maximum signal per antenna will be used.
-    pre_split : bool
-        Determines whether to attempt to load from pre split libraries.  If true (and the pre split libraries are calculated and saved appropriately) this avoids lengthy 
-        calculations which separate the rays into the different solution types. 
-    plot_geometry : bool
-        Enables plotting of the neutrino location, rays, and antennas.  Only plots for trigger events.
-    plot_signals : bool
-        Enables plotting of the waveforms, as well as of the beam forming plots and some meta data.  Only plots for trigger events.
-    trigger_threshold : float
-        The trigger threshold to be applied on the signal or set of signals.  This should correspond to trigger_threshold_units.
-    trigger_threshold_units : str
-        This selects to units used for triggering.  To see the options try getAcceptedTriggerUnits().  If this is 'fpga' then do_beamforming must be True.
-    use_interp_threading : bool
-        Enables multi-threading during the interpolation portion of the code.  Significantly speeds up users perception of start up time (computationally
-        this obviously still takes the same amount of time).  Note that if this is enabled then live plotting is disabled, due to
-        matplotlib currently not being thread safe.  Plots can be generated after the fact. (See gnosim.analysis.testing_single_event.py).
-    use_event_threading : bool
-        Enables multi-threading during the interpolation portion of the code.  Significantly speeds up users perception of total run time (computationally
-        this obviously still takes the same amount of time).   Note that if this is enabled then live plotting is disabled, due to
-        matplotlib currently not being thread safe.  Plots can be generated after the fact. (See gnosim.analysis.testing_single_event.py).
-    output_all_solutions : bool
-        Enables all solution types to be output, otherwise only the solution type with the maximum signal per antenna is output.
-    save_signals : bool
-        Enables saving the waveforms for triggered events.  Waveforms are saved in the output file as a dictionary under the 'signals' header.
-        This dictionary is organized at the top level by event, then branching to station label. 
-        The signals from a station are in the form of a numpy.ndarray which contains the signals for all antennas in the station.
-        Each antenna in each station is stored as row in the numpy.ndarray corresponding to that station.  The final row of
-        this ndarray is the times corresponding to the signals in every other row.  Signals are given in units of adu and times
-        in units of ns.
-        # TODO: Add a script that converts these to be in the same format as real data taken from an ARA station.
-        pre_trigger_angle : float or list of floats or None, optional
-            If given, then a pre trigger will be applied to the event such that calculations of Askaryan radiation/electric field will only be conducted 
-            if ANY of the possible solution types (for all antennas and stations) have an observation angle within pre_trigger_angle number of degrees to
-            the Cherenkov angle.  Essentially the Cherenkov cone must be observable within the pre trigger angular window from at least one antenna in the
-            array in order for the calculations to proceed.
+- **outfile_dir : str**
 
-            pre_trigger_angle can be given as a single float (i.e. 10.0), or as a list no more than 2 floats i.e.([5.0,10.0]).  In order for 2 values to be 
-            interpretted correctly by yaml they must be given as a list, NOT a tuple or array in the config file.  If a single number is given
-            then it will be used for both the upper an lower (relative) bounds of acceptable angles.  If two values are given the the first value will act
-            as the lower (relative) bound, and the second will be used as the upper (relative) bound.  In this case relative mean that the given angle(s)
-            are relative to the cherenkov angle, and will be added or subtracted from it depending on the bound.
+  Where the data files will be saved.
+- **outfile_name_root : str**
 
-            i.e. if pre_trigger_angle is 10.0 degrees then signals will only be calculated if one of the solutions was emitted (observed on cone) at an
-            angle: theta_c - 10.0 deg < theta_obs < theta_c + 10.0 deg.
+  This will be the first part of the outfiles name.  It will be followed by information about the simulation such as station_config_file_name and the number of neutrino events.  Common choices for this are the date, i.e. 'results_2019_Mar', to distinguish sets of simulations.
+- **station_config_file : str**
 
-            If [5.0,10.0] is given then signals will only be calculated if one of the solutions was emitted (observed on cone) at an
-            angle: theta_c - 5.0 deg < theta_obs < theta_c + 10.0 deg.
+  The address of the station configuration file.
+- **solutions : list of str**
 
-            If ANY of the solution types of ANY of the antennas in the entire array satisfies the pre trigger, then all calculations for that event proceed, 
-            not just the solution types that independently satisfied the pre trigger threshold.  
+  The solutions to work with in the simulation.  To see the list of accepted solution types see gnosim.trace.refraction_library.getAcceptedSolutions().
+  Often either all accepted solution types, or the same list omitting types containing _2, which represent libraries of solution that reflect of the bottom of the ice.  These are often omitted because they double compute time and are assumed to have a small effect on the overall measured results.
+- **image_extension : str**
 
-            *NOTE:  Setting a pre trigger can speed up the code significantly, but it must be done with care or else information may be lost.
-            It is highly recommended that you first run a simulation with you desired settings and pre_trigger_angle set to None.  Then with this
-            preliminary simulation analyse the losses you expect by not computing these angles (using gnosim/analysis/pre_trigger_set_tool.py for example).
-            Then with this knowledge set the pre trigger for future simulations as you see fit.  This script currently only supports single values pre
-            trigger angles.*
+  The image extension for any saved images.  Examples: 'svg', 'png', etc.
+- **image_path_root : str**
 
-            (Default is None).
-    output_fields : list of str
-        Much of the meta-data for each event is contained within a single structured array.  Internally (while the simulation is running) this array will
-        have the dtype info_dtype, which is specified withinin antarcticsim.  This data type is reduced for ouput, with some fields being required and staying, 
-        and others only being present if specified.  This parameter (output_fields) specifies which of the optional fields to include in the output file.
+  The location of the directory for which a new sub-folder with the name of the simulation will be created for output images.
+- **electric_field_domain : str**
 
-        Below are the lists of required and optional fields.  The required fields are deemed so because they allow for testing_single_event to run without doing
-        a full grid interpolation, saving considerable time when trying to examine just a few events after a larger simulation has been run.  The rest of the
-        fields can be recalculated within testing_single_event using just these fields, and thus are optional.  It is considerably easier to have an optional
-        field enabled (if it is valuable) then to recalculte it with testing_single_event, so it is recommended that you enable the fields you require.  Note that
-        the more fields that are enabled, the more RAM that will be needed and the larger the output file.  Full descriptions of the data corresponding to each of
-        the following fields can befound in Section 3.3.1.
+  Selects the Askaryan calculation type.  Either 'time' (highly recommended) or 'freq'.  'freq' is not fully supported and outdated, will use the frequency domain calculation that was in early builds of GNOSim rather than the new time domain calculation.
+- **do_beamforming : bool**
 
-        Required Fields
-            These fields are already included in the output dtype and do not need to be listed in output_fields.
-            
-                'eventid'                  
-                'station'
-                'antenna'
-                'has_solution'
-                'triggered'
-                'solution'
-                'time'
-                'distance'
-                'theta_ant'
-                'theta_ray'
-                'a_s'
-                'a_p'
-                'seed'  
+  Enables a the performance of beamforming trigger on digitized signals.  Meta data will be stored in the info section of the outfile pertaining to
+  this.  Beams will only be triggered on if trigger_threshold_units is 'fpga'. 
+- **include_noise : bool**
 
-        Optional Fields
-            These fields are not included on output by default, and must be listed as utes in output_fields for them to be saved in the info dataset.  If you wish
-            to have none of these then you either put an empty list, or you can set output_fields to None, 'None', or 'none'.  If you wish to have all of the fields then you
-            can simply list them all or set output_fields to 'All' or 'all'. 
+  Enables the inclusion of noise in the signals.  If this is False no noise will be in the signals, but digitized signals will still be scaled as if noise were present (i.e. a noise signal will be calculated to get the noise_rms voltage, while will be scaled as specified in the station configuration file).
+- **summed_signals : bool**
 
-                'pre_triggered'
-                'observation_angle'
-                'electric_field'
-                'electric_field_digitized'
-                'fpga_max'
-                'dominant_freq'
-                'SNR'
-                'signal_reduction_factor'
-                'polarization_dot_factor'
-                'beam_pattern_factor'
-                'attenuation_factor'
-                'pol_dot_angle'
-                'neutrino_travel_dir_vector'
-                'emission_wave_vector'
-                'detection_wave_vector'
-                'emission_polarization_vector'
-                'detection_polarization_vector'
-        coords : str or None
-            This is the location of a csv file containing the coordinates of neutrinos to be thrown.  If this is given then the number of
-            events thrown will be overidden to match the number of specified coordinates in this file.  To see an example of how such a
-            csv file can be created see gnosim/utils/generate_event_orientations.py.  
-            The columns are expected to be: x_0, y_0, z_0, phi_0, theta_0
-            Definitions of these can be found in the documentation for gnosim.sim.antarcticsim.sim.throw().
+  If True, then signals resulting from different solution types are combined into a single waveform per antenna.  Otherwise only the waveform of the solution type with the maximum signal per antenna will be used.
+- **pre_split : bool**
+
+  Determines whether to attempt to load from pre split libraries.  If true (and the pre split libraries are calculated and saved appropriately) this avoids lengthy calculations which separate the rays into the different solution types. 
+- **plot_geometry : bool**
+
+  Enables plotting of the neutrino location, rays, and antennas.  Only plots for trigger events.
+- **plot_signals : bool**
+
+  Enables plotting of the waveforms, as well as of the beam forming plots and some meta data.  Only plots for trigger events.
+- **trigger_threshold : float**
+
+  The trigger threshold to be applied on the signal or set of signals.  This should correspond to trigger_threshold_units.
+- **trigger_threshold_units : str**
+
+  This selects to units used for triggering.  To see the options try getAcceptedTriggerUnits().  If this is 'fpga' then do_beamforming must be True.
+- **use_interp_threading : bool**
+
+  Enables multi-threading during the interpolation portion of the code.  Significantly speeds up users perception of start up time (computationally this obviously still takes the same amount of time).  Note that if this is enabled then live plotting is disabled, due to matplotlib currently not being thread safe.  Plots can be generated after the fact. (See gnosim.analysis.testing_single_event.py).
+- **use_event_threading : bool**
+
+  Enables multi-threading during the interpolation portion of the code.  Significantly speeds up users perception of total run time (computationally this obviously still takes the same amount of time).   Note that if this is enabled then live plotting is disabled, due to matplotlib currently not being thread safe.  Plots can be generated after the fact. (See gnosim.analysis.testing_single_event.py).
+- **output_all_solutions : bool**
+
+  Enables all solution types to be output, otherwise only the solution type with the maximum signal per antenna is output.
+- **save_signals : bool**
+
+  Enables saving the waveforms for triggered events.  Waveforms are saved in the output file as a dictionary under the 'signals' header.  This dictionary is organized at the top level by event, then branching to station label.  The signals from a station are in the form of a numpy.ndarray which contains the signals for all antennas in the station.  Each antenna in each station is stored as row in the numpy.ndarray corresponding to that station.  The final row of this ndarray is the times corresponding to the signals in every other row.  Signals are given in units of adu and times in units of ns.
+
+- **pre_trigger_angle : float or list of floats or None, optional**
+
+  If given, then a pre trigger will be applied to the event such that calculations of Askaryan radiation/electric field will only be conducted if ANY of the possible solution types (for all antennas and stations) have an observation angle within pre_trigger_angle number of degrees to the Cherenkov angle.  Essentially the Cherenkov cone must be observable within the pre trigger angular window from at least one antenna in the array in order for the calculations to proceed.
+
+  pre_trigger_angle can be given as a single float (i.e. 10.0), or as a list no more than 2 floats i.e.([5.0,10.0]).  In order for 2 values to be interpretted correctly by yaml they must be given as a list, NOT a tuple or array in the config file.  If a single number is given then it will be used for both the upper an lower (relative) bounds of acceptable angles.  If two values are given the the first value will act as the lower (relative) bound, and the second will be used as the upper (relative) bound.  In this case relative mean that the given angle(s) are relative to the cherenkov angle, and will be added or subtracted from it depending on the bound.
+
+  i.e. if pre_trigger_angle is 10.0 degrees then signals will only be calculated if one of the solutions was emitted (observed on cone) at an angle: theta_c - 10.0 deg < theta_obs < theta_c + 10.0 deg.
+
+  If [5.0,10.0] is given then signals will only be calculated if one of the solutions was emitted (observed on cone) at an angle: theta_c - 5.0 deg < theta_obs < theta_c + 10.0 deg.
+
+  If ANY of the solution types of ANY of the antennas in the entire array satisfies the pre trigger, then all calculations for that event proceed, not just the solution types that independently satisfied the pre trigger threshold.  
+
+  *NOTE:  Setting a pre trigger can speed up the code significantly, but it must be done with care or else information may be lost. It is highly recommended that you first run a simulation with you desired settings and pre_trigger_angle set to None.  Then with this preliminary simulation analyse the losses you expect by not computing these angles (using gnosim/analysis/pre_trigger_set_tool.py for example). Then with this knowledge set the pre trigger for future simulations as you see fit.  This script currently only supports single values pre trigger angles.*
+
+  (Default is None).
+- **output_fields : list of str**
+
+  Much of the meta-data for each event is contained within a single structured array.  Internally (while the simulation is running) this array will have the dtype info_dtype, which is specified withinin antarcticsim.  This data type is reduced for ouput, with some fields being required and staying, and others only being present if specified.  This parameter (output_fields) specifies which of the optional fields to include in the output file.
+
+  Below are the lists of required and optional fields.  The required fields are deemed so because they allow for testing_single_event to run without doing a full grid interpolation, saving considerable time when trying to examine just a few events after a larger simulation has been run.  The rest of the fields can be recalculated within testing_single_event using just these fields, and thus are optional.  It is considerably easier to have an optional field enabled (if it is valuable) then to recalculte it with testing_single_event, so it is recommended that you enable the fields you require.  Note that the more fields that are enabled, the more RAM that will be needed and the larger the output file.  Full descriptions of the data corresponding to each of the following fields can befound in Section 3.3.1.
+
+  **Required Fields**
+  These fields are already included in the output dtype and do not need to be listed in output_fields.
+
+  - *'eventid'*
+  - *'station'*
+  - *'antenna'*
+  - *'has_solution'*
+  - *'triggered'*
+  - *'solution'*
+  - *'time'*
+  - *'distance'*
+  - *'theta_ant'*
+  - *'theta_ray'*
+  - *'a_s'*
+  - *'a_p'*
+  - *'seed'*
+
+  **Optional Fields**
+  These fields are not included on output by default, and must be listed as utes in output_fields for them to be saved in the info dataset.  If you wish
+  to have none of these then you either put an empty list, or you can set output_fields to None, 'None', or 'none'.  If you wish to have all of the fields then you
+  can simply list them all or set output_fields to 'All' or 'all'. 
+
+  - *'pre_triggered'*
+  - *'observation_angle'*
+  - *'electric_field'*
+  - *'electric_field_digitized'*
+  - *'fpga_max'*
+  - *'dominant_freq'*
+  - *'SNR'*
+  - *'signal_reduction_factor'*
+  - *'polarization_dot_factor'*
+  - *'beam_pattern_factor'*
+  - *'attenuation_factor'*
+  - *'pol_dot_angle'*
+  - *'neutrino_travel_dir_vector'*
+  - *'emission_wave_vector'*
+  - *'detection_wave_vector'*
+  - *'emission_polarization_vector'*
+  - *'detection_polarization_vector'*
+  
+- **coords : str or None**
+
+  This is the location of a csv file containing the coordinates of neutrinos to be thrown.  If this is given then the number of
+  events thrown will be overidden to match the number of specified coordinates in this file.  To see an example of how such a
+  csv file can be created see gnosim/utils/generate_event_orientations.py.  
+  The columns are expected to be: x_0, y_0, z_0, phi_0, theta_0
+  Definitions of these can be found in the documentation for gnosim.sim.antarcticsim.sim.throw().
+
+
 
 
 # 2.0.0 Running the Simulation
