@@ -20,10 +20,7 @@ danielsmith@uchicago.edu
 
 # OVERVIEW
 
-GNOSim is a MC neutrino simulation designed to support time-domain Askaryan signals, allowing for 
-phased-array triggering and more realistic signal waveforms.  The simulation currently has several 
-in-built ice models for easy simulations in either Antarctica or Greenland. 
-The below section discusses the usage of the simulation code:
+GNOSim is a MC neutrino simulation designed to support time-domain Askaryan signals, allowing for phased-array triggering and more realistic signal waveforms.  The simulation currently has several in-built ice models for easy simulations in either Antarctica or Greenland. The below section discusses the usage of the simulation code:
 
 # Table of Contents
 
@@ -107,28 +104,16 @@ The below section discusses the usage of the simulation code:
 # 0.0.0 Preface / Quick Guide
 ------------------------------
   
-  This README has been written to ideally be quite detailed.  This can be extremely helpful when questions arise,
-  but off putting if you just want to quickly try something and ignore the details.  
-
-  If you wish to know the minimum at first and come back as questions arise, then the sections outlined below are a quick
-  and easy way to start.  Note that if you change things in configuration files you should consult the README to see
-  if there are special considerations for those parameters.  Otherwise for this Quick Guide it is assumed you are 
-  running with essentially default parameters.
+  This README has been written to ideally be quite detailed.  This can be extremely helpful when questions arise, but off putting if you just want to quickly try something and ignore the details.  If you wish to know the minimum at first and come back as questions arise, then the sections outlined below are a quick and easy way to start.  Note that if you change things in configuration files you should consult the README to see if there are special considerations for those parameters.  Otherwise for this Quick Guide it is assumed you are running with essentially default parameters.
 
   Quick Guide
   -----------
   - Read section 1.1.1 to ensure you have the required software and knowledge of use.
   - Follow Section 1.2.2 to create the necessary ray tracing look-up libraries.
   - Reference 1.3.0 and 1.4.0 for preparing the antenna locations, ice models, and all other simulation parameters.
-  - Read the appropriate sections of 2.0.0 depending on how many simulations you want to run on your first attempt.
-    If you intend on running many jobs (thus potentially using a lot of memory) it is recommended that you read
-    Sections 2.2.0, otherwise for a relatively low event count (~10000 - ~100000) you can run with just the info
-    provided in Section 2.1.0.
-  - At this point you should have run the simulation and gotten output data.  To learn how to work with this data
-    reference the appropriate portions of Section 3.0.0.
-  - Section 3.4.0 discusses previously developed analysis scripts that you should in theory be able to run on
-    your data to start working with it.  The code contained in these also shows how the data can be worked with
-    so you can form your own analysis scripts as necessary.
+  - Read the appropriate sections of 2.0.0 depending on how many simulations you want to run on your first attempt.  If you intend on running many jobs (thus potentially using a lot of memory) it is recommended that you read Sections 2.2.0, otherwise for a relatively low event count (~10000 - ~100000) you can run with just the info provided in Section 2.1.0.
+  - At this point you should have run the simulation and gotten output data.  To learn how to work with this data reference the appropriate portions of Section 3.0.0.
+  - Section 3.4.0 discusses previously developed analysis scripts that you should in theory be able to run on your data to start working with it.  The code contained in these also shows how the data can be worked with so you can form your own analysis scripts as necessary.
   -   If in early testing you see no events triggering, double check that you are running at reasonable energies.  Energies less than 1e7 GeV will have every small trigger rates.  
 
 # 1.0.0 General Preparations
@@ -155,8 +140,7 @@ h5py - http://www.h5py.org/
 
 matplotlib / pylab - http://matplotlib.org/
 
-Certain portions of the code require large amounts of memory.  If the code is breaking this may be something to check.
-See Section 2.2.0 for more on memory concerns.
+Certain portions of the code require large amounts of memory.  If the code is breaking this may be something to check.  See Section 2.2.0 for more on memory concerns.
 
 ### 1.1.2 Running Scripts
 
@@ -179,8 +163,7 @@ In order for GNOSim to reliably find files as intended you must set and export t
     GNOSIM_DIR="/PATH_TO_GNOSIM"
     export GNOSIM_DIR
 
-Where PATH_TO_GNOSIM is the path that the folder where the git directory is located.  I.e the folder containing gnosim (which should be 
-one directory up from the location of this README).
+Where PATH_TO_GNOSIM is the path that the folder where the git directory is located.  I.e the folder containing gnosim (which should be one directory up from the location of this README).
 
 It may also be useful to add a path to the root location of where data is stored (for instance if you store a lot of data on scratch).
 
@@ -201,11 +184,7 @@ Ideally this is done in the code where, but if it is missed and you get an error
 
 ### 1.2.1 What is a Ray Tracing Library?
 
-GNOSim calculates many of the values per neutrino event by interpolating the values from previously generated ray tracing libraries.
-These libraries contain information such as the the paths of rays connecting the antenna to the rest of the detector volume, the time
-it takes for a ray to travel, distance traveled, attenuation information, reflection information, etc.  They are created in advance
-once per antenna depth.  The directory containing a particular antenna depth is then listed under that antenna's library directory
-option in the station configuration file (see section 1.3.0).
+GNOSim calculates many of the values per neutrino event by interpolating the values from previously generated ray tracing libraries.  These libraries contain information such as the the paths of rays connecting the antenna to the rest of the detector volume, the time it takes for a ray to travel, distance traveled, attenuation information, reflection information, etc.  They are created in advance once per antenna depth.  The directory containing a particular antenna depth is then listed under that antenna's library directory option in the station configuration file (see section 1.3.0).
 
 ### 1.2.2 Creating a Ray Tracing Library
 
@@ -215,8 +194,7 @@ Open the gnosim/trace/refraction_library.py file in a text editor, and scroll to
 
     if __name__ == '__main__':
 
-The code written below this will generate the libraries for you and split them up by solution type (for quicker loading later).  To
-create the ray tracing libraries you should adjust the parameters listed here as you wish.  Below are example settings and descriptions:
+The code written below this will generate the libraries for you and split them up by solution type (for quicker loading later).  To create the ray tracing libraries you should adjust the parameters listed here as you wish.  Below are example settings and descriptions:
 
     make_library = True     #If True, will compute the libraries and save them.  Otherwise just loads from previously saved libraries if available (False is useful for plotting previously generated libraries).
     split_library = True    #If True, will split the libraries by solution type and save them.
@@ -230,8 +208,7 @@ create the ray tracing libraries you should adjust the parameters listed here as
     ice_model = 'antarctica' #The ice model to use when throwing rays.  To see available options see gnosim.earth.ice.getAcceptedIceModels().
     plot_solution_list = numpy.array(['direct','cross','reflect','direct_2','cross_2','reflect_2']) #The list of solutions types to plot.  To see options see gnosim.trace.refraction_library.getAcceptedSolutions(). 
 
-The above settings are pretty standard.  This would created and prepare libraries for each of the depths in z_array, which each library containing 180 rays.
-The more rays, the higher to computing time and RAM requirements but the more accurate the interpolation.  
+The above settings are pretty standard.  This would created and prepare libraries for each of the depths in z_array, which each library containing 180 rays. The more rays, the higher to computing time and RAM requirements but the more accurate the interpolation.  
 
 #### RUNNING
 
@@ -241,207 +218,153 @@ Once the script is prepare, the script can be run by opening a python command li
 
 #### GENERAL
 
-Following the above steps in creating a library will create a folder containing multiple traces through the ice corresponding 
-to different elevation angles at the antenna. The RefractionLibrary class manages the output trace files.   The user will
-need to regenerate these ray trace libraries for different antenna elevations, index of refraction profiles, attenuation lengths, etc.
+Following the above steps in creating a library will create a folder containing multiple traces through the ice corresponding to different elevation angles at the antenna. The RefractionLibrary class manages the output trace files.   The user will need to regenerate these ray trace libraries for different antenna elevations, index of refraction profiles, attenuation lengths, etc.
 
-If you are having troubles running you may need to include a line before the first called 
-gnosim import functions to include the path gnosim is located: sys.path.append('<where-gnosim-is>')
+If you are having troubles running you may need to include a line before the first called gnosim import functions to include the path gnosim is located: sys.path.append('<where-gnosim-is>')
 
-*NOTE:  The current algorithm used for calculated the concave hulls is not ideal, and thus requires some attention from the user.  
-See section 1.2.3 for a description of how this is used, how it is calculated, what to be careful about.*
+*NOTE:  The current algorithm used for calculated the concave hulls is not ideal, and thus requires some attention from the user.  See section 1.2.3 for a description of how this is used, how it is calculated, what to be careful about.*
 
 ### 1.2.3    Concerning the Envelope and Concave Hull
 
-The set of points created by the ray tracing library will ultimately populate the r-z plane of the ice (flattened cylindrical coordinates)
-in such a way as to have a concave hull (i.e. the polygon that would surround all points is concave).  The hull is characterized be an envelope
-function which is used to determine which portion of the r-z plane has possible ray tracing solutions for each of the solution types.  e.g. does
-a point at (r,z) have any reflected solutions connecting the point to the antenna.  The accuracy of the hull is important for maximizing the 
-image-able volume, without falsely classifying points resulting in poor interpolation.
+The set of points created by the ray tracing library will ultimately populate the r-z plane of the ice (flattened cylindrical coordinates) in such a way as to have a concave hull (i.e. the polygon that would surround all points is concave).  The hull is characterized be an envelope function which is used to determine which portion of the r-z plane has possible ray tracing solutions for each of the solution types.  e.g. does a point at *(r,z)* have any reflected solutions connecting the point to the antenna.  The accuracy of the hull is important for maximizing the image-able volume, without falsely classifying points resulting in poor interpolation.
 
-It turns out that generating a concave hull is significantly harder than calculating a convex hull.  Efforts were made in 2018 to update the hull
-algorithms (previously only concave hulls).  The problem was solved sufficiently, and prioritization did not enable further development of how the
-hull is calculated.  Because of this the hull calculation is not quite as automated as would be preferable, and may require slight adjustments if
-the number of rays thrown in a library vary significantly from the values used in development (often 180 rays).  More on this later.
+It turns out that generating a concave hull is significantly harder than calculating a convex hull.  Efforts were made in 2018 to update the hull algorithms (previously only concave hulls).  The problem was solved sufficiently, and prioritization did not enable further development of how the hull is calculated.  Because of this the hull calculation is not quite as automated as would be preferable, and may require slight adjustments if the number of rays thrown in a library vary significantly from the values used in development (often 180 rays).  More on this later.
 
-The information describing the concave hull is calculated and stored in the dictionary concave_hull.  Calculations with the hull use a combination
-of two limits:
-  - Upper and lower depth bounds (denoted as z_min, z_max in concave_hull)
-  - A set of radial boundary functions, which interpolate values stored in the dictionary.  'z_inner_r_bound' & 'r_inner_r_bound' described in
-    inner boundary (low values of r), and 'z_outer_r_bound' & 'r_outer_r_bound' describe the out boundary (high values of r).
-For a solution to be identified as in a particular hull, the depth must be within the depth range defined by z_min and z_max, and within the 
-range specified by the inner and outer radial bounding interpolation functions evaluated at that depth. 
+The information describing the concave hull is calculated and stored in the dictionary concave_hull.  Calculations with the hull use a combination of two limits:
+  - Upper and lower depth bounds (denoted as *z_min*, *z_max* in concave_hull)
+  - A set of radial boundary functions, which interpolate values stored in the dictionary.  *'z_inner_r_bound'* & *'r_inner_r_bound'* described in inner boundary (low values of *r*), and *'z_outer_r_bound'* & *'r_outer_r_bound'* describe the out boundary (high values of *r*).   For a solution to be identified as in a particular hull, the depth must be within the depth range defined by *z_min* and *z_max*, and within the range specified by the inner and outer radial bounding interpolation functions evaluated at that depth. 
 
-The part that requires some attention is how these values for 'z_inner_r_bound','r_inner_r_bound','z_outer_r_bound', and 'r_outer_r_bound' are
-obtained.  Essentially the total depth of the simulation is broken up into bins (with the number of bins being specified in the dictionary as
-discussed below).  For each bin, the minimum and maximum radii are stored in 'r_inner_r_bound' and 'r_outer_r_bound', while depth values are stored
-as 'z_inner_r_bound' and 'z_outer_r_bound'. 
+The part that requires some attention is how these values for *'z_inner_r_bound'*, *'r_inner_r_bound'*, *'z_outer_r_bound'*, and *'r_outer_r_bound'* are obtained.  Essentially the total depth of the simulation is broken up into bins (with the number of bins being specified in the dictionary as discussed below).  For each bin, the minimum and maximum radii are stored in *'r_inner_r_bound'* and 'r_outer_r_bound', while depth values are stored as *'z_inner_r_bound'* and *'z_outer_r_bound'*. 
 
-The size of these bins defines how well approximates the concave hull is.  If the bins are too fine then the hull can appear jagged at the boundary,
-jutting inward to points that would clearly have counterparts at further radii if more rays were thrown, if the bins are too coarse then the hull
-becomes inaccurate/convex, and can include regions such as the shadow that should not be included in the hull.  The number of bins needed for
-preferable accuracy depends on the solution type, and thus in practice is included in the definition of the concave_hull dictionary in the 
-refraction_library.py module: See gnosim.trace.refraction_library.getConcaveHullStarter().
+The size of these bins defines how well approximates the concave hull is.  If the bins are too fine then the hull can appear jagged at the boundary, jutting inward to points that would clearly have counterparts at further radii if more rays were thrown, if the bins are too coarse then the hull becomes inaccurate/convex, and can include regions such as the shadow that should not be included in the hull.  The number of bins needed for preferable accuracy depends on the solution type, and thus in practice is included in the definition of the concave_hull dictionary in the refraction_library.py module: See [gnosim.trace.refraction_library.getConcaveHullStarter()](https://github.com/djsouthall/gnosim/blob/master/trace/refraction_library.py).
 
-Below is how the hull is defined presently, with the number of bins being set to values that worked well for 180 rays throw in a volume of 3000 m depth
-and a radius of 6300 m.
+Below is how the hull is defined presently, with the number of bins being set to values that worked well for 180 rays throw in a volume of 3000 m depth and a radius of 6300 m.
 
     concave_hull = {'direct':{'n_bins':1000},'cross':{'n_bins':1500},'reflect':{'n_bins':2000},'direct_2':{'n_bins':500},'cross_2':{'n_bins':400},'reflect_2':{'n_bins':2000}} # worked for 120 rays
 
-If significant changes are made to the number of rays thrown, or the dimensions of the ice, then please consult this line of code and adjust it as
-required.  The hulls/envelopes can be plotted and referenced to guide your adjustment of the number of bins.
+If significant changes are made to the number of rays thrown, or the dimensions of the ice, then please consult this line of code and adjust it as required.  The hulls/envelopes can be plotted and referenced to guide your adjustment of the number of bins.
 
 ### 1.2.4 Making Many Libraries with Farm Script
 
-There is a farm_lib.py script that can be used for submitting multiple refraction library generation scripts to midway.  The majority of settings
-are still contained within the refraction library script (which is called by the farm script).  The farm can currently only vary the depths and 
-submit a different depth per batch job, so to vary things like ice model you will need to change the model as defined in refraction_library.py 
-and run the farm again.  
+There is a [farm_lib.py](https://github.com/djsouthall/gnosim/blob/master/trace/farm_lib.py) script that can be used for submitting multiple refraction library generation scripts to midway.  The majority of settings are still contained within the refraction library script (which is called by the farm script).  The farm can currently only vary the depths and submit a different depth per batch job, so to vary things like ice model you will need to change the model as defined in [refraction_library.py](https://github.com/djsouthall/gnosim/blob/master/trace/refraction_library.py) and run the farm again.  
 
 
 ## 1.3.0 Preparing a Station Configuration File
 
-Station configuration files are used in the construction of the station in the simulation.  It contains a lot of information and options for customizing
-the station.  Multiple stations can be supported, each must simply be a different dictionary listed in the 'stations' section.  The key given to each
-station should be a unique station label, (for instance, 'ARA5').  This label will then be used as the key in dictionaries and labels for plots, etc.
+Station configuration files are used in the construction of the station in the simulation.  It contains a lot of information and options for customizing the station.  Multiple stations can be supported, each must simply be a different dictionary listed in the *'stations'* section.  The key given to each station should be a unique station label, (for instance, *'ARA5'*).  This label will then be used as the key in dictionaries and labels for plots, etc.
 
-Station configuration files should be located in gnosim/detector/station_config.  Below is a description of the keys to include in the configuration file.
-It is recommended that you copy and modify existing configuration files locally, rather than creating your own from scratch.
+Station configuration files should be located in gnosim/detector/station_config.  Below is a description of the keys to include in the configuration file.  It is recommended that you copy and modify existing configuration files locally, rather than creating your own from scratch.
 
+*Note that certain fields of the station configuration files will be paths to other files.  To use relative paths you should put ${GNOSIM_DIR} in the paths.  These paths are interpreted using os.expandvars which will replace portions of strings with ${VAR} with the corresponding system variable VAR.*
 
-Note that certain fields of the station configuration files will be paths to other files.  To use relative paths you should put ${GNOSIM_DIR} in the
-paths.  These paths are interpreted using os.expandvars which will replace portions of strings with ${VAR} with the corresponding system variable VAR.
-
-For example:
+*For example:*
 
     'system_response':'${GNOSIM_DIR}/gnosim/sim/response/ara_system_response_vpol.npy'
 
 #### Station Configuration Parameters
 
-    detector_volume : dict
-      A dictionary containing information about the ice to be loaded in the simulation.
+- **detector_volume : dict**
+
+A dictionary containing information about the ice to be loaded in the simulation.
+
+  - **ice_model : str**
+
+    The desired ice model (label) to be loaded when the ice is initiated.  This will be checked with gnosim.earth.ice.getAcceptedIceModels() to ensure it is an acceptable ice model.
+  - **radius : float**
+
+    The radius of the 'detector' (ice to be used as detector/populated with neutrinos).  Given in m.  Small edge effects can be present for neutrinos near the edge of a ray tracing library due to interpolation at a boundary, however signals at these boundaries are often to weak to be detected anyways.  With that in mind, if using a single station then it may be beneficial to make this radius just under the radius used for creating the ray tracing library such that neutrinos aren't populated near edges.  
+  For use of multiple stations one should keep in mind that this specifies the region of ice for which neutrinos are being populated.  Thus if you have two stations each with an effective detectable radius (governed by the ray tracing libraries), then this radius should be large enough to place neutrinos in the visible volume of both stations effective radii (accounting for the stations physical separation).  
+  
+  - **depth : float**
+
+    The depth of the 'detector' (ice to be used as detector/populated with neutrinos).  Given in m.  This should not exceed that used when making the ray tracing libraries defined in the configuration file.  Making it slightly lower than that used in the ray tracing library construction can help avoid edge effects from the interpolation.
+
+- **stations : dict**
+
+  Contains the dictionaries of each station.  Each station dictionary should include the following:
+  - **DAQ : dict**
+
+    A dictionary containing relevant quantities for calculations pertaining to digitization, the fpga, and beamforming for this station.
+
+    - **sampling_rate_GHz : float**
+
+        This is the sampling rate of the fpga digitizer.  It will sample from the electric fields at this rate, returning digitized signals.
+    Given in GHz.
+    - **sampling_bits: : int**
+
+        This sets the number of voltage bins for a digitized signal.  Signals will be digitized asymmetrically about 0 to this bit size with value ranging from -2**(sampling_bits-1)+1 to 2**(sampling_bits-1).
+    - **scale_noise_to : int**
+
+        This scales the calculated 'analog' Askaryan calculations (in V) during digitization such that the noise_rms value is scale_noise_to adu.  
+    The common use case is to set noise_rms to 3 adu.
+    - **n_beams : int**
+
+        The number of beams to be formed when creating a beam forming dictionary. 
+    - **n_baselines : int**
+
+        This sets the number of baselines to be considered when creating the beam forming dictionary.  Currently this will automatically select the n_baselines that are smallest (in m).  I.e. if you had 8 antennas separated evenly by 1 m, then n_baselines = 2 would result in both the 1 m and 2 m baselines being used for subbeams.  If they 8 antennas were separated evenly by 2 m, then n_baselines = 2 would result in both the 2 m and 4 m baselines being used for subbeams.  A subbeam is created for each baseline for a given beam (assuming at least 2 antennas are separated by the baseline).  Thus this parameter selects the number of subbeams to be used per beam.  Specified in the configuration file. Currently the minimum time shift is assigned to the smallest baseline.  Thus every other time shift resulting from larger baselines must be a multiple of the minimum baseline. i.e. all subbeam baselines must be in integer multiples of  the minimum baseline.  Currently requires all  other baselines to be an integer multiple of the minimum baseline.
+    - **power_calculation_sum_length : int**
+
+        This sets the width (in bins of voltage data points) of a particular power sum window.  This is used in the beamforming calculation during the power sum.
+    - **power_calculation_interval : int**
+
+        This sets the number of bins between successive sums in the power sum.  If this is less than power_calculation_sum_length then successive bins will overlap.  The common use case when this was written was to have the interval set to half of the sum length, so successive sums contain half of their values in common with the previous sum.  This is used in the beamforming calculation during the power sum. 
+    - **beamforming_power_sum_bit_cap : int**
+
+        This sets number of bits to cap the power sum calculation (which will have units of adu^2).  This is used in gnosim.detector.fpga.fpgaBeamForming.
+
+  - **position : list**
+
+      A 3 element list containing the x,y,z coordinates of the stations origin.  Antenna positions will be specified with respect to these values.  
+
+  - **phased_antennas : dict**
+
+      A dictionary containing the detectors that will be used in the triggering process.  If using beamforming triggering these phased array antennas should all be positions in a single vertical string, otherwise beamforming calculations and preparations may be false.  If you want multiple phased strings then you are currently constrained to treating these as seperate stations.  Each antenna dictionary should be formatted to contain the following:
+
+    - **antenna_definitions : dict**
+
+        A dictionary containing each antennas definition dictionary.  
+
+    - **antenna_key : dict**
+
+        antenna_key is an identifier given to each antenna should be a unique antenna label (within the station), for instance, 'PA00' for the first phased array antenna, or 'RA00' for the first reconstruction array antenna.  This label will then be used as the key in dictionaries and labels for plots, etc.  Ideally these labels should allow someone to distinguish between phased array v.s. reconstruction array antennas.  The corresponding dictionary contains the info relevant for that antenna:
+
+    - **antenna_type : str**
+
+        This is the label of a particular antenna type defined in the code.  This will select how the antenna behaves, i.e. beam patterns, polarization sensitivity, etc.  To see current supported antenna types  try gnosim.detector.detector.getAcceptedAntennaTypes().
+    - **lib : str**
+
+        The location of the ray tracing library corresponding to an antenna at this location.
+    - **position : list of floats**
+
+        The Cartesian coordinates of the antenna relative to the stations origin.   i.e. if a station location is specified as [0., 0., -173.], and an antenna within that station has position in the config file of [0., 0., -1.], then the absolute ice frame coordinates of the antenna will be [0., 0., -174.].  Given in m.
+    - **orientation : list of floats**
+
+        Specifies the Euler angle coordinates for choosing the orientation of the antenna in the ice frame: [alpha_deg, beta_deg, gamma_deg].  Given in degrees.  These angles will be used with a rotation matrix to orient the axis of the antenna using a z-x-z extrinsic rotation.   For additional information see the [gnosim/info/EulerAngleDefiniton.pdf](https://github.com/djsouthall/gnosim/blob/master/info/EulerAngleDefinition.pdf) file.
+    - **system_response : str, optional**
+
+        The directory/file containing the system response. See gnosim.detector.detector.Antenna.addTimingInfo() to see how the system response is loaded and handled.  If a new system response is loaded it should have am equally sampled antenna response.  The sampling period for each should be sufficiently small that the calculations of Askaryan radiation do not lose necessary resolution (A sampling period of ~0.1 ns).  It may be necessary to up sample the responses to accommodate this.  Note:  I am aware that upsampling the system/antenna response does NOT increase information about the responses, but the times used to calculate Askaryan radiation are chosen such that they easily match up with the frequencies of the responses.  So information can be lost in the Askaryan calculation if the responses are not sampled at high enough rate because the Askaryan radiation is calculated at that time step.
+    - **antenna_response : str**
+
+        The directory/file containing the antenna response. See gnosim.detector.detector.Antenna.addTimingInfo() to see how the antenna response is loaded and handled.  If a new antenna response is loaded it should have am equally sampled system response.  The sampling period for each should be sufficiently small that the calculations of Askaryan radiation do not lose necessary resolution (A sampling period of ~0.1 ns).  It may be necessary to up sample the responses to accommodate this.  Note:  I am aware that upsampling the system/antenna response does NOT increase information about the responses, but the times used to calculate Askaryan radiation are chosen such that they easily match up with the frequencies of the responses.  So information can be lost in the Askaryan calculation if the responses are not sampled at high enough rate because the Askaryan radiation is calculated at that time step.
+    - **noise_temperature : float**
+
+        The temperature to be used in the noise calculation.  Given in K.  Note that the noise is also processed by the system response, which may be scaled to obtain a particular noise level for a certain temperature.
+    - **resistance : float**
+
+        The resistance to be used in the noise calculation.  Given in Ohms. Note that the noise is also processed by the system response, which may be scaled to obtain a particular noise level for a certain temperature.
+    - **frequency_low : float, optional**
+
+        The lower frequency bound for the old and unsupported frequency domain calculation of the Askaryan radiation.  Only used if the selected time domain for the calculation is 'freq'.  electric_field_domain is specified in the simulation configuration file.
+    - **frequency_high : float, optional**
+
+        The upper frequency bound for the old and unsupported frequency domain calculation of the Askaryan radiation.  Only used if the selected time domain for the calculation is 'freq'.  electric_field_domain is specified in the simulation configuration file.
+
+  - **reconstruction_antennas : dict**
+
+    A dictionary containing the detectors that will be used for reconstruction.  These antennas are only used in the event that the phased array triggers.  Unlike phased array antennas, these do not need to be on a single string and can be placed throughout the ice as desired.  Each antenna should be formatted in the same way as described above for the phased antennas.  Keep in mind that the antenna labels are station-wide, NOT per group.  So if you label a phased antenna 'dipole0' and a reconstruction antenna 'dipole0', there WILL be issues.  It is best to keep the labels clear and separate.  For instance 'PA00' v.s. 'RA00'.
+
       
-        ice_model : str
-          The desired ice model (label) to be loaded when the ice is initiated.  This will be checked with gnosim.earth.ice.getAcceptedIceModels() to ensure
-          it is an acceptable ice model.
-        radius : float
-          The radius of the 'detector' (ice to be used as detector/populated with neutrinos).  Given in m.  Small edge effects can be present for neutrinos
-          near the edge of a ray tracing library due to interpolation at a boundary, however signals at these boundaries are often to weak to be detected anyways.
-          With that in mind, if using a single station then it may be beneficial to make this radius just under the radius used for creating the ray tracing
-          library such that neutrinos aren't populated near edges.  
-          For use of multiple stations one should keep in mind that this specifies the region of ice for which neutrinos are being populated.  Thus if you have two
-          stations each with an effective detectable radius (governed by the ray tracing libraries), then this radius should be large enough to place 
-          neutrinos in the visible volume of both stations effective radii (accounting for the stations physical separation).  
-        depth : float
-          The depth of the 'detector' (ice to be used as detector/populated with neutrinos).  Given in m.  This should not exceed that
-          used when making the ray tracing libraries defined in the configuration file.  Making it slightly lower than that used in the 
-          ray tracing library construction can help avoid edge effects from the interpolation.
-        stations : dict
-          Contains the dictionaries of each station.  Each station dictionary should include the following:
-    DAQ : dict
-      A dictionary containing relevant quantities for calculations pertaining to digitization, the fpga, and beamforming for this station.
-
-        sampling_rate_GHz : float
-          This is the sampling rate of the fpga digitizer.  It will sample from the electric fields at this rate, returning digitized signals.
-        Given in GHz.
-          sampling_bits: : int
-          This sets the number of voltage bins for a digitized signal.  Signals will be digitized asymmetrically about 0 to this bit size with values
-          ranging from -2**(sampling_bits-1)+1 to 2**(sampling_bits-1).
-        scale_noise_to : int
-          This scales the calculated 'analog' Askaryan calculations (in V) during digitization such that the noise_rms value is scale_noise_to adu.  
-          The common use case is to set noise_rms to 3 adu.
-        n_beams : int
-          The number of beams to be formed when creating a beam forming dictionary. 
-        n_baselines : int
-          This sets the number of baselines to be considered when creating the beam forming dictionary.  Currently this will automatically select the
-          n_baselines that are smallest (in m).  I.e. if you had 8 antennas separated evenly by 1 m, then n_baselines = 2 would result in both the 1 m
-          and 2 m baselines being used for subbeams.  If they 8 antennas were separated evenly by 2 m, then n_baselines = 2 would result in both the 2 m
-          and 4 m baselines being used for subbeams.  A subbeam is created for each baseline for a given beam (assuming at least 2 antennas are separated
-          by the baseline).  Thus this parameter selects the number of subbeams to be used per beam.  Specified in the configuration file.
-          Currently the minimum time shift is assigned to the smallest baseline.  Thus every other time shift resulting from larger baselines must be a 
-          multiple of the minimum baseline. i.e. all subbeam baselines must be in integer multiples of  the minimum baseline.  Currently requires all 
-          other baselines to be an integer multiple of the minimum baseline.
-        power_calculation_sum_length : int
-          This sets the width (in bins of voltage data points) of a particular power sum window.  This is used in the beamforming calculation 
-          during the power sum.
-        power_calculation_interval : int
-          This sets the number of bins between successive sums in the power sum.  If this is less than power_calculation_sum_length then successive
-          bins will overlap.  The common use case when this was written was to have the interval set to half of the sum length, so successive sums
-          contain half of their values in common with the previous sum.  This is used in the beamforming calculation during the power sum. 
-        beamforming_power_sum_bit_cap : int
-          This sets number of bits to cap the power sum calculation (which will have units of adu^2).  This is used in gnosim.detector.fpga.fpgaBeamForming.
-
-        position : list
-            A 3 element list containing the x,y,z coordinates of the stations origin.  Antenna positions will be specified with respect to these values.  
-
-        phased_antennas : dict
-            A dictionary containing the detectors that will be used in the triggering process.  If using beamforming triggering these phased array antennas
-            should all be positions in a single vertical string, otherwise beamforming calculations and preparations may be false.  If you want multiple phased
-            strings then you are currently constrained to treating these as seperate stations.  
-
-            Each antenna dictionary should be formatted to contain the following:
-
-            antenna_definitions : dict
-                A dictionary containing each antennas definition dictionary.  
-
-                antenna_key : dict
-                    antenna_key is an identifier given to each antenna should be a unique antenna label (within the station), for instance, 'PA00' for the 
-                    first phased array antenna, or 'RA00' for the first reconstruction array antenna.  This label will then be used as the key in dictionaries 
-                    and labels for plots, etc.  Ideally these labels should allow someone to distinguish between phased array v.s. reconstruction array
-                    antennas.  The corresponding dictionary contains the info relevant for that antenna:
-
-                    antenna_type : str
-                        This is the label of a particular antenna type defined in the code.  This will select how the antenna behaves, i.e. beam patterns, 
-                        polarization sensitivity, etc.  To see current supported antenna types  try gnosim.detector.detector.getAcceptedAntennaTypes().
-                    lib : str
-                        The location of the ray tracing library corresponding to an antenna at this location.
-                    position : list of floats
-                        The Cartesian coordinates of the antenna relative to the stations origin.   i.e. if a station location is specified as [0., 0., -173.], 
-                        and an antenna within that station has position in the config file of [0., 0., -1.], then the absolute ice frame coordinates of the 
-                        antenna will be [0., 0., -174.].  Given in m.
-                    orientation : list of floats
-                        Specifies the Euler angle coordinates for choosing the orientation of the antenna in the ice frame: [alpha_deg, beta_deg, gamma_deg].
-                        Given in degrees.  These angles will be used with a rotation matrix to orient the axis of the antenna using a z-x-z extrinsic rotation.
-                        For additional information see the gnosim/info/EulerAngleDefiniton.pdf file.
-                    system_response : str, optional
-                        The directory/file containing the system response. See gnosim.detector.detector.Antenna.addTimingInfo() to see how the system response
-                        is loaded and handled.  If a new system response is loaded it should have am equally sampled antenna response.  The sampling period for
-                        each should be sufficiently small that the calculations of Askaryan radiation do not lose necessary resolution (A sampling period of ~0.1 ns).
-                        It may be necessary to up sample the responses to accommodate this.  Note:  I am aware that upsampling the system/antenna response does
-                        NOT increase information about the responses, but the times used to calculate Askaryan radiation are chosen such that they easily match
-                        up with the frequencies of the responses.  So information can be lost in the Askaryan calculation if the responses are not sampled at 
-                        high enough rate because the Askaryan radiation is calculated at that time step.
-                    antenna_response : str
-                        The directory/file containing the antenna response. See gnosim.detector.detector.Antenna.addTimingInfo() to see how the antenna response
-                        is loaded and handled.  If a new antenna response is loaded it should have am equally sampled system response.  The sampling period for
-                        each should be sufficiently small that the calculations of Askaryan radiation do not lose necessary resolution (A sampling period of ~0.1 ns).
-                        It may be necessary to up sample the responses to accommodate this.  Note:  I am aware that upsampling the system/antenna response does
-                        NOT increase information about the responses, but the times used to calculate Askaryan radiation are chosen such that they easily match
-                        up with the frequencies of the responses.  So information can be lost in the Askaryan calculation if the responses are not sampled at 
-                        high enough rate because the Askaryan radiation is calculated at that time step.
-                    noise_temperature : float
-                        The temperature to be used in the noise calculation.  Given in K.
-                        Note that the noise is also processed by the system response, which may be scaled to obtain a particular noise
-                        level for a certain temperature.
-                    resistance : float
-                        The resistance to be used in the noise calculation.  Given in Ohms. 
-                        Note that the noise is also processed by the system response, which may be scaled to obtain a particular noise
-                        level for a certain temperature.
-                    frequency_low : float, optional
-                        The lower frequency bound for the old and unsupported frequency domain calculation of the Askaryan radiation.  Only used if the
-                        selected time domain for the calculation is 'freq'.  electric_field_domain is specified in the simulation configuration file.
-                    frequency_high : float, optional
-                        The upper frequency bound for the old and unsupported frequency domain calculation of the Askaryan radiation.  Only used if the
-                        selected time domain for the calculation is 'freq'.  electric_field_domain is specified in the simulation configuration file.
-
-        reconstruction_antennas : dict
-            A dictionary containing the detectors that will be used for reconstruction.  These antennas are only used in the event that the phased array triggers.
-            Unlike phased array antennas, these do not need to be on a single string and can be placed throughout the ice as desired.  
-            Each antenna should be formatted in the same way as described above for the phased antennas.  Keep in mind that the antenna labels are station-wide,
-            NOT per group.  So if you label a phased antenna 'dipole0' and a reconstruction antenna 'dipole0', there WILL be issues.  It is best to keep the labels
-            clear and separate.  For instance 'PA00' v.s. 'RA00'.
-
-    
 
 ## 1.4.0 Preparing a Simulation Configuration File
   
