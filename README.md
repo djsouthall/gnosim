@@ -861,22 +861,29 @@ The info data set can be extracted as a whole using the command:
 
     info = file['info'][...]
 
-However individual portions of the info object can be loaded from the h5py file without loading the entire object into memory.
-This can be done to obtain a single list if information, or to select on the components required for a particular calculation.
-It is common to load in one set of information to make a cut on to use subsequently for loading other information.  For instance,
-if I only wanted to look at triggered events I could do the following:
+However individual portions of the info object can be loaded from the h5py file without loading the entire object into memory.  This can be done to obtain a single list if information, or to select on the components required for a particular calculation.  It is common to load in one set of information to make a cut on to use subsequently for loading other information.  For instance, if I only wanted to look at triggered events I could do the following:
 
-    bool_triggered = file['info']['triggered'] #This will be an array of bools.  If the event triggered then those entries will have True at their index.
+    bool_triggered = file['info']['triggered'] 
+    
+This will be an array of bools.  If the event triggered then those entries will have True at their index.
 
-    info_triggered = file['info'][numpy.where(bool_triggered)[0]] #This will load only entries corresponding to events that were triggered on.
+    info_triggered = file['info'][numpy.where(bool_triggered)[0]]
 
-    triggered_event_ids = numpy.unique(info_triggered['eventids']) #This will get a list of events that triggered, which can be used to index other datasets.
+This will load only entries corresponding to events that were triggered on.
+
+    triggered_event_ids = numpy.unique(info_triggered['eventids'])
+    
+This will get a list of events that triggered, which can be used to index other datasets.
 
 The above list of triggered event ids could alternatively be calculated as seen below.
 
-    my_info = numpy.unique(reader['info']['eventid','triggered']) # An array containing the event id and trigger bool for each entry, Because eventid and triggered are the same for each entry in a given event, this unique function will cause my_info to consist of only one entry per event.  Thus below I do not need a second unique call. Doing it here makes the below line faster as the cut is operating on less elements.
+    my_info = numpy.unique(reader['info']['eventid','triggered'])
+    
+An array containing the event id and trigger bool for each entry, Because eventid and triggered are the same for each entry in a given event, this unique function will cause my_info to consist of only one entry per event.  Thus below I do not need a second unique call. Doing it here makes the below line faster as the cut is operating on less elements.
 
-    triggered_event_ids = my_info['eventid'][ my_info['triggered'] == True ] #This returns the 'eventid' section but sliced by  the cut on the 'triggered' section.
+    triggered_event_ids = my_info['eventid'][ my_info['triggered'] == True ] 
+    
+This returns the 'eventid' section but sliced by  the cut on the 'triggered' section.
 
 Note that when working with these compound data types, you should first select the key and then apply the cut.
 It will work both ways with reading the information, but if you wish to set values to a certain cut, the cut
@@ -884,49 +891,36 @@ must be applied second.  i.e.:
 
 WILL WORK: 
 
-        my_info['eventid'][ my_info['triggered'] == False ] = -999 #will set the eventid for all non-triggered events to -999
+    my_info['eventid'][ my_info['triggered'] == False ] = -999 #will set the eventid for all non-triggered events to -999
 
 WON'T WORK
 
-        my_info[ my_info['triggered'] == False ]['eventid'] = -999 #This will not actually set the values to -999 in my experience.
+    my_info[ my_info['triggered'] == False ]['eventid'] = -999 #This will not actually set the values to -999 in my experience.
 
 
 ## 3.4.0 Analysis Scripts
 
-As a full analysis has not been done with the simulation code, only some analysis files exist.  Those that exist
-can be used as examples for future development.  Ideally as the simulation is worked with, interesting analysis
-scripts will be developed and added to the git repository to allow for general use.  The sub sections below discuss
-some existing analysis scripts.  Note that these are not as maintained or thought out/generalized as some things in
-the main portion of the simulation, and may require some tinkering to ensure they work as you desire.  Analysis
-file should stay within the gnosim/analysis folder for organization purposes.
+As a full analysis has not been done with the simulation code, only some analysis files exist.  Those that exist can be used as examples for future development.  Ideally as the simulation is worked with, interesting analysis scripts will be developed and added to the git repository to allow for general use.  The sub sections below discuss some existing analysis scripts.  Note that these are not as maintained or thought out/generalized as some things in the main portion of the simulation, and may require some tinkering to ensure they work as you desire.  Analysis file should stay within the gnosim/analysis folder for organization purposes.
 
 ### 3.4.1 Volumetric Acceptance
 
-The volumetric acceptance is a common thing to calculate for a particular set of simulations.  During development
-the script gnosim/analysis/volumetric_acceptance.py was used for these calculations. 
+The volumetric acceptance is a common thing to calculate for a particular set of simulations.  During development the script gnosim/analysis/volumetric_acceptance.py was used for these calculations. 
 
 ### 3.4.2 Neutrino Approach Test
 
-This script was written for a long gone build of the code, and was supposed to plot the approach angles of the
-neutrinos (potentially with some weighting) as a check on if it made sense.  The code is still there in case it
-will some day be adapted for the recent code build. 
+This script was written for a long gone build of the code, and was supposed to plot the approach angles of the neutrinos (potentially with some weighting) as a check on if it made sense.  The code is still there in case it will some day be adapted for the recent code build. 
 
 ### 3.4.3 Arrival Times Testing
 
-This script was written for a long gone build of the code, and was supposed to plot times of arrival across the
-different antennas and compare this to the expected values for different angles.  This code was used while the
-hull was being improved but has not been touched since.  The code is still there in case it will some day be 
-adapted for the recent code build.
+This script was written for a long gone build of the code, and was supposed to plot times of arrival across the different antennas and compare this to the expected values for different angles.  This code was used while the hull was being improved but has not been touched since.  The code is still there in case it will some day be adapted for the recent code build.
 
 ## 3.5.0 Utils Scripts
 
-Sometimes a script will be made and added to the utils section rather than analysis, as it is just for general use or is
-useful before the simulation is run and not necessarily as part of the analysis.  Here are descriptions of some of those
-scripts.
+Sometimes a script will be made and added to the utils section rather than analysis, as it is just for general use or is useful before the simulation is run and not necessarily as part of the analysis.  Here are descriptions of some of those scripts.
 
 ### 3.5.1 Generate Event Orientations
 
-Script: gnosim/utils/generate_event_orientations.py 
+Script: [https://github.com/djsouthall/gnosim/utils/generate_event_orientations.py](gnosim/utils/generate_event_orientations.py)
 This is a small script which can be used to create a csv file containing coordinates of on-cone neutrino events surrounding
 chosen antenna locations at a defined radius (either spherical or cylindrical radius).  These location of the csv containing 
 these coordinates can thn be used as the input parameter 'coords' in sim configuration files.
@@ -942,6 +936,7 @@ This section will contain information relevant for people intending on contribut
 ## 4.1.0 Code Repository
 
         [Midway Repo]
+        https://github.com/djsouthall/gnosim/
 
 
 ## 4.2.0    Conventions
@@ -958,10 +953,7 @@ The following conventions are ideally followed:
 
 #### Documentation
 
-Each function and module should be properly documented with both contributors and users in mind.  The formatting
-should follow the NumPy Style for Python Docstrings.  It is recommended that you look at some of the main
-modules to see examples of how the documentation is intended to look. 
-Typically single quotes are used over double quotes. Eventually it would be good to use a tool like sphinx and the sphinx.ext.napoleon parser to turn these docstrings into a navigable html structure.  
+Each function and module should be properly documented with both contributors and users in mind.  The formatting should follow the NumPy Style for Python Docstrings.  It is recommended that you look at some of the main modules to see examples of how the documentation is intended to look. Typically single quotes are used over double quotes. Eventually it would be good to use a tool like sphinx and the sphinx.ext.napoleon parser to turn these docstrings into a navigable html structure.  
 
 
 #### Coordinates
@@ -983,8 +975,7 @@ Typically single quotes are used over double quotes. Eventually it would be good
 
 ## 4.3.0 TODOs
 
-If you are coding and find something that should be changed (and you do not intend to change it right away),
-please put a comment near the desired change location with the following formatting: 
+If you are coding and find something that should be changed (and you do not intend to change it right away), please put a comment near the desired change location with the following formatting: 
 
     #TODO : This section should be changed to this different way because of this reason. 
 
