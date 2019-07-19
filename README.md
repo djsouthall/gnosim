@@ -24,80 +24,80 @@ GNOSim is a MC neutrino simulation designed to support time-domain Askaryan sign
 
 # Table of Contents
 
-0.0.0 ............. [Preface and Quick Guide](#-preface-and-quick-guide)
+0.0.0 ............. [Preface and Quick Guide](#0.0.0-preface-and-quick-guide)
 
-1.0.0 ............. [General Preparations](#-general-preparations)
+1.0.0 ............. [General Preparations](#1.0.0-general-preparations)
 
-&nbsp;&nbsp;&nbsp;&nbsp;1.1.0 ......... [Usage Information](#-usage-information)
+&nbsp;&nbsp;&nbsp;&nbsp;1.1.0 ......... [Usage Information](#1.1.0-usage-information)
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.1.1 ..... [Dependencies](#-dependencies)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.1.1 ..... [Dependencies](#1.1.1-dependencies)
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.1.2 ..... [Running Scripts](#-running-scripts)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.1.2 ..... [Running Scripts](#1.1.2-running-scripts)
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.1.3 ..... [Paths](#-paths)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.1.3 ..... [Paths](#1.1.3-paths)
 
-&nbsp;&nbsp;&nbsp;&nbsp;1.2.0 ......... [Creating a Ray Tracing Library for the Simulation](#-creating-a-ray-tracing-library-for-the-simulation)
+&nbsp;&nbsp;&nbsp;&nbsp;1.2.0 ......... [Creating a Ray Tracing Library for the Simulation](#1.2.0-creating-a-ray-tracing-library-for-the-simulation)
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.1 ..... [What is a Ray Tracing Library?](#-what-is-a-ray-tracing-library?)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.1 ..... [What is a Ray Tracing Library?](#1.2.1-what-is-a-ray-tracing-library?)
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.2 ..... [Creating a Ray Tracing Library](#-creating-a-ray-tracing-library)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.2 ..... [Creating a Ray Tracing Library](#1.2.2-creating-a-ray-tracing-library)
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.3 ..... [Concerning the Envelope and Concave Hull](#-concerning-the-envelope-and-concave-hull)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.3 ..... [Concerning the Envelope and Concave Hull](#1.2.3-concerning-the-envelope-and-concave-hull)
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.4 ..... [Making Many Libraries with Farm Script](#-making-many-libraries-with-farm-script)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.4 ..... [Making Many Libraries with Farm Script](#1.2.4-making-many-libraries-with-farm-script)
 
-&nbsp;&nbsp;&nbsp;&nbsp;1.3.0 ......... [Preparing a Station Configuration File](#-preparing-a-station-configuration-file)
+&nbsp;&nbsp;&nbsp;&nbsp;1.3.0 ......... [Preparing a Station Configuration File](#1.3.0-preparing-a-station-configuration-file)
 
-&nbsp;&nbsp;&nbsp;&nbsp;1.4.0 ......... [Preparing a Simulation Configuration File](#-preparing-a-simulation-configuration-file)
+&nbsp;&nbsp;&nbsp;&nbsp;1.4.0 ......... [Preparing a Simulation Configuration File](#1.4.0-preparing-a-simulation-configuration-file)
 
-2.0.0 ............. [Running the Simulation](#-running-the-simulation)
+2.0.0 ............. [Running the Simulation](#2.0.0-running-the-simulation)
 
-&nbsp;&nbsp;&nbsp;&nbsp;2.1.0 ......... [Running a Single Instance of GNOSim](#-running-a-single-instance-of-gnosim)
+&nbsp;&nbsp;&nbsp;&nbsp;2.1.0 ......... [Running a Single Instance of GNOSim](#2.1.0-running-a-single-instance-of-gnosim)
 
-&nbsp;&nbsp;&nbsp;&nbsp;2.2.0 ......... [Memory Allocation for GNOSim and Running on Midway](#-memory-allocation-for-gnosim-and-running-on-midway)
+&nbsp;&nbsp;&nbsp;&nbsp;2.2.0 ......... [Memory Allocation for GNOSim and Running on Midway](#2.2.0-memory-allocation-for-gnosim-and-running-on-midway)
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.2.1 ..... [Running with Batch](#-running-with-batch)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.2.1 ..... [Running with Batch](#2.2.1-running-with-batch)
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.2.2 ..... [Running in an Interactive Terminal](#-running-in-an-interactive-terminal)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.2.2 ..... [Running in an Interactive Terminal](#2.2.2-running-in-an-interactive-terminal)
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.2.3 ..... [More Info](#-more-info)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.2.3 ..... [More Info](#2.2.3-more-info)
 
-&nbsp;&nbsp;&nbsp;&nbsp;2.3.0 ......... [Running Many Simulations with Farm Script](#-running-many-simulations-with-farm-script)
+&nbsp;&nbsp;&nbsp;&nbsp;2.3.0 ......... [Running Many Simulations with Farm Script](2.3.0-running-many-simulations-with-farm-script)
 
-&nbsp;&nbsp;&nbsp;&nbsp;2.4.0 ......... [Stitching Together Simulations](#-stitching-together-simulations)
+&nbsp;&nbsp;&nbsp;&nbsp;2.4.0 ......... [Stitching Together Simulations](#2.4.0-stitching-together-simulations)
 
-3.0.0 ............. [Working with Simulation Data](#-working-with-simulation-data)
+3.0.0 ............. [Working with Simulation Data](#3.0.0-working-with-simulation-data)
 
-&nbsp;&nbsp;&nbsp;&nbsp;3.1.0 ......... [Information About h5py](#-information-about-h5py)
+&nbsp;&nbsp;&nbsp;&nbsp;3.1.0 ......... [Information About h5py](3.1.0#-information-about-h5py)
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.1.1 ..... [Saving and Loading h5py Files](#-saving-and-loading-h5py-files)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.1.1 ..... [Saving and Loading h5py Files](#3.1.1-saving-and-loading-h5py-files)
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.1.2 ..... [Attributes and Datasets in h5py Files](#-attributes-and-datasets-in-h5py-files)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.1.2 ..... [Attributes and Datasets in h5py Files](#3.1.2-attributes-and-datasets-in-h5py-files)
 
-&nbsp;&nbsp;&nbsp;&nbsp;3.2.0 ......... [Formatting of Output Files](#-formatting-of-output-files)
+&nbsp;&nbsp;&nbsp;&nbsp;3.2.0 ......... [Formatting of Output Files](#3.2.0-formatting-of-output-files)
 
-&nbsp;&nbsp;&nbsp;&nbsp;3.3.0 ......... [Working with info_dtype Objects for Meta-data](#-working-with-info_dtype-objects-for-meta-data)
+&nbsp;&nbsp;&nbsp;&nbsp;3.3.0 ......... [Working with info_dtype Objects for Meta-data](#3.3.0-working-with-info_dtype-objects-for-meta-data)
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.3.1 ..... [Info Content Descriptions](#-info-content-descriptions)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.3.1 ..... [Info Content Descriptions](#3.3.1-info-content-descriptions)
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.3.2 ..... [Working with the Info Dataset](#-working-with-the-info-dataset)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.3.2 ..... [Working with the Info Dataset](#3.3.2-working-with-the-info-dataset)
 
-&nbsp;&nbsp;&nbsp;&nbsp;3.4.0 ......... [Analysis Scripts](#-analysis-scripts)
+&nbsp;&nbsp;&nbsp;&nbsp;3.4.0 ......... [Analysis Scripts](#3.4.0-analysis-scripts)
 
-&nbsp;&nbsp;&nbsp;&nbsp;3.5.0 ......... [Utils Scripts](#-utils-scripts)
+&nbsp;&nbsp;&nbsp;&nbsp;3.5.0 ......... [Utils Scripts](#3.5.0-utils-scripts)
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.5.1 ..... [Generate Event Orientations](#-generate-event-orientations)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.5.1 ..... [Generate Event Orientations](#3.5.1-generate-event-orientations)
 
-&nbsp;&nbsp;&nbsp;&nbsp;3.6.0 ......... [Converting Signals to Data-Like Format](#-converting-signals-to-data-like-format)
+&nbsp;&nbsp;&nbsp;&nbsp;3.6.0 ......... [Converting Signals to Data-Like Format](#3.6.0-converting-signals-to-data-like-format)
 
-4.0.0 ............. [Information For Contributors](#-information-for-contributors)
+4.0.0 ............. [Information For Contributors](#4.0.0-information-for-contributors)
 
 
-&nbsp;&nbsp;&nbsp;&nbsp;4.1.0 ......... [Code Repository](#-code-repository)
+&nbsp;&nbsp;&nbsp;&nbsp;4.1.0 ......... [Code Repository](#4.1.0-code-repository)
 
-&nbsp;&nbsp;&nbsp;&nbsp;4.2.0 ......... [Conventions](#-conventions)
+&nbsp;&nbsp;&nbsp;&nbsp;4.2.0 ......... [Conventions](#4.2.0-conventions)
 
-&nbsp;&nbsp;&nbsp;&nbsp;4.3.0 ......... [TODOs](#-todos)
+&nbsp;&nbsp;&nbsp;&nbsp;4.3.0 ......... [TODOs](#4.3.0-todos)
 
 
 
@@ -108,12 +108,12 @@ GNOSim is a MC neutrino simulation designed to support time-domain Askaryan sign
 
   Quick Guide
   -----------
-  - Read [Section 1.1.1](#-dependencies) to ensure you have the required software and knowledge of use.
-  - Follow [Section 1.2.2](#-creating-a-ray-tracing-library) to create the necessary ray tracing look-up libraries.
-  - Reference [Section 1.3.0](#-preparing-a-station-configuration-file) and [Section 1.4.0](#-preparing-a-simulation-configuration-file) for preparing the antenna locations, ice models, and all other simulation parameters.
-  - Read the appropriate subsections of [Section 2.0.0](#-running-the-simulation) depending on how many simulations you want to run on your first attempt.  If you intend on running many jobs (thus potentially using a lot of memory) it is recommended that you read [Sections 2.2.0](#-memory-allocation-for-gnosim-and-running-on-midway), otherwise for a relatively low event count (~10000 - ~100000) you can run with just the info provided in [Section 2.1.0](#-running-a-single-instance-of-gnosim).
-  - At this point you should have run the simulation and gotten output data.  To learn how to work with this data reference the appropriate portions of [Section 3.0.0](#-working-with-simulation-data).
-  - [Section 3.4.0](#-analysis-scripts) discusses previously developed analysis scripts that you should in theory be able to run on your data to start working with it.  The code contained in these also shows how the data can be worked with so you can form your own analysis scripts as necessary.
+  - Read [Section 1.1.1](#1.1.1-dependencies) to ensure you have the required software and knowledge of use.
+  - Follow [Section 1.2.2](#1.2.2-creating-a-ray-tracing-library) to create the necessary ray tracing look-up libraries.
+  - Reference [Section 1.3.0](#1.3.0-preparing-a-station-configuration-file) and [Section 1.4.0](#1.4.0-preparing-a-simulation-configuration-file) for preparing the antenna locations, ice models, and all other simulation parameters.
+  - Read the appropriate subsections of [Section 2.0.0](#2.0.0-running-the-simulation) depending on how many simulations you want to run on your first attempt.  If you intend on running many jobs (thus potentially using a lot of memory) it is recommended that you read [Sections 2.2.0](#2.2.0-memory-allocation-for-gnosim-and-running-on-midway), otherwise for a relatively low event count (~10000 - ~100000) you can run with just the info provided in [Section 2.1.0](#2.1.0-running-a-single-instance-of-gnosim).
+  - At this point you should have run the simulation and gotten output data.  To learn how to work with this data reference the appropriate portions of [Section 3.0.0](#3.0.0-working-with-simulation-data).
+  - [Section 3.4.0](#3.4.0-analysis-scripts) discusses previously developed analysis scripts that you should in theory be able to run on your data to start working with it.  The code contained in these also shows how the data can be worked with so you can form your own analysis scripts as necessary.
   -   If in early testing you see no events triggering, double check that you are running at reasonable energies.  Energies less than 1e7 GeV will have every small trigger rates.  
 
 # 1.0.0 General Preparations
@@ -140,7 +140,7 @@ h5py - http://www.h5py.org/
 
 matplotlib / pylab - http://matplotlib.org/
 
-Certain portions of the code require large amounts of memory.  If the code is breaking this may be something to check.  See Section 2.2.0 for more on memory concerns.
+Certain portions of the code require large amounts of memory.  If the code is breaking this may be something to check.  See [Section 2.2.0](#2.2.0-memory-allocation-for-gnosim-and-running-on-midway) for more on memory concerns.
 
 ### 1.1.2 Running Scripts
 
@@ -184,7 +184,7 @@ Ideally this is done in the code where, but if it is missed and you get an error
 
 ### 1.2.1 What is a Ray Tracing Library?
 
-GNOSim calculates many of the values per neutrino event by interpolating the values from previously generated ray tracing libraries.  These libraries contain information such as the the paths of rays connecting the antenna to the rest of the detector volume, the time it takes for a ray to travel, distance traveled, attenuation information, reflection information, etc.  They are created in advance once per antenna depth.  The directory containing a particular antenna depth is then listed under that antenna's library directory option in the station configuration file (see [Section 1.3.0](#-preparing-a-station-configuration-file)).
+GNOSim calculates many of the values per neutrino event by interpolating the values from previously generated ray tracing libraries.  These libraries contain information such as the the paths of rays connecting the antenna to the rest of the detector volume, the time it takes for a ray to travel, distance traveled, attenuation information, reflection information, etc.  They are created in advance once per antenna depth.  The directory containing a particular antenna depth is then listed under that antenna's library directory option in the station configuration file (see [Section 1.3.0](#1.3.0-preparing-a-station-configuration-file)).
 
 ### 1.2.2 Creating a Ray Tracing Library
 
@@ -222,7 +222,7 @@ Following the above steps in creating a library will create a folder containing 
 
 If you are having troubles running you may need to include a line before the first called gnosim import functions to include the path gnosim is located: sys.path.append('<where-gnosim-is>')
 
-*NOTE:  The current algorithm used for calculated the concave hulls is not ideal, and thus requires some attention from the user.  See [Section 1.2.3](#-concerning-the-envelope-and-concave-hull) for a description of how this is used, how it is calculated, what to be careful about.*
+*NOTE:  The current algorithm used for calculated the concave hulls is not ideal, and thus requires some attention from the user.  See [Section 1.2.3](#1.2.3-concerning-the-envelope-and-concave-hull) for a description of how this is used, how it is calculated, what to be careful about.*
 
 ### 1.2.3    Concerning the Envelope and Concave Hull
 
@@ -451,7 +451,7 @@ Below is a description of the keys to include in the simulation configuration fi
 
   Much of the meta-data for each event is contained within a single structured array.  Internally (while the simulation is running) this array will have the dtype info_dtype, which is specified withinin antarcticsim.  This data type is reduced for ouput, with some fields being required and staying, and others only being present if specified.  This parameter (output_fields) specifies which of the optional fields to include in the output file.
 
-  Below are the lists of required and optional fields.  The required fields are deemed so because they allow for testing_single_event to run without doing a full grid interpolation, saving considerable time when trying to examine just a few events after a larger simulation has been run.  The rest of the fields can be recalculated within testing_single_event using just these fields, and thus are optional.  It is considerably easier to have an optional field enabled (if it is valuable) then to recalculte it with testing_single_event, so it is recommended that you enable the fields you require.  Note that the more fields that are enabled, the more RAM that will be needed and the larger the output file.  Full descriptions of the data corresponding to each of the following fields can befound in [Section 3.3.1](#-saving-and-loading-h5py-files).
+  Below are the lists of required and optional fields.  The required fields are deemed so because they allow for testing_single_event to run without doing a full grid interpolation, saving considerable time when trying to examine just a few events after a larger simulation has been run.  The rest of the fields can be recalculated within testing_single_event using just these fields, and thus are optional.  It is considerably easier to have an optional field enabled (if it is valuable) then to recalculte it with testing_single_event, so it is recommended that you enable the fields you require.  Note that the more fields that are enabled, the more RAM that will be needed and the larger the output file.  Full descriptions of the data corresponding to each of the following fields can befound in [Section 3.3.1](#3.3.1-saving-and-loading-h5py-files).
 
   **Required Fields**
   These fields are already included in the output dtype and do not need to be listed in output_fields.
@@ -545,7 +545,7 @@ For UChicago/Midway it was common when running simulations with about 1 million 
 
     sbatch --cpus-per-task=16 --mem-per-cpu=1500 --job-name=gnosim LAUNCH_COMMAND
 
-For information on LAUNCH_COMMAND please see [Section 2.1.0](#-running-a-single-instance-of-gnosim).  When sending a command to Slurm using these flags, we request 30 GB of memory per job, with the ability to use up to 16 threads per job.  The amount of memory requested here may be more than is necessary depending on the application.
+For information on LAUNCH_COMMAND please see [Section 2.1.0](#2.1.0-running-a-single-instance-of-gnosim).  When sending a command to Slurm using these flags, we request 30 GB of memory per job, with the ability to use up to 16 threads per job.  The amount of memory requested here may be more than is necessary depending on the application.
 
 The status of this job can be monitored using the command:
 
@@ -557,7 +557,7 @@ While running a slurm.out file will be made in the current directory.  This shou
 
 Which will continue to show the end of the slurm file as it updates.  
 
-This method of running jobs is used in the farm.py script which automates the running of many simulations (see [Section 2.3.0](#-running-many-simulations-with-farm-script)).
+This method of running jobs is used in the farm.py script which automates the running of many simulations (see [Section 2.3.0](#2.3.0-running-many-simulations-with-farm-script)).
 
 ### 2.2.2 Running in an Interactive Terminal
 
@@ -663,7 +663,7 @@ Datasets can be added to a file using a command such as:
 
 As discussed in Chapter 7 of *'Python and HDF5 - Unlocking Scientific Data'*, HDF5 supports many data types, however the main ones used
 in the simulation are integer, float, strings, and, compound.  Compound dtypes utilize the numpy's structured data types, which are used
-in the simulation for the 'info' data set and info_dtype objects (More in [Section 3.2.0](#-formatting-of-output-files)).  
+in the simulation for the 'info' data set and info_dtype objects (More in [Section 3.2.0](#3.2.0-formatting-of-output-files)).  
 
 Then with this dataset present, it can be populated either in complete blocks or using numpy-like slices/indexing:
 
@@ -672,7 +672,7 @@ Then with this dataset present, it can be populated either in complete blocks or
     file['DATASET_NAME'][INDEX : INDEX + N_ANTENNA] = numpy.ones(N_ANTENNA) #An example of filling just a slice.
 
 Reading from the data set works similarly.  They can be loaded completely in blocks, or with slices, or if the dtype supports it,
-with slices on keys as well  (See [Section 3.2.0](#-formatting-of-output-files) for slicing on keys).  Examples of loading are below:
+with slices on keys as well  (See [Section 3.2.0](#3.2.0-formatting-of-output-files) for slicing on keys).  Examples of loading are below:
     
     ALL_VALUES = file['DATASET_NAME'][...]
 
@@ -752,11 +752,11 @@ This is the 'geometric_factor' calculated for the simulation, which is often use
   A small random jitter in timing to ensure that no systematic error is introduced from perfect timing in the MC simulation.  Given in ns.  Length is n_events.
 - **'info' : info_dtype**
 
-  Contains the meta data for the event for each antenna and solution type (if output_all_solutions == True, which is defined in the simulation configuration file).  For more information about the contents of this see [Section 3.3.0](#-working-with-info_dtype-objects-for-meta-data).  Length is n_events*n_antennas if output_all_solutions == False, otherwise it is n_events*n_antennas*n_solution_types.  Two info_dtypes will exists within the simulation, the main: info_dtype which contains ALL meta-data fields, and the output: out_info_dtype, which contains only the required fields for reconstruction offline without interpolation, plus those fields selected in the 'output_fields' section of the simulation configuration file.  See [Section 1.4.0](#-preparing-a-simulation-configuration-file) for more information on specifying output fields.
+  Contains the meta data for the event for each antenna and solution type (if output_all_solutions == True, which is defined in the simulation configuration file).  For more information about the contents of this see [Section 3.3.0](#3.3.0-working-with-info_dtype-objects-for-meta-data).  Length is n_events*n_antennas if output_all_solutions == False, otherwise it is n_events*n_antennas*n_solution_types.  Two info_dtypes will exists within the simulation, the main: info_dtype which contains ALL meta-data fields, and the output: out_info_dtype, which contains only the required fields for reconstruction offline without interpolation, plus those fields selected in the 'output_fields' section of the simulation configuration file.  See [Section 1.4.0](#1.4.0-preparing-a-simulation-configuration-file) for more information on specifying output fields.
 
 ## 3.3.0 Working with info_dtype Objects for Meta-data
 
-Most of the information and meta-data about the individual events is stored in the 'info' dataset of the output files.  The data within this dataset is stored using the out_info_dtype numpy structured dtype.  [Section 3.3.1](#-info-content-descriptions) discusses the contents.  [Section 3.3.2](#-working-with-the-info-dataset) discusses how to work with this data.  
+Most of the information and meta-data about the individual events is stored in the 'info' dataset of the output files.  The data within this dataset is stored using the out_info_dtype numpy structured dtype.  [Section 3.3.1](#3.3.1-info-content-descriptions) discusses the contents.  [Section 3.3.2](#3.3.2-working-with-the-info-dataset) discusses how to work with this data.  
 
 ### 3.3.1 Info Content Descriptions
 
