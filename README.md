@@ -471,9 +471,7 @@ Below is a description of the keys to include in the simulation configuration fi
   - *'seed'*
 
   **Optional Fields**
-  These fields are not included on output by default, and must be listed as utes in output_fields for them to be saved in the info dataset.  If you wish
-  to have none of these then you either put an empty list, or you can set output_fields to None, 'None', or 'none'.  If you wish to have all of the fields then you
-  can simply list them all or set output_fields to 'All' or 'all'. 
+  These fields are not included on output by default, and must be listed as utes in output_fields for them to be saved in the info dataset.  If you wish to have none of these then you either put an empty list, or you can set output_fields to None, 'None', or 'none'.  If you wish to have all of the fields then you can simply list them all or set output_fields to 'All' or 'all'. 
 
   - *'pre_triggered'*
   - *'observation_angle'*
@@ -495,13 +493,7 @@ Below is a description of the keys to include in the simulation configuration fi
   
 - **coords : str or None**
 
-  This is the location of a csv file containing the coordinates of neutrinos to be thrown.  If this is given then the number of
-  events thrown will be overidden to match the number of specified coordinates in this file.  To see an example of how such a
-  csv file can be created see gnosim/utils/generate_event_orientations.py.  
-  The columns are expected to be: x_0, y_0, z_0, phi_0, theta_0
-  Definitions of these can be found in the documentation for gnosim.sim.antarcticsim.sim.throw().
-
-
+  This is the location of a csv file containing the coordinates of neutrinos to be thrown.  If this is given then the number of events thrown will be overidden to match the number of specified coordinates in this file.  To see an example of how such a csv file can be created see gnosim/utils/generate_event_orientations.py.  The columns are expected to be: *x_0*, *y_0*, *z_0*, *phi_0*, *theta_0*.  Definitions of these can be found in the documentation for [gnosim.sim.antarcticsim.sim.throw()](https://github.com/djsouthall/gnosim/sim/antarcticsim.py).
 
 
 # 2.0.0 Running the Simulation
@@ -519,58 +511,47 @@ This command will be referenced as LAUNCH_COMMAND in future sections.  The conte
 #### Command Parameters
 ------------------
 
-    ./gnosim/sim/antarcticsim.py : executable file
-        This is the antarcticsim file.  The __main__ script will be run by placing this as the command in the command line.  The
-        following parameters will be used as input parameters to this script, and must be ordered correctly.
-    PATH_T0_SIMULATION_CONFIG : path
-        This should be the address of the simulation file.  For example:
-            ./gnosim/sim/sim_settings.py
-    ENERGY_NEUTRINO : float
-        This is the energy of the neutrinos to be thrown.  Given in GeV. *Note that in practice within the simulation the energy
-        that actually goes into the calculation of the Askaryan radiation is a reduced energy that accounts for inelasticity of
-        the interaction in the ice. *  
-    N_EVENTS : int
-        The number of neutrinos to throw for this simulation.
-    INDEX : int
-        The index of this simulation.  This is useful for instance if several simulations are being run with the same settings to be
-        stitched back together in analysis (running a large number of events can reduce the required memory per job). 
-    SEED : int, optional
-        This is an integer which will seed the entire simulation.  Allows for the simulation to be reproducible.  Be careful to make 
-        this different for each job if you are intending on running multiple jobs with the same settings and stitching them back 
-        together, but don't want duplicate events.  If this is not given then either a default seed will be used (if altered within
-        the antarcticsim to be a value other than None), or if the default seed is None (Default), then no seed is used.
+- **[./gnosim/sim/antarcticsim.py](https://github.com/djsouthall/gnosim/sim/antarcticsim.py) : executable file**
 
-        This seed (or lack thereof) is used to calculate an individual seed for each event in the simulation using the command:
-            numpy.random.randint(numpy.iinfo(numpy.uint32).max,size=self.n_events)
-        This allows for reproducibility of individual events through scripts like gnosim.analysis.test_single_event, which can be used to
-        learn more about a particular event after the simulation has run, but to reproduce the entire simulation these event seeds and other
-        rand properties are dependent on SEED.
+  This is the antarcticsim file.  The __main__ script will be run by placing this as the command in the command line.  The following parameters will be used as input parameters to this script, and must be ordered correctly.
+- **PATH_T0_SIMULATION_CONFIG : path**
+
+  This should be the address of the simulation file.  For example: [./gnosim/sim/sim_settings.py](https://github.com/djsouthall/gnosim/sim/sim_settings.py)
+- **ENERGY_NEUTRINO : float**
+
+  This is the energy of the neutrinos to be thrown.  Given in GeV. *Note that in practice within the simulation the energy that actually goes into the calculation of the Askaryan radiation is a reduced energy that accounts for inelasticity of the interaction in the ice.  
+- **N_EVENTS : int**
+
+  The number of neutrinos to throw for this simulation.
+- **INDEX : int**
+
+  The index of this simulation.  This is useful for instance if several simulations are being run with the same settings to be stitched back together in analysis (running a large number of events can reduce the required memory per job). 
+- **SEED : int, optional**
+
+  This is an integer which will seed the entire simulation.  Allows for the simulation to be reproducible.  Be careful to make this different for each job if you are intending on running multiple jobs with the same settings and stitching them back together, but don't want duplicate events.  If this is not given then either a default seed will be used (if altered within the antarcticsim to be a value other than None), or if the default seed is None (Default), then no seed is used.
+
+  This seed (or lack thereof) is used to calculate an individual seed for each event in the simulation using the command: 
+  
+      numpy.random.randint(numpy.iinfo(numpy.uint32).max,size=self.n_events)
+  This allows for reproducibility of individual events through scripts like gnosim.analysis.test_single_event, which can be used to learn more about a particular event after the simulation has run, but to reproduce the entire simulation these event seeds and other rand properties are dependent on SEED.
 
 ## 2.2.0 Memory Allocation for GNOSim and Running on Midway
 
-Due to the interpolation being performed using large ray tracing libraries, the simulation is generally very memory intensive.  Because of this it
-is recommended that you use a machine capable of allocating a lot of memory (such as the Midway cluster at UChicago).  It does not matter how this
-memory is available, but if multi-threading is enabled then it is in general best to request as many nodes as possible, each with as little 
-memory as needed such that n_cpu*mem_per_cpu is larger than the memory needed to run the simulation.  Determining the ideal configuration for your
-simulation may require some trial and error.  
+Due to the interpolation being performed using large ray tracing libraries, the simulation is generally very memory intensive.  Because of this it is recommended that you use a machine capable of allocating a lot of memory (such as the Midway cluster at UChicago).  It does not matter how this memory is available, but if multi-threading is enabled then it is in general best to request as many nodes as possible, each with as little memory as needed such that *n_cpu* \* *mem_per_cpu* is larger than the memory needed to run the simulation.  Determining the ideal configuration for your simulation may require some trial and error.  
 
 ### 2.2.1 Running with Batch
 
-For UChicago/Midway it was common when running simulations with about 1 million events to run with
-the resources specified in the following command:
+For UChicago/Midway it was common when running simulations with about 1 million events to run with the resources specified in the following command:
 
     sbatch --cpus-per-task=16 --mem-per-cpu=1500 --job-name=gnosim LAUNCH_COMMAND
 
-For information on LAUNCH_COMMAND please see Section 2.1.1.  When sending a command to Slurm using these flags, we request 30 GB of memory per job, 
-with the ability to use up to 16 threads per job.  The amount of memory requested here may be more than is necessary depending on the application.
+For information on LAUNCH_COMMAND please see Section 2.1.1.  When sending a command to Slurm using these flags, we request 30 GB of memory per job, with the ability to use up to 16 threads per job.  The amount of memory requested here may be more than is necessary depending on the application.
 
 The status of this job can be monitored using the command:
 
     squeue --user=USERID
 
-While running a slurm.out file will be made in the current directory.  This should be updated as print statements are made to the command line 
-in the simulation (barring some issues with Pythons print buffering), and thus can be monitored to see where the simulation is.  This file
-can be monitored live used the command:
+While running a slurm.out file will be made in the current directory.  This should be updated as print statements are made to the command line in the simulation (barring some issues with Pythons print buffering), and thus can be monitored to see where the simulation is.  This file can be monitored live used the command:
 
     tail -f slurm.out
 
@@ -584,25 +565,20 @@ The simulation can also be run in an interactive terminal by launching the termi
 
     sinteractive --cpus-per-task=16 --mem-per-cpu=1500 --job-name=gnosim
 
-Within this terminal the LAUNCH_COMMAND can be run from the folder containing gnosim.  Here the print statements of the simulation will appear
-in the terminal as normal, so no special monitoring is required.
+Within this terminal the LAUNCH_COMMAND can be run from the folder containing gnosim.  Here the print statements of the simulation will appear in the terminal as normal, so no special monitoring is required.
 
 ### 2.2.3 More Info
-Please see https://rcc.uchicago.edu/docs/using-midway/index.html for information on using Midway.  Additionally it may be helpful to look up
-common Slurm commands.
+Please see https://rcc.uchicago.edu/docs/using-midway/index.html for information on using Midway.  Additionally it may be helpful to look up common Slurm commands.
 
 ## 2.3.0 Running Many Simulations with the gnosim/sim/farm.py Script
 
-It is often desirable to initiate/queue many simulations at once.  For this one can use (modify locally as needed) the gnosim/sim/farm.py script.  This script
-contains a sample of the infrastructure that can be used to queue many jobs with a range of energies or simulation configuration files.  The parameters
-for running this script are mostly self explanatory.  
+It is often desirable to initiate/queue many simulations at once.  For this one can use (modify locally as needed) the gnosim/sim/farm.py script.  This script contains a sample of the infrastructure that can be used to queue many jobs with a range of energies or simulation configuration files.  The parameters for running this script are mostly self explanatory.  
 
 The status of each job can be monitored using the command:
 
     squeue --user=USERID
 
-To see the command line print statements of a specific job, locate the slurm file (formatted slurm-JOBID.out) with the appropriate JOBID from the
-squeue command.  Then run the command:
+To see the command line print statements of a specific job, locate the slurm file (formatted slurm-JOBID.out) with the appropriate JOBID from the squeue command.  Then run the command:
 
     tail -f slurm.out
 
@@ -610,22 +586,13 @@ Which will continue to show the end of the slurm file as it updates.
 
 ## 2.4.0 Stitching Together Simulations
 
-Sometimes when running simulations with large numbers of events it is desirable to split the events across multiple instances of the simulation, such
-that individual jobs require less memory, or potentially so the events can be run faster in user time (obviously computation time does not significantly
-change as mostly the same number of calculations are performed).  If this is done then a different index should be used for each simulation instance.
+Sometimes when running simulations with large numbers of events it is desirable to split the events across multiple instances of the simulation, such that individual jobs require less memory, or potentially so the events can be run faster in user time (obviously computation time does not significantly change as mostly the same number of calculations are performed).  If this is done then a different index should be used for each simulation instance.
 
-To recombine the meta-data and outfiles of these simulations one can use (or modify to their needs locally) the gnosim/analysis/quickmerge.py script, which
-provides a general infrastructure for combining the output files.  There is no claim that this is the best way to recombine, but it is currently how that is
-done.  
+To recombine the meta-data and outfiles of these simulations one can use (or modify to their needs locally) the [gnosim/analysis/quickmerge.py](https://github.com/djsouthall/gnosim/analysis/quickmerge.py) script, which provides a general infrastructure for combining the output files.  There is no claim that this is the best way to recombine, but it is currently how that is done.  
 
-Recombining requires significant memory, so it is recommended to run this in a batch command or from an interactive terminal with access to a lot of memory.
-It is currently designed to be run in a particular directory of the output files.  It will try to combine files unless a file exists already with the expected
-'merged' output name.  The output file is generated for a particular set of simulations first, so this script can be run multiple times in a directory and each
-instance will only work on files that aren't already being worked on (given that the instances are run with enough time separation to allow for the output file
-to be made by one script to be noticed by the other).  This is not the most elegant of solutions, so be careful when using.
+Recombining requires significant memory, so it is recommended to run this in a batch command or from an interactive terminal with access to a lot of memory.  It is currently designed to be run in a particular directory of the output files.  It will try to combine files unless a file exists already with the expected  *'merged'* output name.  The output file is generated for a particular set of simulations first, so this script can be run multiple times in a directory and each instance will only work on files that aren't already being worked on (given that the instances are run with enough time separation to allow for the output file to be made by one script to be noticed by the other).  This is not the most elegant of solutions, so be careful when using.
 
-The output files will have events appended into the data files with new event numbers.  The attributes are crudely copied and appended with the index of
-the particular file for which it came from.
+The output files will have events appended into the data files with new event numbers.  The attributes are crudely copied and appended with the index of the particular file for which it came from.
 
 # 3.0.0 Working with Simulation Data
 
@@ -633,9 +600,7 @@ This section contains information about working with the output data from the si
   
 ## 3.1.0 Information About h5py
 
-The data is stored in h5 (HDF5) files produced using the h5py python package (http://www.h5py.org/).  For full details on working with this type of
-data it is recommended that the user reference the website or the textbook 'Python and HDF5 - Unlocking Scientific Data' by Andrew Collette 
-(O'Reilly Publishing).  A basic overview is discussed below.
+The data is stored in h5 (HDF5) files produced using the h5py python package (http://www.h5py.org/).  For full details on working with this type of data it is recommended that the user reference the website or the textbook *'Python and HDF5 - Unlocking Scientific Data' by Andrew Collette (O'Reilly Publishing)*.  A basic overview is discussed below.
 
 To work with h5py files the package must be loaded in python using the command:
 
@@ -643,24 +608,23 @@ To work with h5py files the package must be loaded in python using the command:
 
 ### 3.1.1 Saving and Loading h5py Files
 
-            In order to create or save an h5py file it must be opened in 'write' (below as 'w'):
+In order to create or save an h5py file it must be opened in 'write' (below as 'w'):
 
-                >>> file = h5py.File(OUTFILE_NAME, 'w')
+    file = h5py.File(OUTFILE_NAME, 'w')
 
-            where OUTFILE_NAME is a string of the name of the output file, including extension - e.g. './results.h5'.
+where OUTFILE_NAME is a string of the name of the output file, including extension - e.g. './results.h5'.
 
-            If loading a file and writing is not required then you can load the file in 'read' mode:
+If loading a file and writing is not required then you can load the file in 'read' mode:
 
-                >>> file = h5py.File(INFILE_NAME, 'r')
+    file = h5py.File(INFILE_NAME, 'r')
 
-            After the file is no longer needed it should be closed:
+After the file is no longer needed it should be closed:
 
-                >>> file.close()
+    file.close()
 
 ### 3.1.2 Attributes and Datasets in h5py Files
 
-The h5py files used in this simulation store meta information as either 'attrs' (attributes) or datasets.
-To quickly see the contents of an h5py file, open it using python and the following commands:
+The h5py files used in this simulation store meta information as either 'attrs' (attributes) or datasets.  To quickly see the contents of an h5py file, open it using python and the following commands:
 
     import h5py
     reader = h5py.File('/PATH/TO/FILE.h5' , 'r')
@@ -691,13 +655,13 @@ And can later be accessed from a loaded file using the command:
 Datasets are the central feature of HDF5. You can think of them as NumPy arrays that live on disk. Every dataset in HDF5 has a name, 
 a type, and a shape, and supports random access. Unlike the built-in np.save and friends, there?s no need to read and write the entire 
 array as a block; you can use the standard NumPy syntax for slicing to read and write just the parts you want.' - Chapter 3 of 
-'Python and HDF5 - Unlocking Scientific Data' by Andrew Collette.
+*'Python and HDF5 - Unlocking Scientific Data' by Andrew Collette*.
 
 Datasets can be added to a file using a command such as:
 
     file.create_dataset('DATASET_NAME', (LENGTH,), dtype='DTYPE', compression='gzip', compression_opts=9, shuffle=True)
 
-As discussed in Chapter 7 of 'Python and HDF5 - Unlocking Scientific Data', HDF5 supports many data types, however the main ones used
+As discussed in Chapter 7 of *'Python and HDF5 - Unlocking Scientific Data'*, HDF5 supports many data types, however the main ones used
 in the simulation are integer, float, strings, and, compound.  Compound dtypes utilize the numpy's structured data types, which are used
 in the simulation for the 'info' data set and info_dtype objects (More in Section 3.2.0).  
 
@@ -719,178 +683,177 @@ with slices on keys as well  (See Section 3.2.0 for slicing on keys).  Examples 
 Below are descriptions of the many attributes and datasets stored within a gnosim output file.
 
 #### Attrs
+- **seed : int or str**
 
-    seed : int or str
-        The seed used for the simulation.  Will be the str 'None' if no string was used.
-    geometric_factor : float
-        This is the 'geometric_factor' calculated for the simulation, which is often used as a pre factor in volumetric acceptance calculations.
-        Given in m^3 sr.
-    config : float
-        This is the location of the station configuration file used for the simulation.
-    ice_model : str
-        The used ice model (label).
-    trigger_mode : str
-        The units/mode of trigger used.  Corresponds to trigger_threshold_units from the simulation configuration file.
-    trigger_threshold : float
-        The threshold set for triggering.  The bool signifying if a particular event triggered or not is stored in the 'info' dataset.
-    pre_trigger_angle : float or list of floats or None, optional
-            This is the pre trigger angle(s) used.  If None was used then this will be 'None'.
+  The seed used for the simulation.  Will be the str 'None' if no string was used.
+- **geometric_factor : float**
+
+This is the 'geometric_factor' calculated for the simulation, which is often used as a pre factor in volumetric acceptance calculations.  Given in m^3 sr.
+- **config : float**
+
+  This is the location of the station configuration file used for the simulation.
+- **ice_model : str**
+
+  The used ice model (label).
+- **trigger_mode : str**
+
+  The units/mode of trigger used.  Corresponds to trigger_threshold_units from the simulation configuration file.
+- **trigger_threshold : float**
+
+  The threshold set for triggering.  The bool signifying if a particular event triggered or not is stored in the 'info' dataset.
+- **pre_trigger_angle : float or list of floats or None, optional**
+
+  This is the pre trigger angle(s) used.  If None was used then this will be 'None'.
 
 
 #### Datasets
 
-    'event_seeds' : int
-        The seeds that set the states of the random objects to be used internally for each event, allowing it to be reproducable regardless 
-        of the number of times random calls were made externally.  This is calculated using 
-        numpy.random.randint(numpy.iinfo(numpy.uint32).max,size=self.n_events), where the seed of this random call is set by the simulation 
-        seed.
-    'energy_neutrino' : float
-        Energy of each event.  Given in GeV.  Length is n_events.  This is the full energy before inelasticity is accounted for.
-    'inelasticity' : float
-        Inelasticity of each event.  Length is n_events.
-    'x_0' : float
-        x coordinate of the neutrino interaction for each event site in the ice frame.  Given in m.  Length is n_events.
-    'y_0' : float
-        y coordinate of the neutrino interaction for each event site in the ice frame.  Given in m.  Length is n_events.
-    'z_0' : float
-        z coordinate of the neutrino interaction for each event site in the ice frame.  Given in m.  Length is n_events.
-    'theta_0' : float
-        The polar spherical coordinates for the directions each neutrino came from.  Given in degrees.  Length is n_events.
-    'phi_0' : float
-        The azimuthal spherical coordinates for the directions each neutrino came from.  Given in degrees.  Length is n_events.
-    'p_interact' : float
-        The probability that the neutrino interacts in a sphere containing a cubic meter of ice for each event.
-        This may be used for weighting in some analysis scripts, however currently it's exact definition and relevance for use in
-        weight is not entirely clear.  See gnosim.earth.earth.probInteract().  Length is n_events.
-        #TODO: Compare this other simulations weighting parameters to how analogous it is and how it could be used.
-    'p_earth' : float
-        The probability of survival for the neutrino passing through the earth.  These are used on volumetric acceptance calculations.  
-        See gnosim.earth.earth.probSurvival().  Length is n_events.
-    'p_detect' : bool
-        A bool for each event signifying if the event is observable (meaning there is at least one ray connecting the neutrino interaction
-        site an antenna in the array).  True if the event is observable at all (i.e. has at least one solution type visible across the array).
-        Length is n_events.
-    'random_time_offsets' : float
-        A small random jitter in timing to ensure that no systematic error is introduced from perfect timing in the MC simulation.  
-        Given in ns.  Length is n_events.
-    'info' : info_dtype
-        Contains the meta data for the event for each antenna and solution type (if output_all_solutions == True, which is defined in the 
-        simulation configuration file).  For more information about the contents of this see Section 3.3.0.  Length is n_events*n_antennas if 
-        output_all_solutions == False, otherwise it is n_events*n_antennas*n_solution_types.  Two info_dtypes will exists within the simulation,
-        the main: info_dtype which contains ALL meta-data fields, and the output: out_info_dtype, which contains only the required fields for
-        reconstruction offline without interpolation, plus those fields selected in the 'output_fields' section of the simulation configuration
-        file.  See Section 1.4.0 for more information on specifying output fields.
+
+- **'event_seeds' : int**
+
+  The seeds that set the states of the random objects to be used internally for each event, allowing it to be reproducable regardless of the number of times random calls were made externally.  This is calculated using:
+
+      numpy.random.randint(numpy.iinfo(numpy.uint32).max,size=self.n_events)
+
+  where the seed of this random call is set by the simulation seed.
+
+- **'energy_neutrino' : float**
+
+  Energy of each event.  Given in GeV.  Length is n_events.  This is the full energy before inelasticity is accounted for.
+- **'inelasticity' : float**
+
+  Inelasticity of each event.  Length is n_events.
+- **'x_0' : float**
+
+  x coordinate of the neutrino interaction for each event site in the ice frame.  Given in m.  Length is n_events.
+- **'y_0' : float**
+
+  y coordinate of the neutrino interaction for each event site in the ice frame.  Given in m.  Length is n_events.
+- **'z_0' : float**
+
+  z coordinate of the neutrino interaction for each event site in the ice frame.  Given in m.  Length is n_events.
+- **'theta_0' : float**
+
+  The polar spherical coordinates for the directions each neutrino came from.  Given in degrees.  Length is n_events.
+- **'phi_0' : float**
+
+  The azimuthal spherical coordinates for the directions each neutrino came from.  Given in degrees.  Length is n_events.
+- **'p_interact' : float**
+
+  The probability that the neutrino interacts in a sphere containing a cubic meter of ice for each event.  This may be used for weighting in some analysis scripts, however currently it's exact definition and relevance for use in weight is not entirely clear.  See gnosim.earth.earth.probInteract().  Length is n_events.
+- **'p_earth' : float**
+
+  The probability of survival for the neutrino passing through the earth.  These are used on volumetric acceptance calculations.  See [gnosim.earth.earth.probSurvival()](https://github.com/djsouthall/gnosim/earth/earth.py).  Length is n_events.
+- **'p_detect' : bool**
+
+  A bool for each event signifying if the event is observable (meaning there is at least one ray connecting the neutrino interaction site an antenna in the array).  True if the event is observable at all (i.e. has at least one solution type visible across the array).  Length is n_events.
+- **'random_time_offsets' : float**
+
+  A small random jitter in timing to ensure that no systematic error is introduced from perfect timing in the MC simulation.  Given in ns.  Length is n_events.
+- **'info' : info_dtype**
+
+  Contains the meta data for the event for each antenna and solution type (if output_all_solutions == True, which is defined in the simulation configuration file).  For more information about the contents of this see Section 3.3.0.  Length is n_events*n_antennas if output_all_solutions == False, otherwise it is n_events*n_antennas*n_solution_types.  Two info_dtypes will exists within the simulation, the main: info_dtype which contains ALL meta-data fields, and the output: out_info_dtype, which contains only the required fields for reconstruction offline without interpolation, plus those fields selected in the 'output_fields' section of the simulation configuration file.  See Section 1.4.0 for more information on specifying output fields.
 
 ## 3.3.0 Working with info_dtype Objects for Meta-data
 
-Most of the information and meta-data about the individual events is stored in the 'info' dataset of the output files.  The data
-within this dataset is stored using the out_info_dtype numpy structured dtype.  Section 3.3.1 discusses the contents.  Section 3.3.2 discusses how to
-work with this data.  
+Most of the information and meta-data about the individual events is stored in the 'info' dataset of the output files.  The data within this dataset is stored using the out_info_dtype numpy structured dtype.  Section 3.3.1 discusses the contents.  Section 3.3.2 discusses how to work with this data.  
 
 ### 3.3.1 Info Content Descriptions
 
-info_dtype is defined within antarcticsim.  Search for it in that file to see the definition used.  Below are descriptions of the
-keys/contents in the data type.  The info dataset often as an 'entry' for every solution type of every antenna in the array.  Thus
-below I will be using the terminology of 'per entry' rather then 'per event', because multiple entries will correspond to a single
-event, but describe different solutions/antennas.
+info_dtype is defined within antarcticsim.  Search for it in that file to see the definition used.  Below are descriptions of the keys/contents in the data type.  The info dataset often as an 'entry' for every solution type of every antenna in the array.  Thus below I will be using the terminology of 'per entry' rather then 'per event', because multiple entries will correspond to a single event, but describe different solutions/antennas.
 
-    eventid : int
-        The identifier for the event within the simulation.  Corresponds to the index in most other datasets.
-    station : int
-        The index of the station for each entry.
-    antenna : int
-        The index of the antenna for each entry.
-    solution : S10
-        The solution type for this particular entry.  Stored as a fixed with string.  This may need to be decoded for use, as it 
-        will appear as a b-str.  i.e. this might look like b'direct', rather than 'direct'.  So you may need to do solution.decode().
-    has_solution : bool
-        True if there is a ray connection the neutrino interaction location to the antenna that is corresponds to this entries
-        solution type (defined in solution).
-    pre_triggered : bool
-        Whether this particular solution satisfied the pre trigger.  It passed the pre trigger if True.
-    triggered : bool
-        True for all entries of a particular event if the event as a whole was triggered on.
-    time : float
-        The time of flight for this particular entry.  Given in ns.
-    distance : float
-        The distance traveled for this entry.  Given in m.
-    theta_ant : float
-        The spherical polar coordinate of the momentum vector of the ray pointing along the ray towards the neutrino event in the ice frame
-        at the antenna.
-        In other words: The spherical polar angle of the direction of the ray connecting the neutrino and the antenna as interpolated to 
-        be at the antenna location.  This points in the opposite direction of the pulse travel direction (i.e. opposite to 'towards
-        the antenna from the neutrino').  Given for this particular entry.  Given in degrees. 
-    theta_ray : float
-        The spherical polar coordinate of the momentum vector of the ray pointing along the ray towards the neutrino event in the ice frame
-        at the neutrino.
-        In other words: The spherical polar angle of the direction of the ray connecting the neutrino and the antenna as interpolated to 
-        be at the neutrino interaction location.  This points in the opposite direction of the pulse travel direction (i.e. opposite to 'towards
-        the antenna from the neutrino').  Given for this particular entry.  Given in degrees. 
-    observation_angle : float
-        The observation angle relative to the shower axis.  i.e. The angle 'on-cone'.  This is the angle used in the pre trigger.  Given in degrees.
-    electric_field : float
-        The maximum value of the electric field for this entry.  Taken after noise was added (if noise was added), thus for small signals may
-        only be the noise max.  Given in V.
-    electric_field_digitized : float
-        The maximum value of the electric field for this entry.  Taken after noise was added (if noise was added), thus for small signals may
-        only be the noise max.  Given in adu.
-    fpga_max : int
-        The maximum measured beamforming value for this event.  Given in adu^2.  If do_beamforming = False then this will be -999.0.
-    dominant_freq : float
-        This is the frequency of the bin corresponding to the maximum power in the frequency spectrum of the Askaryan radiation.  Taken 
-        after noise was added (if noise was added).
-    a_p : float
-        p polarization attenuation factor.  Includes effects from general attenuation in ice due to attenuation length (currently only for 300 MHz), 
-        as well as reduction in signal resulting from Fresnel coefficients (as well as sign flips resulting from Fresnel amplitudes). 
-        Corresponds to this entry.
-    a_s : float
-        s polarization attenuation factor.  Includes effects from general attenuation in ice due to attenuation length (currently only for 300 MHz), 
-        as well as reduction in signal resulting from Fresnel coefficients (as well as sign flips resulting from Fresnel amplitudes). 
-        Corresponds to this entry.
-    SNR : float
-        SNR is calculated as the ratio of the 'peak to peak'/2 over rms(noise), squared (ratio of powers).  The 'peak to peak' is calculated
-        using the NOISELESS signal, allowing for the SNR to be accurate far below noise level (a privilege of simulation land). 
-    signal_reduction_factor : float
-        The calculation method for this is specific to the detector type selected for the antenna of this entry (defined in the station 
-        configuration file).  See gnosim.detector.detector.Antenna.getAntennaResponseFactor. This is the reduction factor that was 
-        multiplied with the antenna response for this entries Askaryan calculation.
-    beam_pattern_factor : float
-        The beam pattern componant of the signal_reduction factor.  I.e. the reduction in signal strength due to the approach angles
-        of the wave vector at the antenna.  This componant may be calculated depending on the type of antenna chosen.
-        If it is not calculated for a particular antenna type then a value of -999.0 is returned.  To see how this factor was
-        specifically calculated for your antenna type see the code below.
-    attenuation_factor : float
-        The attenuation componant of the signal_reduction factor.  The contains the affects of a_s and a_p (the attennuations for 
-        each polarization of light).  Depending on the type of detector chosen this could entail simply returning one of those values,
-        or accounting for the appropriate vectorized proportion of each componant on the final signal.  This componant may be calculated 
-        depending on the type of antenna chosen. If it is not calculated for a particular antenna type then a value of -999.0 is returned.  
-        o see how this factor was specifically calculated for your antenna type see the code below.
-    polarization_dot_factor : float
-        The polarization componant of the signal_reduction factor (i.e. the factor resulting from the dot product between the
-        polarization vector at the antenna and the polarization sensitivity vector set for that antenna).  This componant may 
-        be calculated depending on the type of antenna chosen. If it is not calculated for a particular antenna type then a 
-        value of -999.0 is returned.  To see how this factor was specifically calculated for your antenna type see the appropriate
-        section of gnosim.detector.antenna.getAntennaResponseFactor().
-    pol_dot_angle : float
-        The angle from the dot product of the polarization vector and the polarization sensitivity vector.  Only works for
-        detectors sensitive to polarization, will return -999.0 otherwise. 
-    seed : int
-        This is the event specific seed.  
-    neutrino_travel_dir_vector : numpy.ndarray of floats
-        The unit vector for the direction the shower is propogating.  This is returned in ice-frame cartesian coordinates.
-    emission_wave_vector : numpy.ndarray of floats
-        The unit vector for the vector directed towards the antenna along the observation ray.  This is returned in ice-frame cartesian 
-        coordinates.  This should be the wave vector as it was emitted from the neutrino.
-    detection_wave_vector : numpy.ndarray of floats
-        The unit vector for the vector directed towards the antenna along the observation ray at the antenna.  Given in the ice-frame cartesian coordinates.
-    emission_polarization_vector : numpy.ndarray of floats
-        The unit vector for the polarization as it is just after emission at the neutrino. This is a unit vector.
-        This is returned in ice-frame cartesian coordinates.
-    detection_polarization_vector : numpy.ndarray of floats
-        The unit vector for the polarization as it is just before interacting with the antenna. This is a unit vector, magnitudes represent 
-        how the s and p polarizations have been reduced during ray propogation.  The magnitude of this vector originally contained 
-        information about a_s and a_p, however the magnitude has been split from the direction and is stored in attenuation_factor 
-        output value. This vector is returned in ice-frame cartesian coordinates.
+
+- **eventid : int**
+
+  The identifier for the event within the simulation.  Corresponds to the index in most other datasets.
+- **station : int**
+
+  The index of the station for each entry.
+- **antenna : int**
+
+  The index of the antenna for each entry.
+- **solution : S10**
+
+  The solution type for this particular entry.  Stored as a fixed with string.  This may need to be decoded for use, as it will appear as a b-str.  i.e. this might look like *b'direct'*, rather than *'direct'*.  So you may need to do *solution.decode()*.
+- **has_solution : bool**
+
+  True if there is a ray connection the neutrino interaction location to the antenna that is corresponds to this entries solution type (defined in solution).
+- **pre_triggered : bool**
+
+  Whether this particular solution satisfied the pre trigger.  It passed the pre trigger if True.
+- **triggered : bool**
+
+  True for all entries of a particular event if the event as a whole was triggered on.
+- **time : float**
+
+  The time of flight for this particular entry.  Given in ns.
+- **distance : float**
+
+  The distance traveled for this entry.  Given in m.
+- **theta_ant : float**
+
+  The spherical polar coordinate of the momentum vector of the ray pointing along the ray towards the neutrino event in the ice frame at the antenna.  In other words: The spherical polar angle of the direction of the ray connecting the neutrino and the antenna as interpolated to be at the antenna location.  This points in the opposite direction of the pulse travel direction (i.e. opposite to 'towards the antenna from the neutrino').  Given for this particular entry.  Given in degrees. 
+- **theta_ray : float**
+
+  The spherical polar coordinate of the momentum vector of the ray pointing along the ray towards the neutrino event in the ice frame at the neutrino.  In other words: The spherical polar angle of the direction of the ray connecting the neutrino and the antenna as interpolated to be at the neutrino interaction location.  This points in the opposite direction of the pulse travel direction (i.e. opposite to 'towards the antenna from the neutrino').  Given for this particular entry.  Given in degrees. 
+- **observation_angle : float**
+
+  The observation angle relative to the shower axis.  i.e. The angle 'on-cone'.  This is the angle used in the pre trigger.  Given in degrees.
+- **electric_field : float**
+
+  The maximum value of the electric field for this entry.  Taken after noise was added (if noise was added), thus for small signals may only be the noise max.  Given in V.
+- **electric_field_digitized : float**
+
+  The maximum value of the electric field for this entry.  Taken after noise was added (if noise was added), thus for small signals may only be the noise max.  Given in adu.
+- **fpga_max : int**
+
+  The maximum measured beamforming value for this event.  Given in adu^2.  If do_beamforming = False then this will be -999.0.
+- **dominant_freq : float**
+
+  This is the frequency of the bin corresponding to the maximum power in the frequency spectrum of the Askaryan radiation.  Taken after noise was added (if noise was added).
+- **a_p : float**
+
+  *p* polarization attenuation factor.  Includes effects from general attenuation in ice due to attenuation length (currently only for 300 MHz), as well as reduction in signal resulting from Fresnel coefficients (as well as sign flips resulting from Fresnel amplitudes).  Corresponds to this entry.
+- **a_s : float**
+
+  *s* polarization attenuation factor.  Includes effects from general attenuation in ice due to attenuation length (currently only for 300 MHz), as well as reduction in signal resulting from Fresnel coefficients (as well as sign flips resulting from Fresnel amplitudes).  Corresponds to this entry.
+- **SNR : float**
+
+  SNR is calculated as the ratio of the 'peak to peak'/2 over rms(noise), squared (ratio of powers).  The 'peak to peak' is calculated using the NOISELESS signal, allowing for the SNR to be accurate far below noise level (a privilege of simulation land). 
+- **signal_reduction_factor : float**
+
+  The calculation method for this is specific to the detector type selected for the antenna of this entry (defined in the station configuration file).  See [gnosim.detector.detector.Antenna.getAntennaResponseFactor](https://github.com/djsouthall/gnosim/detector/detector.py). This is the reduction factor that was multiplied with the antenna response for this entries Askaryan calculation.
+- **beam_pattern_factor : float**
+
+  The beam pattern componant of the signal_reduction factor.  I.e. the reduction in signal strength due to the approach angles of the wave vector at the antenna.  This componant may be calculated depending on the type of antenna chosen.  If it is not calculated for a particular antenna type then a value of -999.0 is returned.  To see how this factor was specifically calculated for your antenna type see the code below.
+- **attenuation_factor : float**
+
+  The attenuation componant of the signal_reduction factor.  The contains the affects of a_s and a_p (the attennuations for each polarization of light).  Depending on the type of detector chosen this could entail simply returning one of those values, or accounting for the appropriate vectorized proportion of each componant on the final signal.  This componant may be calculated depending on the type of antenna chosen. If it is not calculated for a particular antenna type then a value of -999.0 is returned.  To see how this factor was specifically calculated for your antenna type see the code below.
+- **polarization_dot_factor : float**
+
+  The polarization componant of the signal_reduction factor (i.e. the factor resulting from the dot product between the polarization vector at the antenna and the polarization sensitivity vector set for that antenna).  This componant may be calculated depending on the type of antenna chosen. If it is not calculated for a particular antenna type then a value of -999.0 is returned.  To see how this factor was specifically calculated for your antenna type see the appropriate section of gnosim.detector.antenna.getAntennaResponseFactor().
+- **pol_dot_angle : float**
+
+  The angle from the dot product of the polarization vector and the polarization sensitivity vector.  Only works for detectors sensitive to polarization, will return -999.0 otherwise. 
+- **seed : int**
+
+  This is the event specific seed.  
+- **neutrino_travel_dir_vector : numpy.ndarray of floats**
+
+  The unit vector for the direction the shower is propogating.  This is returned in ice-frame cartesian coordinates.
+- **emission_wave_vector : numpy.ndarray of floats**
+
+  The unit vector for the vector directed towards the antenna along the observation ray.  This is returned in ice-frame cartesian coordinates.  This should be the wave vector as it was emitted from the neutrino.
+- **detection_wave_vector : numpy.ndarray of floats**
+
+  The unit vector for the vector directed towards the antenna along the observation ray at the antenna.  Given in the ice-frame cartesian coordinates.
+- **emission_polarization_vector : numpy.ndarray of floats**
+
+  The unit vector for the polarization as it is just after emission at the neutrino. This is a unit vector.  This is returned in ice-frame cartesian coordinates.
+- **detection_polarization_vector : numpy.ndarray of floats**
+
+  The unit vector for the polarization as it is just before interacting with the antenna. This is a unit vector, magnitudes represent how the *s* and *p* polarizations have been reduced during ray propogation.  The magnitude of this vector originally contained information about *a_s* and *a_p*, however the magnitude has been split from the direction and is stored in attenuation_factor output value. This vector is returned in ice-frame cartesian coordinates.
+
 
 ### 3.3.2 Working with the Info Dataset
 
