@@ -24,7 +24,7 @@ GNOSim is a MC neutrino simulation designed to support time-domain Askaryan sign
 
 # Table of Contents
 
-0.0.0 ............. [Preface and Quick Guide](#000-preface-and-quick-guide)
+0.0.0 ............. [Preface and Quick Guide](000-preface--quick-guide)
 
 1.0.0 ............. [General Preparations](#100-general-preparations)
 
@@ -38,7 +38,7 @@ GNOSim is a MC neutrino simulation designed to support time-domain Askaryan sign
 
 &nbsp;&nbsp;&nbsp;&nbsp;1.2.0 ......... [Creating a Ray Tracing Library for the Simulation](#120-creating-a-ray-tracing-library-for-the-simulation)
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.1 ..... [What is a Ray Tracing Library?](#121-what-is-a-ray-tracing-library?)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.1 ..... [What is a Ray Tracing Library?](#121-what-is-a-ray-tracing-library)
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.2 ..... [Creating a Ray Tracing Library](#122-creating-a-ray-tracing-library)
 
@@ -224,7 +224,7 @@ If you are having troubles running you may need to include a line before the fir
 
 *NOTE:  The current algorithm used for calculated the concave hulls is not ideal, and thus requires some attention from the user.  See [Section 1.2.3](#123-concerning-the-envelope-and-concave-hull) for a description of how this is used, how it is calculated, what to be careful about.*
 
-### 1.2.3    Concerning the Envelope and Concave Hull
+### 1.2.3 Concerning the Envelope and Concave Hull
 
 The set of points created by the ray tracing library will ultimately populate the r-z plane of the ice (flattened cylindrical coordinates) in such a way as to have a concave hull (i.e. the polygon that would surround all points is concave).  The hull is characterized be an envelope function which is used to determine which portion of the r-z plane has possible ray tracing solutions for each of the solution types.  e.g. does a point at *(r,z)* have any reflected solutions connecting the point to the antenna.  The accuracy of the hull is important for maximizing the image-able volume, without falsely classifying points resulting in poor interpolation.
 
@@ -939,7 +939,7 @@ This section will contain information relevant for people intending on contribut
         https://github.com/djsouthall/gnosim/
 
 
-## 4.2.0    Conventions
+## 4.2.0 Conventions
 
 The following conventions are ideally followed:
 
