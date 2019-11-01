@@ -21,6 +21,7 @@ import scipy.signal
 import gnosim.utils.constants
 import gnosim.interaction.inelasticity
 import gnosim.detector.fpga
+import matplotlib.pyplot as plt
 pylab.ion()
 
 ############################################################
@@ -794,7 +795,7 @@ if __name__ == "__main__":
     import yaml
     import gnosim.detector.detector
     solutions = numpy.array(['direct'])
-    config_file = os.environ['GNOSIM_DIR'] + '/gnosim/detector/station_config/real_config_full_station.py'
+    config_file = os.environ['GNOSIM_DIR'] + '/gnosim/detector/station_config/ara5_full_station_antarctica_allison.py'#'/gnosim/detector/station_config/ara5_phased_array_antarctica_allison.py'
     config = yaml.load(open(config_file))
     station = gnosim.detector.detector.Station('ARA5',config,solutions = solutions)
     station.plotStation()
@@ -808,14 +809,26 @@ if __name__ == "__main__":
     cherenkov_angle = numpy.arccos(1./n)
     cherenkov_angle_deg = numpy.rad2deg(numpy.arccos(1./n))
 
+    #To make a lower SNR signal either decrease inelasticty, decrease neutrino energy, make observation angle more off cone, or increase signal_reduction_factor (typically set by the gain of the recieving antenna but here just as a number). 
     inelasticity = 1.00
-
-    u, V_noiseless, dominant_freq, V_noise,  SNR = gnosim.interaction.askaryan.quickSignalSingle(numpy.deg2rad(50),R,inelasticity*energy_neutrino,n,1,0.7,ant.signal_times, ant.h_fft, ant.sys_fft, ant.freqs_response,plot_signals=True,plot_spectrum=True,plot_potential=True,include_noise = True)
+    #                                              gnosim.interaction.askaryan.quickSignalSingle(theta_obs_rad   , R, Energy_GeV,                 n, t_offset, signal_reduction_factor, u,               h_fft,      sys_fft,     freqs,             fp_fft=None, plot_signals=False, plot_spectrum=False, plot_signals_spectrum=False, plot_angles=False, plot_potential=False, include_noise=False, resistance=50, noise_temperature=320, random_local=None):  
+    u, V_noiseless, dominant_freq, V_noise,  SNR = gnosim.interaction.askaryan.quickSignalSingle(numpy.deg2rad(50),R,inelasticity*energy_neutrino,n,1,         0.7,                     ant.signal_times, ant.h_fft, ant.sys_fft, ant.freqs_response,plot_signals=True,plot_spectrum=True,plot_potential=True,include_noise = True)
     minimum_time = numpy.min(u)
     maximum_time = numpy.max(u)
     random_time_offset = numpy.random.uniform(-1, 1, size=1)
     digital_sample_times = numpy.arange(minimum_time,maximum_time,station.digital_sampling_period) + random_time_offset #these + random_time_offset #these
     sample_times,V_bit = gnosim.detector.fpga.digitizeSignal(u,V_noise,digital_sample_times,7,0.0204,3, dc_offset = 0, plot = True)
+
+
+    #You can save the following and however you want. 
+    analog_times = u
+    analog_signal = V_noise
+
+    digital_times = sample_times
+    digital_signal = V_but
+
+
+
     '''
     See gnosim.sim.testing_single_event for how to rerun calculations for an event.
     '''    
