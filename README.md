@@ -9,13 +9,15 @@ bechtol@kicp.uchicago.edu
 - Shoshana Chipman 
 chipmansb@uchicago.edu
 
+ - Dan Smith
+danielsmith@uchicago.edu
+
 ### Current Contributor:
 
  - Dan Southall (contact if there are problems)
 dsouthall@uchicago.edu
 
- - Dan Smith
-danielsmith@uchicago.edu
+
 
 
 # OVERVIEW
